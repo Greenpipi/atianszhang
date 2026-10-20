@@ -411,6 +411,7 @@ const App = {
         cat.value = t.category;
         cat.onchange();
         sub.value = t.sub;
+        this.enhanceSelects(root);
         $('en-amt').focus();
         this.toast('已带出：' + t.category + ' · ' + t.sub);
       };
@@ -574,6 +575,7 @@ const App = {
     this.bindRecordsList(recs, lid);
     const sw = el.querySelector('.card-head');
     this.bindMonthSwitcher(sw, 'ledgerMonth', () => this.renderLedger());
+    this.enhanceSelects(el);
   },
 
   alertStripHTML(alerts) {
@@ -698,6 +700,7 @@ const App = {
         };
       });
     });
+    this.enhanceSelects(el);
   },
 
   pickImage(rid) {
@@ -879,6 +882,7 @@ const App = {
       { name: '收入', color: '#4ADE80', data: incSeries },
       { name: '支出', color: '#1A2B4C', data: expSeries }
     ]);
+    this.enhanceSelects(el);
   },
 
   /* ---------- 视图：日历记账 ---------- */
@@ -1049,9 +1053,11 @@ const App = {
     const fillSubs = () => {
       const cc = this.catByName(ledgerId, catSel.value);
       subSel.innerHTML = ((cc && cc.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+      this.enhanceSelects(subSel);
     };
     fillSubs();
     catSel.onchange = fillSubs;
+    this.enhanceSelects(document.getElementById('modal-root'));
     document.querySelectorAll('#ad-stars button').forEach(b => {
       b.onclick = () => {
         const v = Number(b.dataset.v);
@@ -1161,6 +1167,7 @@ const App = {
     const recs = el.querySelector('#rental-recs');
     recs.innerHTML = this.recordsListHTML(lid, month);
     this.bindRecordsList(recs, lid);
+    this.enhanceSelects(el);
   },
 
   /* ---------- 视图：预算设置 ---------- */
@@ -1453,9 +1460,11 @@ const App = {
       const cats = this.catsOf(lid);
       const cSel = el.querySelector('#tpl-cat'), sSel = el.querySelector('#tpl-sub');
       cSel.innerHTML = cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('');
+      this.enhanceSelects(cSel);
       const fillSubs = () => {
         const c = this.catByName(lid, cSel.value);
         sSel.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+        this.enhanceSelects(sSel);
       };
       fillSubs();
       cSel.onchange = fillSubs;
@@ -1484,6 +1493,7 @@ const App = {
       await this.loadData();
       renderCatMgr();
     };
+    this.enhanceSelects(el);
   },
 
   /* ---------- 编辑记录弹窗 ---------- */
@@ -1513,9 +1523,11 @@ const App = {
     const fillSubs = (keep) => {
       const c = this.catByName(ledgerId, catSel.value);
       subSel.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '" ' + (s === keep ? 'selected' : '') + '>' + esc(s) + '</option>').join('');
+      this.enhanceSelects(subSel);
     };
     fillSubs(r.sub);
     catSel.onchange = () => fillSubs();
+    this.enhanceSelects(document.getElementById('modal-root'));
     const edDate = document.getElementById('ed-date');
     edDate.onclick = () => this.openCalendar(edDate);
     document.querySelectorAll('#ed-stars button').forEach(b => {
@@ -1651,6 +1663,103 @@ const App = {
   },
 
   /* ---------- 弹窗 / 提示 ---------- */
+  /* ---------- 统一自定义下拉菜单（替代原生 select） ---------- */
+  enhanceSelects(root) {
+    root = root || document;
+    const scope = (typeof root.querySelectorAll === 'function') ? root : document;
+    scope.querySelectorAll('select').forEach(sel => {
+      if (!sel._csel) this.buildCsel(sel);
+      else this.syncCsel(sel);
+    });
+  },
+  buildCsel(sel) {
+    const wrap = document.createElement('div');
+    wrap.className = 'csel';
+    // 复制布局相关内联样式（flex / min-width / width 等）到外层，保持原排版
+    const style = sel.getAttribute('style') || '';
+    const take = ['flex', 'flex-grow', 'flex-shrink', 'flex-basis', 'min-width', 'width', 'max-width'];
+    const picked = take.map(p => {
+      const m = style.match(new RegExp(p.replace('-', '\\-') + '\\s*:\\s*([^;]+)', 'i'));
+      return m ? p + ':' + m[1].trim() : null;
+    }).filter(Boolean);
+    if (picked.length) wrap.setAttribute('style', picked.join(';'));
+
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add('csel-native');
+    sel.style.cssText = ''; // 原内联视觉样式已隐藏，清空避免干扰
+
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'csel-btn'; btn.tabIndex = 0;
+    const val = document.createElement('span'); val.className = 'csel-val';
+    const arrow = document.createElement('span'); arrow.className = 'csel-arrow';
+    arrow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    btn.appendChild(val); btn.appendChild(arrow);
+
+    const pop = document.createElement('div'); pop.className = 'csel-pop';
+    const opts = document.createElement('div'); opts.className = 'csel-opts';
+    pop.appendChild(opts);
+    wrap.appendChild(btn); wrap.appendChild(pop);
+
+    sel._csel = { wrap, btn, val, pop, opts };
+
+    btn.addEventListener('click', e => { e.stopPropagation(); this.toggleCsel(sel); });
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openCsel(sel); }
+    });
+    opts.addEventListener('click', e => {
+      const opt = e.target.closest('.csel-opt');
+      if (!opt) return;
+      sel.value = opt.dataset.value;
+      this.syncCsel(sel);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      this.closeAllCsel(sel);
+      this.enhanceSelects(document); // 同步依赖项（如小类随大类联动）
+    });
+
+    this.syncCsel(sel);
+    this._bindCselGlobalOnce();
+  },
+  syncCsel(sel) {
+    const o = sel._csel; if (!o) return;
+    const cur = sel.value;
+    let text = '';
+    if (sel.selectedOptions && sel.selectedOptions.length) text = sel.selectedOptions[0].textContent;
+    else if (sel.options.length) text = sel.options[0].textContent;
+    o.val.textContent = text || '请选择';
+    o.opts.innerHTML = '';
+    Array.from(sel.options).forEach(op => {
+      const d = document.createElement('div');
+      d.className = 'csel-opt' + (op.value === cur ? ' sel' : '');
+      d.dataset.value = op.value;
+      d.textContent = op.textContent;
+      o.opts.appendChild(d);
+    });
+    if (o.wrap.classList.contains('open')) {
+      const selOpt = o.opts.querySelector('.csel-opt.sel');
+      if (selOpt) selOpt.scrollIntoView({ block: 'nearest' });
+    }
+  },
+  toggleCsel(sel) {
+    if (sel._csel.wrap.classList.contains('open')) this.closeAllCsel(sel);
+    else this.openCsel(sel);
+  },
+  openCsel(sel) {
+    this.closeAllCsel(sel);
+    const o = sel._csel; o.wrap.classList.add('open');
+    const selOpt = o.opts.querySelector('.csel-opt.sel');
+    if (selOpt) selOpt.scrollIntoView({ block: 'nearest' });
+  },
+  closeAllCsel(except) {
+    const exWrap = except && except._csel ? except._csel.wrap : null;
+    document.querySelectorAll('.csel.open').forEach(w => { if (w !== exWrap) w.classList.remove('open'); });
+  },
+  _bindCselGlobalOnce() {
+    if (this._cselBound) return; this._cselBound = true;
+    document.addEventListener('click', () => this.closeAllCsel());
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') this.closeAllCsel(); });
+  },
+
   openModal(html, wide) {
     this.closeModal();
     const root = document.getElementById('modal-root');
