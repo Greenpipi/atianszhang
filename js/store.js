@@ -135,12 +135,32 @@ const Store = {
   },
   _localWrite(db) { localStorage.setItem(this._localKey(), JSON.stringify(db)); },
 
+  /* ---------- 云端表缺失自动降级 ---------- */
+  _isTableErr(e) {
+    const m = (e && e.message) || String(e || '');
+    return /schema cache/i.test(m)
+      || /Could not find the table/i.test(m)
+      || /PGRST205/i.test(m)
+      || (/relation/i.test(m) && /does not exist/i.test(m));
+  },
+  _fallbackToLocal() {
+    if (this.mode !== 'supabase') return;
+    this.mode = 'local';
+    this._realtimeOn = false;
+    if (this.onCloudMissing) this.onCloudMissing();
+  },
+
   /* ---------- 通用 CRUD（按用户隔离） ---------- */
   async list(table) {
     if (this.mode === 'supabase') {
-      const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
+      try {
+        const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (this._isTableErr(e)) this._fallbackToLocal();
+        else throw new Error(this._dbErr(e));
+      }
     }
     const db = this._localRead();
     return db ? (db[table] || []) : [];
@@ -148,10 +168,15 @@ const Store = {
 
   async insert(table, row) {
     if (this.mode === 'supabase') {
-      const payload = { ...row, user_id: this.user.id };
-      const { data, error } = await this.sb.from(table).insert(payload).select().single();
-      if (error) throw new Error(this._dbErr(error));
-      return data;
+      try {
+        const payload = { ...row, user_id: this.user.id };
+        const { data, error } = await this.sb.from(table).insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (this._isTableErr(e)) this._fallbackToLocal();
+        else throw new Error(this._dbErr(e));
+      }
     }
     const db = this._localRead() || {};
     const r = { ...row, id: row.id || uid(), created_at: new Date().toISOString() };
@@ -163,9 +188,14 @@ const Store = {
 
   async update(table, id, patch) {
     if (this.mode === 'supabase') {
-      const { error } = await this.sb.from(table).update(patch).eq('id', id);
-      if (error) throw new Error(this._dbErr(error));
-      return;
+      try {
+        const { error } = await this.sb.from(table).update(patch).eq('id', id);
+        if (error) throw error;
+        return;
+      } catch (e) {
+        if (this._isTableErr(e)) this._fallbackToLocal();
+        else throw new Error(this._dbErr(e));
+      }
     }
     const db = this._localRead() || {};
     db[table] = (db[table] || []).map(r => r.id === id ? { ...r, ...patch } : r);
@@ -174,9 +204,14 @@ const Store = {
 
   async remove(table, id) {
     if (this.mode === 'supabase') {
-      const { error } = await this.sb.from(table).delete().eq('id', id);
-      if (error) throw new Error(this._dbErr(error));
-      return;
+      try {
+        const { error } = await this.sb.from(table).delete().eq('id', id);
+        if (error) throw error;
+        return;
+      } catch (e) {
+        if (this._isTableErr(e)) this._fallbackToLocal();
+        else throw new Error(this._dbErr(e));
+      }
     }
     const db = this._localRead() || {};
     db[table] = (db[table] || []).filter(r => r.id !== id);
@@ -208,7 +243,9 @@ const Store = {
     try {
       const { error } = await this.sb.from('ledgers').select('id').limit(1);
       if (error) {
-        if (/relation .* not exist/i.test(error.message)) return { ok: true, msg: '连接成功（数据表尚未创建，请执行建表 SQL）' };
+        if (/relation .* not exist/i.test(error.message) || /schema cache/i.test(error.message) || /Could not find the table/i.test(error.message)) {
+          return { ok: true, msg: '连接成功（数据表尚未创建，请在 Supabase SQL Editor 执行建表 SQL）' };
+        }
         return { ok: false, msg: this._dbErr(error) };
       }
       return { ok: true, msg: '连接成功，数据表可访问' };

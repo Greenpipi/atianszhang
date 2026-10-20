@@ -17,6 +17,7 @@ const App = {
   async init() {
     Store.init();
     Store.setHandlers(() => this.onDataChange(), () => this.onAuthChange());
+    Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
 
     let user = null;
