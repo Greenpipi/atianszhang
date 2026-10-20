@@ -82,8 +82,22 @@ create policy "own templates" on templates for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- 实时同步（多设备一致）
-alter publication supabase_realtime add table ledgers;
-alter publication supabase_realtime add table categories;
-alter publication supabase_realtime add table records;
-alter publication supabase_realtime add table budgets;
-alter publication supabase_realtime add table templates;
+-- 用 DO 块包裹，兼容 Supabase SQL Editor 解析器（不直接支持 ALTER PUBLICATION）
+do $$
+begin
+  begin
+    execute 'alter publication supabase_realtime add table public.ledgers';
+  exception when duplicate_object then null; end;
+  begin
+    execute 'alter publication supabase_realtime add table public.categories';
+  exception when duplicate_object then null; end;
+  begin
+    execute 'alter publication supabase_realtime add table public.records';
+  exception when duplicate_object then null; end;
+  begin
+    execute 'alter publication supabase_realtime add table public.budgets';
+  exception when duplicate_object then null; end;
+  begin
+    execute 'alter publication supabase_realtime add table public.templates';
+  exception when duplicate_object then null; end;
+end $$;
