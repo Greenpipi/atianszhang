@@ -42,25 +42,32 @@ const RENTAL_FIXED = ['房租', '水费', '电费', '燃气费', '物业费'];
 
 const DEFAULT_TEMPLATES = [
   // 日常支出板块
-  { ledger: 'personal', section: '日常支出板块', label: '早餐', category: '饮食支出', sub: '早餐' },
-  { ledger: 'personal', section: '日常支出板块', label: '吃吃喝喝', category: '饮食支出', sub: '外出就餐' },
-  { ledger: 'personal', section: '日常支出板块', label: '奶茶零食', category: '饮食支出', sub: '奶茶饮料' },
-  { ledger: 'personal', section: '日常支出板块', label: '休闲娱乐', category: '娱乐支出', sub: '内容消费' },
-  { ledger: 'personal', section: '日常支出板块', label: '日常购物', category: '日常支出', sub: '日用品' },
-  { ledger: 'personal', section: '日常支出板块', label: '养生医疗', category: '健康支出', sub: '医疗健康' },
-  { ledger: 'personal', section: '日常支出板块', label: '租房支出', category: '固定支出', sub: '租房支出' },
-  { ledger: 'personal', section: '日常支出板块', label: '车仙人', category: '养车支出', sub: '车充电' },
-  { ledger: 'personal', section: '日常支出板块', label: '猫仙人', category: '光酱专区', sub: '猫粮' },
+  { ledger: 'personal', section: '日常支出板块', label: '早餐', emoji: '🥪', category: '饮食支出', sub: '早餐' },
+  { ledger: 'personal', section: '日常支出板块', label: '吃吃喝喝', emoji: '🍱', category: '饮食支出', sub: '外出就餐' },
+  { ledger: 'personal', section: '日常支出板块', label: '奶茶零食', emoji: '🧋', category: '饮食支出', sub: '奶茶饮料' },
+  { ledger: 'personal', section: '日常支出板块', label: '休闲娱乐', emoji: '🎬', category: '娱乐支出', sub: '内容消费' },
+  { ledger: 'personal', section: '日常支出板块', label: '日常购物', emoji: '🛒', category: '日常支出', sub: '日用品' },
+  { ledger: 'personal', section: '日常支出板块', label: '养生医疗', emoji: '💊', category: '健康支出', sub: '医疗健康' },
+  { ledger: 'personal', section: '日常支出板块', label: '租房支出', emoji: '🏠', category: '固定支出', sub: '租房支出' },
+  { ledger: 'personal', section: '日常支出板块', label: '车仙人', emoji: '🚗', category: '养车支出', sub: '车充电' },
+  { ledger: 'personal', section: '日常支出板块', label: '猫仙人', emoji: '🐱', category: '光酱专区', sub: '猫粮' },
   // 爱好就是一切板块
-  { ledger: 'personal', section: '爱好就是一切板块', label: '游戏氪金', category: '兴趣支出', sub: '游戏消费' },
-  { ledger: 'personal', section: '爱好就是一切板块', label: '谷子氪金', category: '兴趣支出', sub: '谷子氪金' },
-  { ledger: 'personal', section: '爱好就是一切板块', label: '文创氪金', category: '兴趣支出', sub: '文创文具' },
-  { ledger: 'personal', section: '爱好就是一切板块', label: '数码氪金', category: '兴趣支出', sub: '数码产品' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '游戏氪金', emoji: '🎮', category: '兴趣支出', sub: '游戏消费' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '谷子氪金', emoji: '🪶', category: '兴趣支出', sub: '谷子氪金' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '文创氪金', emoji: '🖋️', category: '兴趣支出', sub: '文创文具' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '数码氪金', emoji: '💻', category: '兴趣支出', sub: '数码产品' },
   // 旅游外出板块
-  { ledger: 'personal', section: '旅游外出板块', label: '景点门票', category: '娱乐支出', sub: '景区景点' },
-  { ledger: 'personal', section: '旅游外出板块', label: '交通费用', category: '养车支出', sub: '交通费' },
-  { ledger: 'personal', section: '旅游外出板块', label: '旅游酒店', category: '娱乐支出', sub: '酒店度假' }
+  { ledger: 'personal', section: '旅游外出板块', label: '景点门票', emoji: '🎫', category: '娱乐支出', sub: '景区景点' },
+  { ledger: 'personal', section: '旅游外出板块', label: '交通费用', emoji: '🚌', category: '养车支出', sub: '交通费' },
+  { ledger: 'personal', section: '旅游外出板块', label: '旅游酒店', emoji: '🏨', category: '娱乐支出', sub: '酒店度假' }
 ];
+
+const QUICK_SECTIONS = ['日常支出板块', '爱好就是一切板块', '旅游外出板块'];
+const QUICK_SECTION_TITLE = {
+  '日常支出板块': '日常支出',
+  '爱好就是一切板块': '爱好就是一切',
+  '旅游外出板块': '旅游外出'
+};
 
 const PALETTE = ['#1A2B4C', '#4ADE80', '#6366F1', '#38BDF8', '#F59E0B', '#F472B6', '#34D399', '#A78BFA', '#FB923C', '#94A3B8'];
 

@@ -7,6 +7,7 @@ const App = {
     ledgerMonth: thisMonth(),
     wish: { sort: 'date-desc', cat: '' },
     cal: { month: thisMonth(), selected: todayStr(), view: 'calendar' },
+    home: { view: 'week', anchor: todayStr() },
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
     settingsLedgerType: 'personal',
     rating: 0,
@@ -165,7 +166,7 @@ const App = {
         const ls = await Store.list('ledgers');
         for (const t of DEFAULT_TEMPLATES) {
           const l = ls.find(x => x.type === t.ledger);
-          if (l) await Store.insert('templates', { ledger_id: l.id, category: t.category, sub: t.sub, label: t.label, section: t.section });
+          if (l) await Store.insert('templates', { ledger_id: l.id, category: t.category, sub: t.sub, label: t.label, section: t.section, emoji: t.emoji });
         }
         changed = true;
       }
@@ -534,6 +535,226 @@ const App = {
 
   /* ---------- 视图：记账本 ---------- */
   renderLedger() {
+    const lid = this.state.currentLedgerId;
+    const l = this.curLedger();
+    if (l && l.type === 'rental') return this.renderLedgerRental();
+    return this.renderLedgerHome();
+  },
+
+  /* ---------- 记账本主页（左右分栏） ---------- */
+  renderLedgerHome() {
+    const el = document.getElementById('view-ledger');
+    const lid = this.state.currentLedgerId;
+    const home = this.state.home;
+    const s = this.monthSummary(lid, thisMonth());
+
+    const quickHTML = QUICK_SECTIONS.map(sec => {
+      const btns = (DEFAULT_TEMPLATES || [])
+        .filter(t => t.section === sec)
+        .map(t => `
+          <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
+            <span class="qemoji">${t.emoji || '•'}</span>
+            <span class="qlabel">${esc(t.label)}</span>
+          </button>`).join('');
+      return `
+        <div class="qgroup">
+          <div class="qgroup-title">${esc(QUICK_SECTION_TITLE[sec] || sec)}</div>
+          <div class="qgrid">${btns}</div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="home-summary">
+        <div class="hs-item"><span>本月支出</span><b class="expense">${fmtMoney(s.expense)}</b></div>
+        <div class="hs-item"><span>本月收入</span><b class="income">${fmtMoney(s.income)}</b></div>
+        <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
+      </div>
+      <div class="home-split">
+        <aside class="quick-pane">
+          <div class="quick-head">快捷记账</div>
+          ${quickHTML}
+        </aside>
+        <section class="cal-pane">
+          <div class="cal-pane-bar">
+            <div class="seg">
+              <button data-hv="week" class="${home.view === 'week' ? 'on' : ''}">周</button>
+              <button data-hv="month" class="${home.view === 'month' ? 'on' : ''}">月</button>
+              <button data-hv="year" class="${home.view === 'year' ? 'on' : ''}">年</button>
+            </div>
+            <div class="cal-pane-nav">
+              <button class="btn btn-ghost btn-sm" data-hnav="-1">‹</button>
+              <b id="hp-title" style="min-width:120px;text-align:center;font-size:15px"></b>
+              <button class="btn btn-ghost btn-sm" data-hnav="1">›</button>
+              <button class="btn btn-ghost btn-sm" data-htoday>今天</button>
+            </div>
+          </div>
+          <div id="home-calendar"></div>
+        </section>
+      </div>`;
+
+    // 快捷按钮 → 带出分类记账
+    el.querySelectorAll('.qbtn').forEach(b => {
+      b.onclick = () => this.addRecordModal(lid, todayStr(), b.dataset.cat, b.dataset.sub);
+    });
+    // 视图切换 / 翻页
+    el.querySelectorAll('[data-hv]').forEach(b => {
+      b.onclick = () => { home.view = b.dataset.hv; this.renderLedgerHome(); };
+    });
+    el.querySelectorAll('[data-hnav]').forEach(b => {
+      b.onclick = () => { this.homeNav(Number(b.dataset.hnav)); this.renderLedgerHome(); };
+    });
+    el.querySelector('[data-htoday]').onclick = () => { home.anchor = todayStr(); this.renderLedgerHome(); };
+
+    this.renderHomeCalendar();
+    this.enhanceSelects(el);
+  },
+
+  homeNav(step) {
+    const home = this.state.home;
+    if (home.view === 'week') {
+      const d = new Date(home.anchor + 'T00:00:00');
+      d.setDate(d.getDate() + step * 7);
+      home.anchor = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    } else if (home.view === 'month') {
+      const [y, m] = home.anchor.split('-').map(Number);
+      const d = new Date(y, m - 1 + step, 1);
+      home.anchor = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    } else {
+      const y = Number(home.anchor.slice(0, 4)) + step;
+      home.anchor = y + '-01-01';
+    }
+  },
+
+  weekDays(anchor) {
+    const d = new Date(anchor + 'T00:00:00');
+    const dow = (d.getDay() + 6) % 7; // 周一=0
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const x = new Date(d);
+      x.setDate(d.getDate() - dow + i);
+      out.push(x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'));
+    }
+    return out;
+  },
+
+  colorOf() {
+    const lid = this.state.currentLedgerId;
+    const cats = this.catsOf(lid);
+    const map = {};
+    cats.forEach((c, i) => { map[c.name] = PALETTE[i % PALETTE.length]; });
+    return map;
+  },
+
+  renderHomeCalendar() {
+    const el = document.getElementById('view-ledger');
+    const lid = this.state.currentLedgerId;
+    const home = this.state.home;
+    const host = el.querySelector('#home-calendar');
+    const colOf = this.colorOf();
+    const kindOfR = r => r.kind || this.kindOf(lid, r.category);
+    const titleEl = el.querySelector('#hp-title');
+
+    if (home.view === 'week') {
+      const days = this.weekDays(home.anchor);
+      const [y0, m0] = days[0].split('-').map(Number);
+      const [y1, m1, d1] = days[6].split('-').map(Number);
+      titleEl.textContent = (y0 === y1 ? '' : y0 + ' 年 ') + m0 + ' 月 ' + days[0].slice(8) + ' 日 - ' + m1 + ' 月 ' + d1 + ' 日';
+      const recsByDate = {};
+      this.recsOf(lid).forEach(r => { (recsByDate[r.date] = recsByDate[r.date] || []).push(r); });
+      const wd = '一二三四五六日';
+      host.innerHTML = '<div class="wk-grid">' + days.map(d => {
+        const recs = recsByDate[d] || [];
+        const tdy = d === todayStr();
+        return `
+        <div class="wk-col${tdy ? ' today' : ''}" data-date="${d}">
+          <div class="wk-col-head">
+            <span>周${wd[(new Date(d + 'T00:00:00').getDay() + 6) % 7]}</span>
+            <span class="wk-date">${d.slice(5).replace('-', '/')}</span>
+          </div>
+          <div class="wk-badge-wrap">
+            ${recs.length
+              ? '<span class="wk-badge">' + recs.length + '</span>'
+              : '<button type="button" class="wk-plus" data-add="' + d + '">+</button>'}
+          </div>
+          <div class="wk-body">
+            ${recs.length ? recs.map(r => {
+              const col = colOf[r.category] || '#6B7280';
+              const inc = kindOfR(r) === 'income';
+              return `<div class="wk-rec" data-rid="${r.id}">
+                <div class="rec-icon ${inc ? 'inc' : ''}" style="${inc ? '' : 'background:' + col + '1F;color:' + col}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
+                <div class="wk-rec-main">
+                  <div class="wk-rec-name">${esc(r.note || r.sub || r.category)}</div>
+                  <div class="wk-rec-amt ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount, { plain: true })}</div>
+                </div>
+              </div>`;
+            }).join('') : '<div class="wk-empty">无记录</div>'}
+          </div>
+        </div>`;
+      }).join('') + '</div>';
+    } else if (home.view === 'month') {
+      const [y, m] = home.anchor.split('-').map(Number);
+      titleEl.textContent = y + ' 年 ' + m + ' 月';
+      const dim = new Date(y, m, 0).getDate();
+      const recsByDate = {};
+      this.recsOf(lid).forEach(r => { (recsByDate[r.date] = recsByDate[r.date] || []).push(r); });
+      let cells = '';
+      for (let dd = 1; dd <= dim; dd++) {
+        const key = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+        const recs = recsByDate[key] || [];
+        const tdy = key === todayStr();
+        cells += `
+        <div class="m2cell${tdy ? ' today' : ''}" data-date="${key}">
+          <div class="m2-top">
+            ${recs.length ? '<span class="m2-badge">' + recs.length + '</span>' : ''}
+            <span class="m2-num">${dd}</span>
+            ${recs.length ? '' : '<button type="button" class="m2-plus" data-add="' + key + '">+</button>'}
+          </div>
+          <div class="m2-body">
+            ${recs.slice(0, 3).map(r => {
+              const col = colOf[r.category] || '#6B7280';
+              const inc = kindOfR(r) === 'income';
+              return '<div class="m2-rec' + (inc ? ' income' : '') + '"><span class="m2-dot" style="background:' + col + '"></span>' + esc(r.note || r.sub || r.category) + '</div>';
+            }).join('')}
+            ${recs.length > 3 ? '<div class="m2-more">+' + (recs.length - 3) + ' 笔</div>' : ''}
+          </div>
+        </div>`;
+      }
+      host.innerHTML = '<div class="m2-grid">' + cells + '</div>';
+    } else {
+      const y = Number(home.anchor.slice(0, 4));
+      titleEl.textContent = y + ' 年';
+      const months = [];
+      let exp = 0, inc = 0;
+      for (let mm = 1; mm <= 12; mm++) {
+        const month = y + '-' + String(mm).padStart(2, '0');
+        const ss = this.monthSummary(lid, month);
+        exp += ss.expense; inc += ss.income;
+        months.push({ mm, ...ss });
+      }
+      host.innerHTML = '<div class="y2-grid">' + months.map(o => `
+        <button class="y2-card" data-ym="${y}-${String(o.mm).padStart(2, '0')}-01">
+          <div class="y2-m">${o.mm} 月</div>
+          <div class="y2-row"><span>支出</span><b class="expense">${fmtMoney(o.expense, { plain: true })}</b></div>
+          <div class="y2-row"><span>收入</span><b class="income">${fmtMoney(o.income, { plain: true })}</b></div>
+        </button>`).join('') + '</div>';
+    }
+
+    // 事件绑定
+    host.querySelectorAll('[data-add]').forEach(b => {
+      b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add); };
+    });
+    host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
+      item.onclick = () => this.editRecord(item.dataset.rid, lid);
+    });
+    host.querySelectorAll('.wk-col, .m2-cell, .m2cell').forEach(col => {
+      col.onclick = (e) => { if (e.target.closest('.wk-rec, .m2-rec, [data-add]')) return; this.addRecordModal(lid, col.dataset.date); };
+    });
+    host.querySelectorAll('.y2-card').forEach(c => {
+      c.onclick = () => { home.view = 'month'; home.anchor = c.dataset.ym; this.renderLedgerHome(); };
+    });
+  },
+
+  renderLedgerRental() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
     const month = this.state.ledgerMonth;
@@ -1032,12 +1253,12 @@ const App = {
   },
 
   /* ---------- 新增记账弹窗（日历页用） ---------- */
-  addRecordModal(ledgerId, date) {
+  addRecordModal(ledgerId, date, preCat, preSub) {
     const cats = this.catsOf(ledgerId);
     let rating = 0;
     this.openModal(`
       <div class="modal-title">新增记账 · ${esc(date)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
-      <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('')}</select></div>
+      <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
       <div class="field"><label>小类</label><select id="ad-sub"></select></div>
       <div class="field"><label>金额（元）</label><input id="ad-amt" type="number" min="0" step="0.01" placeholder="0.00"></div>
       <div class="field"><label>备注</label><input id="ad-note" type="text" placeholder="选填"></div>
@@ -1057,6 +1278,11 @@ const App = {
       this.enhanceSelects(subSel);
     };
     fillSubs();
+    if (preSub) {
+      const subSel = document.getElementById('ad-sub');
+      if (Array.from(subSel.options).some(o => o.value === preSub)) subSel.value = preSub;
+      this.enhanceSelects(subSel);
+    }
     catSel.onchange = fillSubs;
     this.enhanceSelects(document.getElementById('modal-root'));
     document.querySelectorAll('#ad-stars button').forEach(b => {
