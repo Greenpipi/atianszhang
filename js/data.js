@@ -1,0 +1,136 @@
+/* ============ 默认数据与工具函数 ============ */
+
+const DEFAULT_CFG = {
+  url: 'https://qcfmknjoldqirsgjhryx.supabase.co',
+  key: 'sb_publishable_5892YBRrQR_lE0raFn5eAQ_u5EWOy3J'
+};
+
+const LEDGER_PERSONAL = '个人记账本';
+const LEDGER_RENTAL = '出租屋账本';
+
+const DEFAULT_LEDGERS = [
+  { name: LEDGER_PERSONAL, type: 'personal' },
+  { name: LEDGER_RENTAL, type: 'rental' }
+];
+
+const DEFAULT_CATEGORIES = {
+  personal: [
+    { name: '固定支出', kind: 'expense', subs: ['房贷', '保险', '电话网络费', '燃气费', '物业费', '租房房租', '租房支出'] },
+    { name: '日常支出', kind: 'expense', subs: ['日用品', '山姆购物', '衣服鞋袜', '食物', '餐厨具', '电器', '家具', '杂货', '收纳用品'] },
+    { name: '饮食支出', kind: 'expense', subs: ['早餐', '外出就餐', '外卖', '奶茶饮料', '咖啡', '甜食', '零食'] },
+    { name: '健康支出', kind: 'expense', subs: ['养生按摩', '医疗健康', '美容美发', '运动健康'] },
+    { name: '兴趣支出', kind: 'expense', subs: ['数码产品', '文创文具', '谷子氪金', '游戏消费'] },
+    { name: '养车支出', kind: 'expense', subs: ['车充电', '车加油', '车保养', '停车费', '交通费'] },
+    { name: '娱乐支出', kind: 'expense', subs: ['酒店度假', '演唱会', '电影', '内容消费', '景区景点'] },
+    { name: '光酱专区', kind: 'expense', subs: ['猫清洁', '猫粮'] },
+    { name: '综合收入', kind: 'income', subs: ['工资', '理财', '进出差额', '人情'] }
+  ],
+  rental: [
+    { name: '房租', kind: 'expense', subs: ['房租'] },
+    { name: '水费', kind: 'expense', subs: ['水费'] },
+    { name: '电费', kind: 'expense', subs: ['电费'] },
+    { name: '燃气费', kind: 'expense', subs: ['燃气费'] },
+    { name: '物业费', kind: 'expense', subs: ['物业费'] },
+    { name: '装修硬装费', kind: 'expense', subs: ['装修硬装费'] },
+    { name: '装修材料费', kind: 'expense', subs: ['装修材料费'] },
+    { name: '租房软装', kind: 'expense', subs: ['租房软装'] },
+    { name: '搬家搬物', kind: 'expense', subs: ['搬家搬物'] }
+  ]
+};
+
+const RENTAL_FIXED = ['房租', '水费', '电费', '燃气费', '物业费'];
+
+const DEFAULT_TEMPLATES = [
+  // 日常支出板块
+  { ledger: 'personal', section: '日常支出板块', label: '早餐', category: '饮食支出', sub: '早餐' },
+  { ledger: 'personal', section: '日常支出板块', label: '吃吃喝喝', category: '饮食支出', sub: '外出就餐' },
+  { ledger: 'personal', section: '日常支出板块', label: '奶茶零食', category: '饮食支出', sub: '奶茶饮料' },
+  { ledger: 'personal', section: '日常支出板块', label: '休闲娱乐', category: '娱乐支出', sub: '内容消费' },
+  { ledger: 'personal', section: '日常支出板块', label: '日常购物', category: '日常支出', sub: '日用品' },
+  { ledger: 'personal', section: '日常支出板块', label: '养生医疗', category: '健康支出', sub: '医疗健康' },
+  { ledger: 'personal', section: '日常支出板块', label: '租房支出', category: '固定支出', sub: '租房支出' },
+  { ledger: 'personal', section: '日常支出板块', label: '车仙人', category: '养车支出', sub: '车充电' },
+  { ledger: 'personal', section: '日常支出板块', label: '猫仙人', category: '光酱专区', sub: '猫粮' },
+  // 爱好就是一切板块
+  { ledger: 'personal', section: '爱好就是一切板块', label: '游戏氪金', category: '兴趣支出', sub: '游戏消费' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '谷子氪金', category: '兴趣支出', sub: '谷子氪金' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '文创氪金', category: '兴趣支出', sub: '文创文具' },
+  { ledger: 'personal', section: '爱好就是一切板块', label: '数码氪金', category: '兴趣支出', sub: '数码产品' },
+  // 旅游外出板块
+  { ledger: 'personal', section: '旅游外出板块', label: '景点门票', category: '娱乐支出', sub: '景区景点' },
+  { ledger: 'personal', section: '旅游外出板块', label: '交通费用', category: '养车支出', sub: '交通费' },
+  { ledger: 'personal', section: '旅游外出板块', label: '旅游酒店', category: '娱乐支出', sub: '酒店度假' }
+];
+
+const PALETTE = ['#1A2B4C', '#4ADE80', '#6366F1', '#38BDF8', '#F59E0B', '#F472B6', '#34D399', '#A78BFA', '#FB923C', '#94A3B8'];
+
+/* ---------- 工具 ---------- */
+function uid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function monthOf(dateStr) { return (dateStr || '').slice(0, 7); }
+function yearOf(dateStr) { return (dateStr || '').slice(0, 4); }
+function thisMonth() { return monthOf(todayStr()); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmtMoney(n, opts) {
+  const v = Number(n) || 0;
+  const s = v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return opts && opts.plain ? s : '¥' + s;
+}
+function daysBetween(dateStr) {
+  const a = new Date(dateStr + 'T00:00:00');
+  const b = new Date(todayStr() + 'T00:00:00');
+  return Math.max(1, Math.round((b - a) / 86400000));
+}
+function starsStr(n) {
+  n = Math.round(Number(n) || 0);
+  return n > 0 ? '★'.repeat(n) + '<span style="color:#E3E7EE">' + '★'.repeat(5 - n) + '</span>' : '';
+}
+function downloadJSON(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function readJSONFile(input) {
+  return new Promise((resolve, reject) => {
+    const f = input.files && input.files[0];
+    if (!f) return reject(new Error('未选择文件'));
+    const r = new FileReader();
+    r.onload = () => { try { resolve(JSON.parse(r.result)); } catch (e) { reject(new Error('JSON 解析失败')); } };
+    r.onerror = () => reject(new Error('文件读取失败'));
+    r.readAsText(f);
+  });
+}
+/* 图片压缩为 dataURL */
+function compressImage(file, maxSide = 720, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) return reject(new Error('请选择图片文件'));
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.round(w * scale); h = Math.round(h * scale);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = r.result;
+    };
+    r.onerror = () => reject(new Error('文件读取失败'));
+    r.readAsDataURL(file);
+  });
+}

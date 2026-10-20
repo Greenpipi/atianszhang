@@ -1,0 +1,1801 @@
+/* ============ 应用主逻辑 ============ */
+const App = {
+  state: {
+    route: 'ledger',
+    ledgers: [], categories: [], records: [], budgets: [], templates: [],
+    currentLedgerId: null,
+    ledgerMonth: thisMonth(),
+    wish: { sort: 'date-desc', cat: '' },
+    cal: { month: thisMonth(), selected: todayStr(), view: 'calendar' },
+    stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
+    settingsLedgerType: 'personal',
+    rating: 0,
+    loading: false
+  },
+
+  /* ---------- 启动 ---------- */
+  async init() {
+    Store.init();
+    Store.setHandlers(() => this.onDataChange(), () => this.onAuthChange());
+    this.bindChrome();
+
+    let user = null;
+    try { user = await Store.restoreSession(); }
+    catch (e) { console.warn(e); }
+
+    window.addEventListener('hashchange', () => this.route());
+    this.updateOnline();
+    window.addEventListener('online', () => this.updateOnline());
+    window.addEventListener('offline', () => this.updateOnline());
+
+    if (user) { await this.enterApp(); } else { this.showLogin(); }
+  },
+
+  bindChrome() {
+    const $ = id => document.getElementById(id);
+    $('menu-btn').onclick = () => {
+      $('sidebar').classList.toggle('open');
+      $('sidebar-mask').classList.toggle('show');
+    };
+    $('sidebar-mask').onclick = () => {
+      $('sidebar').classList.remove('open');
+      $('sidebar-mask').classList.remove('show');
+    };
+    document.querySelectorAll('.nav-item').forEach(a => {
+      a.addEventListener('click', () => {
+        $('sidebar').classList.remove('open');
+        $('sidebar-mask').classList.remove('show');
+      });
+    });
+    $('toggle-signup').onclick = () => this.toggleSignup();
+    $('login-form').onsubmit = e => { e.preventDefault(); this.doLogin(); };
+  },
+
+  /* ---------- 在线状态 ---------- */
+  updateOnline() {
+    const off = !navigator.onLine;
+    document.getElementById('offline-banner').hidden = !off;
+    this.renderSyncChip();
+  },
+
+  renderSyncChip() {
+    const chip = document.getElementById('sync-chip');
+    const off = !navigator.onLine;
+    chip.className = 'sync-chip' + (Store.mode === 'local' ? ' local' : '') + (off ? ' off' : '');
+    const label = off ? '离线' : (Store.mode === 'supabase' ? '云端同步' : '本地模式');
+    chip.innerHTML = '<span class="sync-dot"></span><span>' + label + '</span>';
+    chip.title = off ? '网络已断开' : (Store.mode === 'supabase' ? '数据实时云端同步' : '数据仅保存在本浏览器');
+  },
+
+  /* ---------- 登录 ---------- */
+  showLogin() {
+    document.getElementById('login-view').hidden = false;
+    document.getElementById('app-view').hidden = true;
+    const tip = document.getElementById('login-mode-tip');
+    if (Store.mode === 'supabase') {
+      tip.textContent = '使用邮箱登录，数据云端同步 · 行级安全隔离';
+    } else {
+      tip.textContent = '未检测到 Supabase 配置，当前为本地演示模式（数据仅存本浏览器）';
+    }
+  },
+
+  toggleSignup() {
+    this.state.signup = !this.state.signup;
+    const btn = document.getElementById('login-btn');
+    const toggle = document.getElementById('toggle-signup');
+    btn.textContent = this.state.signup ? '注 册' : '登 录';
+    toggle.textContent = this.state.signup ? '已有账号？去登录' : '没有账号？注册一个';
+    this._loginErr('');
+  },
+
+  _loginErr(msg) {
+    const el = document.getElementById('login-error');
+    if (!msg) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = msg;
+  },
+
+  async doLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pwd = document.getElementById('login-password').value;
+    if (!email || !pwd) return this._loginErr('请输入邮箱和密码');
+    this._loginErr('');
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.textContent = '处理中…';
+    try {
+      if (this.state.signup) {
+        const r = await Store.signUp(email, pwd);
+        if (r.needConfirm) {
+          this._loginErr('注册成功！请先到邮箱完成验证，再返回登录。');
+          this.state.signup = false;
+          this.toggleSignup();
+          return;
+        }
+        this.toast('注册成功，欢迎使用', 'ok');
+      } else {
+        await Store.signIn(email, pwd);
+        this.toast('登录成功', 'ok');
+      }
+      await this.enterApp();
+    } catch (e) {
+      this._loginErr(e.message || '登录失败');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = this.state.signup ? '注 册' : '登 录';
+    }
+  },
+
+  async onAuthChange() {
+    if (!Store.user) this.showLogin();
+  },
+
+  /* ---------- 进入应用 ---------- */
+  async enterApp() {
+    document.getElementById('login-view').hidden = true;
+    document.getElementById('app-view').hidden = false;
+    await this.loadData();
+    if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
+    this.route();
+  },
+
+  /* ---------- 数据加载 ---------- */
+  async loadData(silent = false) {
+    if (this.state.loading && silent) return;
+    this.state.loading = true;
+    try {
+      const [ledgers, categories, records, budgets, templates] = await Promise.all([
+        Store.list('ledgers'), Store.list('categories'), Store.list('records'), Store.list('budgets'), Store.list('templates')
+      ]);
+      let changed = false;
+      if (!ledgers.length) {
+        for (const l of DEFAULT_LEDGERS) await Store.insert('ledgers', l);
+        changed = true;
+      }
+      if (!categories.length) {
+        const ls = await Store.list('ledgers');
+        for (const l of ls) {
+          const defs = DEFAULT_CATEGORIES[l.type] || [];
+          for (const c of defs) await Store.insert('categories', { ledger_id: l.id, name: c.name, kind: c.kind, subs: c.subs });
+        }
+        changed = true;
+      }
+      if (!templates.length) {
+        const ls = await Store.list('ledgers');
+        for (const t of DEFAULT_TEMPLATES) {
+          const l = ls.find(x => x.type === t.ledger);
+          if (l) await Store.insert('templates', { ledger_id: l.id, category: t.category, sub: t.sub, label: t.label, section: t.section });
+        }
+        changed = true;
+      }
+      if (changed) return this.loadData(silent);
+
+      this.state.ledgers = ledgers;
+      this.state.categories = categories;
+      this.state.records = records;
+      this.state.budgets = budgets;
+      this.state.templates = templates;
+      if (!this.state.currentLedgerId || !ledgers.find(l => l.id === this.state.currentLedgerId)) {
+        this.state.currentLedgerId = (ledgers.find(l => l.type === 'personal') || ledgers[0] || {}).id || null;
+      }
+      this.renderChrome();
+      if (!silent) this.renderView();
+      else if (!document.querySelector('.modal-mask')) this.renderView();
+    } catch (e) {
+      this.toast(e.message || '数据加载失败', 'err');
+    } finally {
+      this.state.loading = false;
+    }
+  },
+
+  onDataChange() {
+    if (!Store.user) return;
+    // 有弹窗或正在输入时仅静默刷新数据，避免打断
+    const ae = document.activeElement;
+    const typing = ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName);
+    this.loadData(true);
+    if (!typing && !document.querySelector('.modal-mask')) this.renderView();
+  },
+
+  /* ---------- 路由 ---------- */
+  route() {
+    const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
+    const names = { ledger: '记账本', calendar: '日历记账', wishlist: '好物仓库', stats: '统计', rental: '出租屋账本', budget: '预算设置', settings: '设置' };
+    this.state.route = names[r] ? r : 'ledger';
+    if (this.state.route === 'rental') {
+      const rental = this.state.ledgers.find(l => l.type === 'rental');
+      if (rental) this.state.currentLedgerId = rental.id;
+    }
+    document.getElementById('page-title').textContent = names[this.state.route];
+    document.querySelectorAll('.nav-item').forEach(a => {
+      a.classList.toggle('active', a.dataset.route === this.state.route);
+    });
+    this.renderChrome();
+    this.renderView();
+    window.scrollTo({ top: 0 });
+  },
+
+  renderChrome() {
+    this.renderSyncChip();
+    // 账本切换
+    const sw = document.getElementById('ledger-switch');
+    sw.innerHTML = this.state.ledgers.map(l =>
+      '<button data-lid="' + l.id + '" class="' + (l.id === this.state.currentLedgerId ? 'active' : '') + '">' + esc(l.name) + '</button>'
+    ).join('');
+    sw.querySelectorAll('button').forEach(b => {
+      b.onclick = () => {
+        this.state.currentLedgerId = b.dataset.lid;
+        this.renderChrome();
+        this.renderView();
+      };
+    });
+    // 用户信息
+    const uc = document.getElementById('user-chip');
+    const email = Store.user ? Store.user.email : '';
+    uc.innerHTML = '<div class="avatar">' + esc(email.slice(0, 1).toUpperCase()) + '</div><span class="mail">' + esc(email) + '</span>';
+    uc.title = '点击退出登录';
+    uc.style.cursor = 'pointer';
+    uc.onclick = () => this.confirmDialog('退出登录', '确定要退出当前账号吗？').then(ok => { if (ok) Store.signOut(); });
+    // 侧栏底部
+    document.getElementById('sidebar-foot').innerHTML =
+      (Store.mode === 'supabase' ? '☁ 云端模式 · 实时同步' : '📦 本地模式') + '<br>' + esc(email);
+  },
+
+  renderView() {
+    const map = {
+      ledger: () => this.renderLedger(),
+      calendar: () => this.renderCalendar(),
+      wishlist: () => this.renderWishlist(),
+      stats: () => this.renderStats(),
+      rental: () => this.renderRental(),
+      budget: () => this.renderBudget(),
+      settings: () => this.renderSettings()
+    };
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const view = document.getElementById('view-' + this.state.route);
+    view.classList.add('active');
+    (map[this.state.route] || (() => {})).call(this);
+  },
+
+  /* ---------- 通用查询助手 ---------- */
+  curLedger() { return this.state.ledgers.find(l => l.id === this.state.currentLedgerId) || null; },
+  catsOf(ledgerId) { return this.state.categories.filter(c => c.ledger_id === ledgerId); },
+  catByName(ledgerId, name) { return this.catsOf(ledgerId).find(c => c.name === name) || null; },
+  kindOf(ledgerId, catName) {
+    const c = this.catByName(ledgerId, catName);
+    return c ? c.kind : 'expense';
+  },
+  recsOf(ledgerId) { return this.state.records.filter(r => r.ledger_id === ledgerId); },
+  budgetOf(ledgerId, category, sub) {
+    return this.state.budgets.find(b => b.ledger_id === ledgerId && b.category === category && b.sub === sub) || null;
+  },
+  monthUsed(ledgerId, category, sub, month) {
+    return this.recsOf(ledgerId)
+      .filter(r => monthOf(r.date) === month && r.category === category && r.sub === sub)
+      .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  },
+
+  /* ---------- 月度汇总卡片 ---------- */
+  monthSummary(ledgerId, month) {
+    const recs = this.recsOf(ledgerId).filter(r => monthOf(r.date) === month);
+    let income = 0, expense = 0;
+    recs.forEach(r => {
+      const kind = r.kind || this.kindOf(ledgerId, r.category);
+      if (kind === 'income') income += Number(r.amount) || 0; else expense += Number(r.amount) || 0;
+    });
+    return { income, expense, balance: income - expense, count: recs.length };
+  },
+
+  budgetAlerts(ledgerId, month) {
+    const alerts = [];
+    this.state.budgets.filter(b => b.ledger_id === ledgerId).forEach(b => {
+      const used = this.monthUsed(ledgerId, b.category, b.sub, month);
+      const limit = Number(b.amount) || 0;
+      if (limit <= 0) return;
+      const pct = used / limit;
+      if (pct > 1) alerts.push({ ...b, used, limit, pct, level: 'over' });
+      else if (pct >= 0.7) alerts.push({ ...b, used, limit, pct, level: 'warn' });
+    });
+    return alerts.sort((a, b2) => b2.pct - a.pct);
+  },
+
+  /* ---------- 记账表单（记账本 / 出租屋共用） ---------- */
+  entryFormHTML(ledgerId) {
+    const cats = this.catsOf(ledgerId);
+    const cat0 = cats[0] ? cats[0].name : '';
+    const cat0subs = (this.catByName(ledgerId, cat0) || { subs: [] }).subs || [];
+    const l = this.curLedger();
+    return `
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">记一笔</div>
+          <div class="card-sub">当前账本：${esc(l ? l.name : '')}</div>
+        </div>
+        <span class="badge badge-purple">${esc(l ? l.name : '')}</span>
+      </div>
+      <div class="entry-grid">
+        <div class="field f-cat">
+          <label>大类</label>
+          <select id="en-cat">${cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('')}</select>
+        </div>
+        <div class="field f-sub">
+          <label>小类</label>
+          <select id="en-sub">${cat0subs.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('')}</select>
+        </div>
+        <div class="field f-amt">
+          <label>金额（元）</label>
+          <input id="en-amt" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field f-date">
+          <label>日期</label>
+          <input id="en-date" class="cal-input" readonly placeholder="选择日期" value="${todayStr()}" data-date="${todayStr()}">
+        </div>
+        <div class="field f-note">
+          <label>备注</label>
+          <input id="en-note" type="text" placeholder="选填，如：和光酱的午餐">
+        </div>
+        <div class="f-fav">
+          <label class="fav-check">
+            <input type="checkbox" id="en-fav"><span class="fav-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+            </span>心仪物品
+          </label>
+        </div>
+        <div class="f-star">
+          <label>评分</label>
+          <div class="stars" id="en-stars">
+            ${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}
+            <button type="button" class="star-clear">清除</button>
+          </div>
+        </div>
+        <div class="f-actions">
+          <button class="btn btn-ghost" id="en-reset" type="button">清空</button>
+          <button class="btn btn-primary" id="en-save" type="button">保存记账</button>
+        </div>
+      </div>
+      <div class="tpl-row" id="en-tpls">
+        <div class="tpl-label">一键记账模板</div>
+        ${this.templatesHTML(ledgerId)}
+      </div>
+    </div>`;
+  },
+
+  templatesHTML(ledgerId) {
+    const tpls = this.state.templates.filter(t => t.ledger_id === ledgerId);
+    if (!tpls.length) return '<span style="font-size:12.5px;color:var(--muted)">暂无模板，可在「设置」中添加</span>';
+    const order = ['日常支出板块', '爱好就是一切板块', '旅游外出板块', '其他模板'];
+    const groups = {};
+    tpls.forEach((t, i) => { const g = t.section || '其他模板'; (groups[g] = groups[g] || []).push({ t, i }); });
+    const keys = Object.keys(groups).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return keys.map(g => `
+      <div class="tpl-section">
+        <div class="tpl-label">${esc(g)}</div>
+        <div class="tpl-chips">
+          ${groups[g].map(({ t, i }) => '<button type="button" class="chip accent" data-tpl="' + i + '">⚡ ' + esc(t.label || (t.category + ' · ' + t.sub)) + '</button>').join('')}
+        </div>
+      </div>`).join('');
+  },
+
+  bindEntryForm(root, ledgerId) {
+    const $ = id => root.querySelector('#' + id);
+    const cat = $('en-cat'), sub = $('en-sub');
+    this.state.rating = 0;
+    const paintStars = () => {
+      root.querySelectorAll('#en-stars button[data-v]').forEach(b => {
+        b.classList.toggle('on', Number(b.dataset.v) <= this.state.rating);
+      });
+    };
+    paintStars();
+    root.querySelectorAll('#en-stars button[data-v]').forEach(b => {
+      b.onclick = () => {
+        const v = Number(b.dataset.v);
+        this.state.rating = (this.state.rating === v) ? 0 : v;
+        paintStars();
+      };
+    });
+    root.querySelector('.star-clear').onclick = () => { this.state.rating = 0; paintStars(); };
+
+    cat.onchange = () => {
+      const c = this.catByName(ledgerId, cat.value);
+      sub.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+    };
+
+    const dateInp = $('en-date');
+    dateInp.onclick = () => this.openCalendar(dateInp);
+
+    root.querySelectorAll('[data-tpl]').forEach(btn => {
+      btn.onclick = () => {
+        const t = this.state.templates.filter(x => x.ledger_id === ledgerId)[Number(btn.dataset.tpl)];
+        if (!t) return;
+        cat.value = t.category;
+        cat.onchange();
+        sub.value = t.sub;
+        $('en-amt').focus();
+        this.toast('已带出：' + t.category + ' · ' + t.sub);
+      };
+    });
+
+    const reset = () => {
+      $('en-amt').value = ''; $('en-note').value = ''; $('en-fav').checked = false;
+      this.state.rating = 0; paintStars();
+      $('en-date').value = todayStr(); $('en-date').dataset.date = todayStr();
+    };
+    $('en-reset').onclick = reset;
+
+    $('en-save').onclick = async () => {
+      const amount = parseFloat($('en-amt').value);
+      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      const date = $('en-date').dataset.date || todayStr();
+      try {
+        await Store.insert('records', {
+          ledger_id: ledgerId,
+          category: cat.value,
+          sub: sub.value,
+          amount,
+          note: $('en-note').value.trim(),
+          favorite: $('en-fav').checked,
+          rating: this.state.rating,
+          date,
+          image: null,
+          kind: this.kindOf(ledgerId, cat.value)
+        });
+        this.toast('已记账 ' + fmtMoney(amount), 'ok');
+        reset();
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+  },
+
+  /* ---------- 记录列表 ---------- */
+  recordsListHTML(ledgerId, month) {
+    const recs = this.recsOf(ledgerId)
+      .filter(r => monthOf(r.date) === month)
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created_at < b.created_at ? 1 : -1)));
+    if (!recs.length) return '<div class="empty"><p>本月还没有记录，记一笔吧</p></div>';
+    const days = {};
+    recs.forEach(r => { (days[r.date] = days[r.date] || []).push(r); });
+    return Object.keys(days).sort().reverse().map(d => {
+      const dayExp = days[d].reduce((s, r) => s + ((r.kind || this.kindOf(ledgerId, r.category)) === 'expense' ? Number(r.amount) || 0 : 0), 0);
+      const dayInc = days[d].reduce((s, r) => s + ((r.kind || this.kindOf(ledgerId, r.category)) === 'income' ? Number(r.amount) || 0 : 0), 0);
+      return `
+      <div class="rec-day">
+        <div class="rec-day-head"><span>${d.slice(5).replace('-', ' 月 ')} 日</span><span>${dayInc ? '收入 ' + fmtMoney(dayInc, { plain: true }) + ' · ' : ''}支出 ${fmtMoney(dayExp, { plain: true })}</span></div>
+        ${days[d].map(r => this.recItemHTML(r, ledgerId)).join('')}
+      </div>`;
+    }).join('');
+  },
+
+  recItemHTML(r, ledgerId) {
+    const kind = r.kind || this.kindOf(ledgerId, r.category);
+    const inc = kind === 'income';
+    return `
+    <div class="rec-item" data-rid="${r.id}">
+      <div class="rec-icon ${inc ? 'inc' : ''}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
+      <div class="rec-main">
+        <div class="rec-title">${esc(r.category)} <span class="sub">· ${esc(r.sub)}</span>
+          ${r.favorite ? '<span class="badge badge-green">心仪</span>' : ''}</div>
+        ${r.note ? '<div class="rec-note">' + esc(r.note) + '</div>' : ''}
+      </div>
+      <div class="rec-stars">${starsStr(r.rating)}</div>
+      <div class="rec-amount ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount)}</div>
+      <div class="rec-acts">
+        <button data-act="edit" title="编辑">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button data-act="del" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  },
+
+  bindRecordsList(root, ledgerId) {
+    root.querySelectorAll('.rec-item').forEach(item => {
+      const rid = item.dataset.rid;
+      item.querySelector('[data-act="edit"]').onclick = () => this.editRecord(rid, ledgerId);
+      item.querySelector('[data-act="del"]').onclick = async () => {
+        const ok = await this.confirmDialog('删除记录', '删除后无法恢复，确定删除这条记录吗？');
+        if (!ok) return;
+        try { await Store.remove('records', rid); this.toast('已删除'); await this.loadData(); }
+        catch (e) { this.toast(e.message, 'err'); }
+      };
+    });
+  },
+
+  monthSwitcherHTML(key, month) {
+    const [y, m] = month.split('-').map(Number);
+    const prev = new Date(y, m - 2, 1), next = new Date(y, m, 1);
+    const f = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    return `
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-ghost btn-sm" data-nav="prev">‹ 上月</button>
+      <b style="font-size:13.5px;min-width:76px;text-align:center">${y} 年 ${m} 月</b>
+      <button class="btn btn-ghost btn-sm" data-nav="next">下月 ›</button>
+      <input type="month" value="${month}" data-jump style="height:32px;border:1.5px solid var(--line);border-radius:9px;padding:0 8px;background:#FAFBFD">
+    </div>`;
+  },
+
+  bindMonthSwitcher(root, key, rerender) {
+    const month = this.state[key];
+    const [y, m] = month.split('-').map(Number);
+    root.querySelectorAll('[data-nav]').forEach(b => {
+      b.onclick = () => {
+        const d = new Date(y, m - 2 + (b.dataset.nav === 'next' ? 1 : -1), 1);
+        this.state[key] = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        rerender();
+      };
+    });
+    const jump = root.querySelector('[data-jump]');
+    if (jump) jump.onchange = () => { this.state[key] = jump.value; rerender(); };
+  },
+
+  /* ---------- 视图：记账本 ---------- */
+  renderLedger() {
+    const el = document.getElementById('view-ledger');
+    const lid = this.state.currentLedgerId;
+    const month = this.state.ledgerMonth;
+    const s = this.monthSummary(lid, month);
+    const alerts = this.budgetAlerts(lid, month);
+
+    el.innerHTML = `
+      <div class="grid grid-3" style="margin-bottom:20px">
+        <div class="stat-card">
+          <div class="stat-label">本月支出</div>
+          <div class="stat-value expense">${fmtMoney(s.expense)}</div>
+          <div class="stat-foot">${s.count} 笔记录</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">本月收入</div>
+          <div class="stat-value income">${fmtMoney(s.income)}</div>
+          <div class="stat-foot">工资 / 奖金 / 报销等</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">本月结余</div>
+          <div class="stat-value" style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</div>
+          <div class="stat-foot">${month.replace('-', ' 年 ')} 月</div>
+        </div>
+      </div>
+      ${alerts.length ? this.alertStripHTML(alerts) : ''}
+      <div id="ledger-entry"></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">收支明细</div>
+          ${this.monthSwitcherHTML('ledgerMonth', month)}
+        </div>
+        <div id="ledger-recs"></div>
+      </div>`;
+
+    const entry = el.querySelector('#ledger-entry');
+    entry.innerHTML = this.entryFormHTML(lid);
+    this.bindEntryForm(entry, lid);
+    const recs = el.querySelector('#ledger-recs');
+    recs.innerHTML = this.recordsListHTML(lid, month);
+    this.bindRecordsList(recs, lid);
+    const sw = el.querySelector('.card-head');
+    this.bindMonthSwitcher(sw, 'ledgerMonth', () => this.renderLedger());
+  },
+
+  alertStripHTML(alerts) {
+    const over = alerts.filter(a => a.level === 'over');
+    const warn = alerts.filter(a => a.level === 'warn');
+    const cls = over.length ? 'red' : '';
+    const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>';
+    const parts = [];
+    if (over.length) parts.push('<b>' + over.length + ' 个小类已超支：</b>' + over.map(a => esc(a.sub)).join('、'));
+    if (warn.length) parts.push('<b>' + warn.length + ' 个小类接近限额：</b>' + warn.map(a => esc(a.sub) + '（' + Math.round(a.pct * 100) + '%）').join('、'));
+    return '<div class="alert-strip ' + cls + '">' + icon + '<span>' + parts.join('；') + '</span></div>';
+  },
+
+  /* ---------- 视图：好物仓库 ---------- */
+  renderWishlist() {
+    const el = document.getElementById('view-wishlist');
+    const lid = this.state.currentLedgerId;
+    let items = this.recsOf(lid).filter(r => r.favorite);
+    const cats = [...new Set(items.map(r => r.category))];
+    const f = this.state.wish;
+
+    if (f.cat) items = items.filter(r => r.category === f.cat);
+    const sorters = {
+      'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
+      'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
+      'amt-desc': (a, b) => b.amount - a.amount,
+      'days-desc': (a, b) => daysBetween(b.date) - daysBetween(a.date),
+      'cost-asc': (a, b) => (a.amount / daysBetween(a.date)) - (b.amount / daysBetween(b.date))
+    };
+    items = [...items].sort(sorters[f.sort] || sorters['date-desc']);
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">好物仓库</div>
+            <div class="card-sub">记账时勾选「心仪物品」即可收入这里 · 共 ${items.length} 件</div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <div class="field"><label>大类筛选</label>
+            <select id="w-cat">
+              <option value="">全部大类</option>
+              ${cats.map(c => '<option value="' + esc(c) + '" ' + (f.cat === c ? 'selected' : '') + '>' + esc(c) + '</option>').join('')}
+            </select>
+          </div>
+          <div class="field"><label>排序</label>
+            <select id="w-sort">
+              <option value="date-desc" ${f.sort === 'date-desc' ? 'selected' : ''}>日期 · 最新</option>
+              <option value="date-asc" ${f.sort === 'date-asc' ? 'selected' : ''}>日期 · 最早</option>
+              <option value="amt-desc" ${f.sort === 'amt-desc' ? 'selected' : ''}>金额 · 从高到低</option>
+              <option value="days-desc" ${f.sort === 'days-desc' ? 'selected' : ''}>陪伴天数 · 从长到短</option>
+              <option value="cost-asc" ${f.sort === 'cost-asc' ? 'selected' : ''}>每日成本 · 从低到高</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="wish-grid" id="wish-grid"></div>`;
+
+    el.querySelector('#w-cat').onchange = e => { this.state.wish.cat = e.target.value; this.renderWishlist(); };
+    el.querySelector('#w-sort').onchange = e => { this.state.wish.sort = e.target.value; this.renderWishlist(); };
+
+    const grid = el.querySelector('#wish-grid');
+    if (!items.length) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里</p></div>';
+      return;
+    }
+    grid.innerHTML = items.map(r => {
+      const days = daysBetween(r.date);
+      const cost = (Number(r.amount) || 0) / days;
+      const name = r.note || (r.category + ' · ' + r.sub);
+      return `
+      <div class="wish-card" data-wid="${r.id}">
+        <div class="wish-img" data-act="img">
+          ${r.image
+            ? '<img src="' + r.image + '" alt="' + esc(name) + '">'
+            : '<span class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m5 17 4.5-4.5 3.5 3.5 3-3L19 16"/></svg></span>'}
+          <span class="upload-tip">${r.image ? '点击更换图片' : '点击上传图片'}</span>
+        </div>
+        <div class="wish-body">
+          <div class="wish-name"><span>${esc(name)}</span><span class="badge ${r.favorite ? 'badge-green' : 'badge-gray'}">${r.favorite ? '使用中' : '已闲置'}</span></div>
+          <div class="wish-amount">${fmtMoney(r.amount)}</div>
+          <div class="wish-meta">
+            <div>购入日期<b>${r.date}</b></div>
+            <div>已陪伴<b>${days} 天</b></div>
+            <div>每日成本<b>${fmtMoney(cost)}</b></div>
+            <div>来源<b>${esc(r.category)} · ${esc(r.sub)}</b></div>
+          </div>
+        </div>
+        <div class="wish-acts">
+          <button class="btn btn-ghost btn-sm" data-act="img">图片</button>
+          <button class="btn btn-ghost btn-sm" data-act="status">${r.favorite ? '标为闲置' : '标为使用中'}</button>
+          <button class="btn btn-ghost btn-sm" data-act="edit">编辑</button>
+          <button class="btn btn-danger btn-sm" data-act="del">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.wish-card').forEach(card => {
+      const rid = card.dataset.wid;
+      card.querySelectorAll('[data-act]').forEach(btn => {
+        btn.onclick = async () => {
+          const act = btn.dataset.act;
+          const rec = this.state.records.find(r => r.id === rid);
+          if (!rec) return;
+          if (act === 'img') {
+            if (btn.tagName === 'DIV' && rec.image) return this.viewImage(rec);
+            this.pickImage(rid);
+          } else if (act === 'status') {
+            await Store.update('records', rid, { favorite: !rec.favorite });
+            this.toast(rec.favorite ? '已标为闲置' : '已标为使用中');
+            await this.loadData();
+          } else if (act === 'edit') {
+            this.editRecord(rid, rec.ledger_id);
+          } else if (act === 'del') {
+            const ok = await this.confirmDialog('删除好物', '删除后无法恢复，确定删除吗？');
+            if (!ok) return;
+            await Store.remove('records', rid);
+            this.toast('已删除');
+            await this.loadData();
+          }
+        };
+      });
+    });
+  },
+
+  pickImage(rid) {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      try {
+        this.toast('图片处理中…');
+        const data = await compressImage(f);
+        await Store.update('records', rid, { image: data });
+        this.toast('图片已保存', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message || '图片处理失败', 'err'); }
+    };
+    inp.click();
+  },
+
+  viewImage(rec) {
+    this.openModal(`
+      <div class="modal-title">${esc(rec.note || (rec.category + ' · ' + rec.sub))}
+        <button class="icon-btn" style="display:flex" data-close>✕</button>
+      </div>
+      <img src="${rec.image}" style="width:100%;border-radius:12px" alt="">
+    `, true);
+  },
+
+  /* ---------- 视图：统计 ---------- */
+  renderStats() {
+    const el = document.getElementById('view-stats');
+    const st = this.state.stats;
+    const scopeLedgerId = st.scope === 'all' ? null : this.state.currentLedgerId;
+    const recs = this.state.records.filter(r => (!scopeLedgerId || r.ledger_id === scopeLedgerId));
+    const period = st.period === 'month' ? st.month : st.year;
+    const inPeriod = recs.filter(r => st.period === 'month' ? monthOf(r.date) === period : yearOf(r.date) === period);
+    const kindOfRec = r => r.kind || (scopeLedgerId ? this.kindOf(scopeLedgerId, r.category) : (this.catByName(r.ledger_id, r.category) || {}).kind || 'expense');
+
+    let income = 0, expense = 0;
+    inPeriod.forEach(r => { const v = Number(r.amount) || 0; if (kindOfRec(r) === 'income') income += v; else expense += v; });
+
+    // 分类占比
+    const byCat = {};
+    inPeriod.filter(r => kindOfRec(r) === st.pie).forEach(r => {
+      byCat[r.category] = (byCat[r.category] || 0) + (Number(r.amount) || 0);
+    });
+    const pieItems = Object.entries(byCat).sort((a, b) => b[1] - a[1])
+      .map(([label, value], i) => ({ label, value, color: PALETTE[i % PALETTE.length] }));
+    const pieTotal = pieItems.reduce((s, i) => s + i.value, 0);
+
+    // 趋势
+    let labels = [], incSeries = [], expSeries = [];
+    if (st.period === 'month') {
+      const [y, m] = st.month.split('-').map(Number);
+      const days = new Date(y, m, 0).getDate();
+      for (let d = 1; d <= days; d++) labels.push(m + '/' + d);
+      incSeries = new Array(days).fill(0); expSeries = new Array(days).fill(0);
+      inPeriod.forEach(r => {
+        const d = parseInt(r.date.slice(8), 10) - 1;
+        const v = Number(r.amount) || 0;
+        if (kindOfRec(r) === 'income') incSeries[d] += v; else expSeries[d] += v;
+      });
+    } else {
+      const y = st.year;
+      labels = Array.from({ length: 12 }, (_, i) => (i + 1) + '月');
+      incSeries = new Array(12).fill(0); expSeries = new Array(12).fill(0);
+      inPeriod.forEach(r => {
+        const m = parseInt(r.date.slice(5, 7), 10) - 1;
+        const v = Number(r.amount) || 0;
+        if (kindOfRec(r) === 'income') incSeries[m] += v; else expSeries[m] += v;
+      });
+    }
+
+    // 小类明细
+    const lid = scopeLedgerId || this.state.currentLedgerId;
+    const cats = this.catsOf(lid);
+    if (!cats.find(c => c.name === st.cat)) st.cat = (cats.find(c => c.name === '日常支出') || cats[0] || { name: '' }).name;
+    const catObj = this.catByName(lid, st.cat);
+    const subRows = ((catObj && catObj.subs) || []).map(sub => {
+      const used = inPeriod.filter(r => r.category === st.cat && r.sub === sub)
+        .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const b = this.budgetOf(lid, st.cat, sub);
+      const limit = b ? Number(b.amount) || 0 : 0;
+      const pct = limit > 0 ? used / limit : 0;
+      return { sub, used, limit, pct };
+    }).sort((a, b) => b.used - a.used);
+    const subMax = Math.max(...subRows.map(r => r.used), 1);
+
+    const nowYear = new Date().getFullYear();
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">统计分析</div>
+            <div class="card-sub">按周期查看收支汇总、分类占比与趋势</div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <div class="field"><label>账本范围</label>
+            <select id="st-scope">
+              <option value="ledger" ${st.scope === 'ledger' ? 'selected' : ''}>当前账本</option>
+              <option value="all" ${st.scope === 'all' ? 'selected' : ''}>全部账本</option>
+            </select>
+          </div>
+          <div class="field"><label>周期</label>
+            <select id="st-period">
+              <option value="month" ${st.period === 'month' ? 'selected' : ''}>月度</option>
+              <option value="year" ${st.period === 'year' ? 'selected' : ''}>年度</option>
+            </select>
+          </div>
+          <div class="field">${st.period === 'month'
+            ? '<label>月份</label><input type="month" id="st-month" value="' + st.month + '">'
+            : '<label>年份</label><input type="number" id="st-year" min="2000" max="2100" value="' + st.year + '">'}</div>
+          <div class="field"><label>小类明细大类</label>
+            <select id="st-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (st.cat === c.name ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">${st.period === 'month' ? '本月' : '本年'}总收入</div><div class="stat-value income">${fmtMoney(income)}</div></div>
+        <div class="stat-card"><div class="stat-label">${st.period === 'month' ? '本月' : '本年'}总支出</div><div class="stat-value expense">${fmtMoney(expense)}</div></div>
+        <div class="stat-card"><div class="stat-label">结余</div><div class="stat-value" style="color:${income - expense >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(income - expense)}</div></div>
+        <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${inPeriod.length}</div></div>
+      </div>
+
+      <div class="grid grid-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">分类占比</div><div class="card-sub">${st.pie === 'expense' ? '支出' : '收入'}按大类划分</div></div>
+            <select id="st-pie" style="height:34px;border:1.5px solid var(--line);border-radius:9px;padding:0 10px;background:#FAFBFD">
+              <option value="expense" ${st.pie === 'expense' ? 'selected' : ''}>支出</option>
+              <option value="income" ${st.pie === 'income' ? 'selected' : ''}>收入</option>
+            </select>
+          </div>
+          <div class="chart-box"><canvas id="pie-canvas" height="240"></canvas></div>
+          <div class="chart-legend">
+            ${pieItems.map(i => '<div class="legend-item"><span class="legend-dot" style="background:' + i.color + '"></span>' + esc(i.label) + ' <span class="val">' + fmtMoney(i.value, { plain: true }) + '</span></div>').join('') || '<span style="font-size:12.5px;color:var(--muted)">暂无数据</span>'}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">收支趋势</div><div class="card-sub">${st.period === 'month' ? '按日' : '按月'}对比</div></div>
+          </div>
+          <div class="chart-box"><canvas id="line-canvas" height="240"></canvas></div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#4ADE80"></span>收入</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#1A2B4C"></span>支出</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">${esc(st.cat)} · 小类消费情况</div><div class="card-sub">${st.period === 'month' ? st.month : st.year}${st.scope === 'all' ? ' · 全部账本' : ''}</div></div>
+        </div>
+        <div class="mini-bars">
+          ${subRows.map(r => `
+            <div class="mini-bar-row">
+              <div class="mini-bar-top"><span>${esc(r.sub)} ${r.limit ? '<span style="color:var(--muted);font-weight:500">/ 限额 ' + fmtMoney(r.limit, { plain: true }) + '</span>' : ''}</span><b>${fmtMoney(r.used, { plain: true })}</b></div>
+              <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.min(100, r.used / subMax * 100)}%;${r.limit ? (r.pct > 1 ? 'background:var(--danger)' : r.pct >= .7 ? 'background:var(--warn)' : '') : ''}"></div></div>
+            </div>`).join('') || '<div class="empty"><p>该大类下暂无小类</p></div>'}
+        </div>
+      </div>`;
+
+    // 绑定
+    el.querySelector('#st-scope').onchange = e => { st.scope = e.target.value; this.renderStats(); };
+    el.querySelector('#st-period').onchange = e => { st.period = e.target.value; this.renderStats(); };
+    const mi = el.querySelector('#st-month'), yi = el.querySelector('#st-year');
+    if (mi) mi.onchange = e => { st.month = e.target.value || st.month; this.renderStats(); };
+    if (yi) yi.onchange = e => { st.year = String(Math.max(2000, Math.min(2100, Number(e.target.value) || nowYear))); this.renderStats(); };
+    el.querySelector('#st-cat').onchange = e => { st.cat = e.target.value; this.renderStats(); };
+    el.querySelector('#st-pie').onchange = e => { st.pie = e.target.value; this.renderStats(); };
+
+    Charts.donut(el.querySelector('#pie-canvas'), pieItems, { label: '合计', value: fmtMoney(pieTotal, { plain: true }) });
+    Charts.line(el.querySelector('#line-canvas'), labels, [
+      { name: '收入', color: '#4ADE80', data: incSeries },
+      { name: '支出', color: '#1A2B4C', data: expSeries }
+    ]);
+  },
+
+  /* ---------- 视图：日历记账 ---------- */
+  renderCalendar() {
+    const el = document.getElementById('view-calendar');
+    const lid = this.state.currentLedgerId;
+    const c = this.state.cal;
+    const l = this.curLedger();
+    const [y, m] = c.month.split('-').map(Number);
+    const cats = this.catsOf(lid);
+    const colorOf = {};
+    cats.forEach((cat, i) => { colorOf[cat.name] = PALETTE[i % PALETTE.length]; });
+    const kindOfR = r => r.kind || this.kindOf(lid, r.category);
+
+    const monthRecs = this.recsOf(lid).filter(r => monthOf(r.date) === c.month)
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created_at < b.created_at ? 1 : -1)));
+    const byDate = {};
+    monthRecs.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+
+    const dayGroupHTML = (d) => {
+      const items = byDate[d] || [];
+      if (!items.length) return '';
+      const dayExp = items.reduce((s, r) => s + (kindOfR(r) === 'expense' ? Number(r.amount) || 0 : 0), 0);
+      const wd = '日一二三四五六'[new Date(d + 'T00:00:00').getDay()];
+      return `
+      <div class="cal-daygroup" data-date="${d}">
+        <div class="cal-daygroup-head" data-goto="${d}">
+          <span>${d.slice(5).replace('-', ' 月 ')} 日 · 周${wd}${d === todayStr() ? ' · 今天' : ''}</span>
+          <span>${items.length} 笔 · 支出 ${fmtMoney(dayExp, { plain: true })}</span>
+        </div>
+        ${items.map(r => {
+          const col = colorOf[r.category] || '#6B7280';
+          const inc = kindOfR(r) === 'income';
+          return `
+          <div class="cal-item" data-rid="${r.id}">
+            <div class="rec-icon ${inc ? 'inc' : ''}" style="${inc ? '' : 'background:' + col + '1F;color:' + col}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
+            <div class="cal-item-main">
+              <div class="cal-item-name">${esc(r.note || r.sub)}</div>
+              <div class="cal-item-sub">${esc(r.category)} · ${esc(r.sub)}</div>
+            </div>
+            <div class="cal-item-amt ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount)}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    };
+
+    const dates = Object.keys(byDate).sort().reverse();
+    const listHTML = dates.map(dayGroupHTML).join('') || '<div class="empty"><p>本月还没有记录，点日历里的 + 记一笔</p></div>';
+
+    // 月历网格（周日为一周开始）
+    const startDow = new Date(y, m - 1, 1).getDay();
+    const dim = new Date(y, m, 0).getDate();
+    const prevDim = new Date(y, m - 1, 0).getDate();
+    const today = todayStr();
+    const mk = (yy, mm, dd) => {
+      const dt = new Date(yy, mm - 1, dd);
+      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+    };
+    let cellsHTML = '';
+    for (let i = 0; i < 42; i++) {
+      const d = i - startDow + 1;
+      let key, dayNum, out;
+      if (d < 1) { key = mk(y, m - 1, prevDim + d); dayNum = prevDim + d; out = true; }
+      else if (d > dim) { key = mk(y, m + 1, d - dim); dayNum = d - dim; out = true; }
+      else { key = mk(y, m, d); dayNum = d; out = false; }
+      const items = byDate[key] || [];
+      cellsHTML += `
+      <div class="mcell${out ? ' out' : ''}${key === today ? ' today' : ''}${key === c.selected ? ' sel' : ''}" data-date="${key}">
+        <div class="mcell-top">
+          ${items.length
+            ? '<span class="mcell-badge">' + items.length + '</span>'
+            : '<button type="button" class="mcell-plus" data-add="' + key + '" title="新增记账">+</button>'}
+          <span class="mcell-num">${dayNum}</span>
+        </div>
+        <div class="mcell-body">
+          ${items.map(r => {
+            const col = colorOf[r.category] || '#6B7280';
+            const inc = kindOfR(r) === 'income';
+            return '<div class="mrec" data-rid="' + r.id + '">' +
+              '<div class="mrec-line"><span class="mdot" style="background:' + col + '"></span><b>' + esc(r.note || r.category) + '</b></div>' +
+              '<div class="mrec-sub">' + esc(r.category) + ' · ' + esc(r.sub) + '</div>' +
+              '<div class="mrec-amt' + (inc ? ' income' : '') + '">' + (inc ? '+' : '') + fmtMoney(r.amount, { plain: true }) + '</div></div>';
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div class="card" style="padding:14px 20px">
+        <div class="card-head" style="margin-bottom:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-ghost btn-sm" data-mnav="-1">‹</button>
+            <b style="font-size:15.5px;min-width:96px;text-align:center">${y} 年 ${m} 月</b>
+            <button class="btn btn-ghost btn-sm" data-mnav="1">›</button>
+            <button class="btn btn-ghost btn-sm" data-mtoday>今天</button>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="badge badge-blue">${esc(l ? l.name : '')}</span>
+            <button class="btn btn-purple btn-sm" id="cal-view-toggle">${c.view === 'calendar' ? '在列表中管理' : '在日历中管理'}</button>
+          </div>
+        </div>
+      </div>
+      ${c.view === 'calendar' ? `
+      <div class="cal-wrap">
+        <div class="cal-left">${listHTML}</div>
+        <div class="cal-right">
+          <div class="mgrid-head">${['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(w => '<div>' + w + '</div>').join('')}</div>
+          <div class="mgrid">${cellsHTML}</div>
+        </div>
+      </div>` : `
+      <div class="card"><div>${listHTML}</div></div>`}`;
+
+    // 月份导航
+    el.querySelectorAll('[data-mnav]').forEach(b => {
+      b.onclick = () => {
+        const dt = new Date(y, m - 1 + Number(b.dataset.mnav), 1);
+        c.month = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+        c.selected = c.month + '-01';
+        this.renderCalendar();
+      };
+    });
+    el.querySelector('[data-mtoday]').onclick = () => { c.month = thisMonth(); c.selected = todayStr(); this.renderCalendar(); };
+    el.querySelector('#cal-view-toggle').onclick = () => { c.view = c.view === 'calendar' ? 'list' : 'calendar'; this.renderCalendar(); };
+
+    // 点击日期格选中 → 左侧列表滚动定位
+    el.querySelectorAll('.mcell').forEach(cell => {
+      cell.onclick = (e) => {
+        if (e.target.closest('.mrec') || e.target.closest('.mcell-plus')) return;
+        c.selected = cell.dataset.date;
+        this.renderCalendar();
+        const g = el.querySelector('.cal-daygroup[data-date="' + c.selected + '"]');
+        if (g) g.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+    });
+    // + 新增记账
+    el.querySelectorAll('[data-add]').forEach(b => {
+      b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add); };
+    });
+    // 点条目编辑
+    el.querySelectorAll('.mrec, .cal-item').forEach(item => {
+      item.onclick = () => this.editRecord(item.dataset.rid, lid);
+    });
+    el.querySelectorAll('[data-goto]').forEach(h => {
+      h.onclick = () => { c.selected = h.dataset.goto; this.renderCalendar(); };
+    });
+  },
+
+  /* ---------- 新增记账弹窗（日历页用） ---------- */
+  addRecordModal(ledgerId, date) {
+    const cats = this.catsOf(ledgerId);
+    let rating = 0;
+    this.openModal(`
+      <div class="modal-title">新增记账 · ${esc(date)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('')}</select></div>
+      <div class="field"><label>小类</label><select id="ad-sub"></select></div>
+      <div class="field"><label>金额（元）</label><input id="ad-amt" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>备注</label><input id="ad-note" type="text" placeholder="选填"></div>
+      <div class="field"><label>心仪物品</label>
+        <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
+      </div>
+      <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
+      <div class="modal-acts">
+        <button class="btn btn-ghost" data-close>取消</button>
+        <button class="btn btn-primary" id="ad-save">保存</button>
+      </div>
+    `);
+    const catSel = document.getElementById('ad-cat'), subSel = document.getElementById('ad-sub');
+    const fillSubs = () => {
+      const cc = this.catByName(ledgerId, catSel.value);
+      subSel.innerHTML = ((cc && cc.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+    };
+    fillSubs();
+    catSel.onchange = fillSubs;
+    document.querySelectorAll('#ad-stars button').forEach(b => {
+      b.onclick = () => {
+        const v = Number(b.dataset.v);
+        rating = rating === v ? 0 : v;
+        document.querySelectorAll('#ad-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
+      };
+    });
+    document.getElementById('ad-save').onclick = async () => {
+      const amount = parseFloat(document.getElementById('ad-amt').value);
+      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      try {
+        await Store.insert('records', {
+          ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
+          note: document.getElementById('ad-note').value.trim(),
+          favorite: document.getElementById('ad-fav').checked,
+          rating, date, image: null, kind: this.kindOf(ledgerId, catSel.value)
+        });
+        this.closeModal();
+        this.toast('已记账 ' + fmtMoney(amount), 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+  },
+
+  /* ---------- 视图：出租屋账本 ---------- */
+  renderRental() {
+    const el = document.getElementById('view-rental');
+    const rental = this.state.ledgers.find(l => l.type === 'rental');
+    if (!rental) { el.innerHTML = '<div class="empty"><p>未找到出租屋账本</p></div>'; return; }
+    const lid = rental.id;
+    const month = thisMonth();
+    const s = this.monthSummary(lid, month);
+
+    const fixedRows = RENTAL_FIXED.map(name => {
+      const b = this.budgetOf(lid, name, name);
+      const limit = b ? Number(b.amount) || 0 : 0;
+      const generated = this.recsOf(lid).some(r => monthOf(r.date) === month && r.category === name);
+      return `
+      <div class="budget-row">
+        <div class="budget-top">
+          <div class="budget-name">${esc(name)}</div>
+          <input class="budget-input" type="number" min="0" step="0.01" value="${limit || ''}" placeholder="月金额" data-fixed="${esc(name)}">
+          <span class="badge ${generated ? 'badge-green' : 'badge-gray'}">${generated ? '本月已生成' : '待生成'}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="grid grid-3" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">本月支出</div><div class="stat-value expense">${fmtMoney(s.expense)}</div><div class="stat-foot">${month.replace('-', ' 年 ')} 月</div></div>
+        <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${s.count}</div></div>
+        <div class="stat-card"><div class="stat-label">固定费用合计</div><div class="stat-value" style="color:var(--purple)">${fmtMoney(RENTAL_FIXED.reduce((sum, n) => { const b = this.budgetOf(lid, n, n); return sum + (b ? Number(b.amount) || 0 : 0); }, 0))}</div><div class="stat-foot">每月自动生成的费用</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">固定费用</div><div class="card-sub">设置每月金额，一键生成本月记录</div></div>
+          <button class="btn btn-accent" id="gen-fixed">⚡ 一键生成本月记录</button>
+        </div>
+        ${fixedRows}
+      </div>
+
+      <div id="rental-entry"></div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-title">出租屋明细</div></div>
+        <div id="rental-recs"></div>
+      </div>`;
+
+    el.querySelectorAll('[data-fixed]').forEach(inp => {
+      inp.onchange = async () => {
+        const name = inp.dataset.fixed;
+        const v = parseFloat(inp.value) || 0;
+        try {
+          const b = this.budgetOf(lid, name, name);
+          if (b) await Store.update('budgets', b.id, { amount: v });
+          else if (v > 0) await Store.insert('budgets', { ledger_id: lid, category: name, sub: name, amount: v });
+          this.toast(name + ' 月金额已设为 ' + fmtMoney(v, { plain: true }), 'ok');
+          await this.loadData();
+        } catch (e) { this.toast(e.message, 'err'); }
+      };
+    });
+
+    el.querySelector('#gen-fixed').onclick = async () => {
+      let n = 0;
+      for (const name of RENTAL_FIXED) {
+        const b = this.budgetOf(lid, name, name);
+        const amt = b ? Number(b.amount) || 0 : 0;
+        if (amt <= 0) continue;
+        const exists = this.recsOf(lid).some(r => monthOf(r.date) === month && r.category === name);
+        if (exists) continue;
+        try {
+          await Store.insert('records', {
+            ledger_id: lid, category: name, sub: name, amount: amt,
+            note: '本月固定费用', favorite: false, rating: 0, date: todayStr(), image: null, kind: 'expense'
+          });
+          n++;
+        } catch (e) { this.toast(e.message, 'err'); }
+      }
+      this.toast(n ? '已生成 ' + n + ' 条固定费用记录' : '本月固定费用已全部生成', n ? 'ok' : '');
+      await this.loadData();
+    };
+
+    const entry = el.querySelector('#rental-entry');
+    entry.innerHTML = this.entryFormHTML(lid);
+    this.bindEntryForm(entry, lid);
+    const recs = el.querySelector('#rental-recs');
+    recs.innerHTML = this.recordsListHTML(lid, month);
+    this.bindRecordsList(recs, lid);
+  },
+
+  /* ---------- 视图：预算设置 ---------- */
+  renderBudget() {
+    const el = document.getElementById('view-budget');
+    const lid = this.state.currentLedgerId;
+    const month = thisMonth();
+    const rows = [];
+    this.catsOf(lid).forEach(c => {
+      (c.subs || []).forEach(sub => {
+        const b = this.budgetOf(lid, c.name, sub);
+        const used = this.monthUsed(lid, c.name, sub, month);
+        const limit = b ? Number(b.amount) || 0 : 0;
+        const pct = limit > 0 ? used / limit : 0;
+        rows.push({ cat: c.name, sub, used, limit, pct, id: b ? b.id : null, kind: c.kind });
+      });
+    });
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">月度预算</div><div class="card-sub">为每个小类设置月度限额 · ${esc(this.curLedger() ? this.curLedger().name : '')} · 留空表示不限额</div></div>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>大类</th><th>小类</th><th class="num">月度限额</th><th class="num">本月已用</th><th style="width:32%">进度</th></tr></thead>
+          <tbody>
+            ${rows.map(r => `
+            <tr data-bid="${r.id || ''}" data-cat="${esc(r.cat)}" data-sub="${esc(r.sub)}">
+              <td>${esc(r.cat)}</td>
+              <td>${esc(r.sub)}</td>
+              <td class="num"><input class="budget-input" type="number" min="0" step="0.01" value="${r.limit || ''}" placeholder="不限" data-binput></td>
+              <td class="num">${fmtMoney(r.used, { plain: true })}</td>
+              <td>
+                <div class="bar"><div class="bar-fill ${r.pct > 1 ? 'over' : r.pct >= 0.7 ? 'warn' : ''}" style="width:${r.limit ? Math.min(100, r.pct * 100) : 0}%"></div></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:3px">${r.limit ? (r.pct > 1 ? '已超支 ' + Math.round((r.pct - 1) * 100) + '%' : '已用 ' + Math.round(r.pct * 100) + '%') : ''}</div>
+              </td>
+            </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">该账本暂无分类</td></tr>'}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:10px">颜色规则</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ADE80;margin-right:6px"></span>70% 以下 · 绿色正常</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F59E0B;margin-right:6px"></span>70%–100% · 黄色警告</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF4444;margin-right:6px"></span>超过 100% · 红色超支</span>
+        </div>
+      </div>`;
+
+    el.querySelectorAll('[data-binput]').forEach(inp => {
+      inp.onchange = async () => {
+        const tr = inp.closest('tr');
+        const cat = tr.dataset.cat, sub = tr.dataset.sub, bid = tr.dataset.bid;
+        const v = parseFloat(inp.value) || 0;
+        try {
+          if (bid) await Store.update('budgets', bid, { amount: v });
+          else if (v > 0) await Store.insert('budgets', { ledger_id: lid, category: cat, sub, amount: v });
+          this.toast(sub + ' 预算已更新', 'ok');
+          await this.loadData();
+        } catch (e) { this.toast(e.message, 'err'); }
+      };
+    });
+  },
+
+  /* ---------- 视图：设置 ---------- */
+  renderSettings() {
+    const el = document.getElementById('view-settings');
+    const mode = Store.mode;
+    el.innerHTML = `
+      <div class="grid grid-2" style="margin-bottom:20px">
+        <div class="stat-card">
+          <div class="stat-label">当前账号</div>
+          <div class="stat-value" style="font-size:18px">${esc(Store.user ? Store.user.email : '')}</div>
+          <div class="stat-foot">${mode === 'supabase' ? '云端模式 · 数据实时同步' : '本地模式 · 数据仅存本浏览器'}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">数据概览</div>
+          <div class="stat-value" style="font-size:18px">${this.state.records.length} 笔记录</div>
+          <div class="stat-foot">${this.state.ledgers.length} 个账本 · ${this.state.categories.length} 个大类 · ${this.state.budgets.length} 项预算</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">云端同步（Supabase）</div><div class="card-sub">填入你的项目 URL 与 anon key 后即可云端同步</div></div>
+          <span class="badge ${mode === 'supabase' ? 'badge-green' : 'badge-gray'}">${mode === 'supabase' ? '已连接' : '未连接'}</span>
+        </div>
+        <div class="grid grid-2">
+          <div class="field"><label>Project URL</label><input id="cfg-url" type="text" value="${esc(Store.cfg.url)}" placeholder="https://xxxx.supabase.co"></div>
+          <div class="field"><label>anon / publishable key</label><input id="cfg-key" type="text" value="${esc(Store.cfg.key)}" placeholder="sb_publishable_..."></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-primary" id="cfg-save">保存并连接</button>
+          <button class="btn btn-ghost" id="cfg-test">测试连接</button>
+          <button class="btn btn-ghost" id="cfg-local">切回本地模式</button>
+        </div>
+        <details style="margin-top:16px">
+          <summary style="cursor:pointer;font-size:13px;font-weight:700;color:var(--purple)">首次使用？点此执行建表 SQL（含行级安全 RLS）</summary>
+          <p style="font-size:12.5px;color:var(--muted);margin:10px 0">在 Supabase 控制台 → SQL Editor 中新建查询，粘贴下面整段 SQL 并 Run：</p>
+          <div style="position:relative">
+            <pre id="sql-block" style="background:#0F1730;color:#D6E0F5;border-radius:12px;padding:16px;font-size:11.5px;line-height:1.6;overflow:auto;max-height:320px">${esc(SQL_SCHEMA)}</pre>
+            <button class="btn btn-sm btn-accent" id="sql-copy" style="position:absolute;top:10px;right:10px">复制 SQL</button>
+          </div>
+        </details>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
+          <button class="btn btn-ghost" id="data-export">导出数据（JSON）</button>
+          <button class="btn btn-ghost" id="data-import">导入数据</button>
+          <input type="file" id="import-file" accept=".json" hidden>
+          ${mode === 'supabase' ? '<button class="btn btn-purple" id="data-migrate">迁移本地数据到云端</button>' : ''}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">分类管理</div><div class="card-sub">增删改查大类与小类</div></div>
+          <select id="cfg-ledger" style="height:36px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD">
+            ${this.state.ledgers.map(l => '<option value="' + l.id + '" ' + (l.type === this.state.settingsLedgerType ? 'selected' : '') + '>' + esc(l.name) + '</option>').join('')}
+          </select>
+        </div>
+        <div id="cat-mgr"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <input id="new-cat-name" placeholder="新大类名称" style="flex:1;min-width:140px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 12px;background:#FAFBFD">
+          <select id="new-cat-kind" style="height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD">
+            <option value="expense">支出</option><option value="income">收入</option>
+          </select>
+          <button class="btn btn-primary" id="add-cat">添加大类</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">快捷模板</div><div class="card-sub">记账面板底部的一键模板</div></div></div>
+        <div id="tpl-mgr"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <select id="tpl-cat" style="flex:1;min-width:130px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD"></select>
+          <select id="tpl-sub" style="flex:1;min-width:130px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD"></select>
+          <button class="btn btn-primary" id="add-tpl">添加模板</button>
+        </div>
+      </div>`;
+
+    /* --- 云端配置 --- */
+    el.querySelector('#cfg-save').onclick = async () => {
+      const url = el.querySelector('#cfg-url').value.trim();
+      const key = el.querySelector('#cfg-key').value.trim();
+      if (!url || !key) return this.toast('请填写完整的 URL 和 key', 'err');
+      const mode2 = Store.saveCfg({ url, key });
+      if (mode2 === 'supabase') { this.toast('已连接 Supabase', 'ok'); location.reload(); }
+      else this.toast('配置已保存，但 Supabase SDK 未加载（检查网络）', 'err');
+    };
+    el.querySelector('#cfg-test').onclick = async () => {
+      const url = el.querySelector('#cfg-url').value.trim();
+      const key = el.querySelector('#cfg-key').value.trim();
+      if (url !== Store.cfg.url || key !== Store.cfg.key) Store.saveCfg({ url, key });
+      const r = await Store.testConnection();
+      this.toast(r.msg, r.ok ? 'ok' : 'err');
+      this.renderChrome();
+    };
+    el.querySelector('#cfg-local').onclick = async () => {
+      const ok = await this.confirmDialog('切回本地模式', '将断开 Supabase，数据只保存在本浏览器。确定吗？');
+      if (!ok) return;
+      Store.clearCfg();
+      location.reload();
+    };
+    el.querySelector('#sql-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(SQL_SCHEMA); this.toast('SQL 已复制', 'ok'); }
+      catch (e) { this.toast('复制失败，请手动选择复制', 'err'); }
+    };
+    el.querySelector('#data-export').onclick = async () => {
+      try { const d = await Store.exportAll(); downloadJSON(d, '财务管家数据备份-' + todayStr() + '.json'); this.toast('已导出', 'ok'); }
+      catch (e) { this.toast(e.message, 'err'); }
+    };
+    const fileInp = el.querySelector('#import-file');
+    el.querySelector('#data-import').onclick = () => fileInp.click();
+    fileInp.onchange = async () => {
+      try {
+        const data = await readJSONFile(fileInp);
+        const ok = await this.confirmDialog('导入数据', '导入将追加数据到当前模式（可能产生重复记录），确定继续吗？');
+        if (!ok) return;
+        await Store.importAll(data, false);
+        this.toast('导入完成', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+      fileInp.value = '';
+    };
+    const mig = el.querySelector('#data-migrate');
+    if (mig) mig.onclick = async () => {
+      const email = Store.user ? Store.user.email : '';
+      const local = JSON.parse(localStorage.getItem('fin_db_' + email) || 'null');
+      if (!local) return this.toast('没有找到本地数据', 'err');
+      const ok = await this.confirmDialog('迁移到云端', '将把本浏览器的本地数据（已存在云端的记录会跳过）迁移到 Supabase，确定吗？');
+      if (!ok) return;
+      try {
+        const exist = await Promise.all(['ledgers', 'categories', 'records', 'budgets', 'templates'].map(t => Store.list(t)));
+        const existIds = new Set(exist.flat().map(r => r.id));
+        let n = 0;
+        for (const table of ['ledgers', 'categories', 'records', 'budgets', 'templates']) {
+          for (const r of (local[table] || [])) {
+            if (existIds.has(r.id)) continue;
+            const row = { ...r }; delete row.user_id; delete row.created_at;
+            try { await Store.insert(table, row); n++; } catch (e2) { console.warn(e2); }
+          }
+        }
+        this.toast('已迁移 ' + n + ' 条数据', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+
+    /* --- 分类管理 --- */
+    const ledgerSel = el.querySelector('#cfg-ledger');
+    const renderCatMgr = () => {
+      const lid = ledgerSel.value;
+      const cats = this.catsOf(lid);
+      el.querySelector('#cat-mgr').innerHTML = cats.map(c => `
+        <div class="budget-row" data-catid="${c.id}">
+          <div class="budget-top">
+            <div class="budget-name">${esc(c.name)} <span class="badge ${c.kind === 'income' ? 'badge-green' : 'badge-blue'}">${c.kind === 'income' ? '收入' : '支出'}</span></div>
+            <button class="btn btn-ghost btn-sm" data-ren>重命名</button>
+            <button class="btn btn-danger btn-sm" data-delcat>删除大类</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center">
+            ${(c.subs || []).map(s => '<span class="chip" style="cursor:default">' + esc(s) + ' <button data-delsub="' + esc(s) + '" style="color:var(--danger);font-weight:800">×</button></span>').join('')}
+            <input placeholder="+ 小类名称" data-newsub style="width:120px;height:30px;border:1.5px dashed var(--line);border-radius:999px;padding:0 12px;background:transparent;outline:none;font-size:12.5px">
+          </div>
+        </div>`).join('') || '<div class="empty"><p>暂无大类，请在下方添加</p></div>';
+
+      el.querySelectorAll('#cat-mgr [data-catid]').forEach(row => {
+        const cid = row.dataset.catid;
+        const cat = this.state.categories.find(c => c.id === cid);
+        row.querySelector('[data-ren]').onclick = async () => {
+          const v = await this.promptDialog('重命名大类', '请输入新名称', cat.name);
+          if (!v) return;
+          await Store.update('categories', cid, { name: v });
+          // 同步更新该大类下记录的 category 字段
+          for (const r of this.state.records.filter(r => r.ledger_id === cat.ledger_id && r.category === cat.name)) {
+            await Store.update('records', r.id, { category: v });
+          }
+          this.toast('已重命名', 'ok');
+          await this.loadData();
+        };
+        row.querySelector('[data-delcat]').onclick = async () => {
+          const ok = await this.confirmDialog('删除大类', '删除「' + cat.name + '」及其 ' + (cat.subs || []).length + ' 个小类，历史记录会保留但不再显示该分类。确定吗？');
+          if (!ok) return;
+          await Store.remove('categories', cid);
+          this.toast('已删除');
+          await this.loadData();
+          renderCatMgr();
+        };
+        row.querySelectorAll('[data-delsub]').forEach(b => {
+          b.onclick = async () => {
+            const s = b.dataset.delsub;
+            const subs = (cat.subs || []).filter(x => x !== s);
+            await Store.update('categories', cid, { subs });
+            this.toast('已删除小类 ' + s);
+            await this.loadData();
+            renderCatMgr();
+          };
+        });
+        const ns = row.querySelector('[data-newsub]');
+        ns.onkeydown = async e => {
+          if (e.key !== 'Enter') return;
+          const v = ns.value.trim();
+          if (!v) return;
+          if ((cat.subs || []).includes(v)) return this.toast('小类已存在', 'err');
+          await Store.update('categories', cid, { subs: [...(cat.subs || []), v] });
+          this.toast('已添加小类 ' + v, 'ok');
+          await this.loadData();
+          renderCatMgr();
+        };
+      });
+    };
+    ledgerSel.onchange = () => { this.state.settingsLedgerType = this.state.ledgers.find(l => l.id === ledgerSel.value).type; renderCatMgr(); this.renderTplMgr(el); };
+    renderCatMgr();
+
+    /* --- 模板管理 --- */
+    const renderTplMgr = () => {
+      const lid = ledgerSel.value;
+      const tpls = this.state.templates.filter(t => t.ledger_id === lid);
+      el.querySelector('#tpl-mgr').innerHTML = tpls.length ? tpls.map(t =>
+        '<span class="chip purple" style="cursor:default">⚡ ' + esc(t.category) + ' · ' + esc(t.sub) + ' <button data-deltpl="' + t.id + '" style="color:var(--danger);font-weight:800">×</button></span>'
+      ).join('') : '<span style="font-size:12.5px;color:var(--muted)">暂无模板</span>';
+      el.querySelectorAll('[data-deltpl]').forEach(b => {
+        b.onclick = async () => {
+          await Store.remove('templates', b.dataset.deltpl);
+          this.toast('已删除模板');
+          await this.loadData();
+          renderTplMgr();
+        };
+      });
+      const cats = this.catsOf(lid);
+      const cSel = el.querySelector('#tpl-cat'), sSel = el.querySelector('#tpl-sub');
+      cSel.innerHTML = cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('');
+      const fillSubs = () => {
+        const c = this.catByName(lid, cSel.value);
+        sSel.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+      };
+      fillSubs();
+      cSel.onchange = fillSubs;
+      el.querySelector('#add-tpl').onclick = async () => {
+        const cat = cSel.value, sub = sSel.value;
+        if (!cat || !sub) return;
+        if (tpls.some(t => t.category === cat && t.sub === sub)) return this.toast('模板已存在', 'err');
+        await Store.insert('templates', { ledger_id: lid, category: cat, sub });
+        this.toast('模板已添加', 'ok');
+        await this.loadData();
+        renderTplMgr();
+      };
+    };
+    this.renderTplMgr = renderTplMgr;
+    renderTplMgr();
+
+    /* --- 添加大类 --- */
+    el.querySelector('#add-cat').onclick = async () => {
+      const name = el.querySelector('#new-cat-name').value.trim();
+      const kind = el.querySelector('#new-cat-kind').value;
+      if (!name) return this.toast('请输入大类名称', 'err');
+      if (this.catByName(ledgerSel.value, name)) return this.toast('大类已存在', 'err');
+      await Store.insert('categories', { ledger_id: ledgerSel.value, name, kind, subs: [] });
+      el.querySelector('#new-cat-name').value = '';
+      this.toast('已添加大类 ' + name, 'ok');
+      await this.loadData();
+      renderCatMgr();
+    };
+  },
+
+  /* ---------- 编辑记录弹窗 ---------- */
+  editRecord(rid, ledgerId) {
+    const r = this.state.records.find(x => x.id === rid);
+    if (!r) return;
+    const cats = this.catsOf(ledgerId);
+    let rating = r.rating || 0;
+    this.openModal(`
+      <div class="modal-title">编辑记录<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
+      <div class="field"><label>小类</label><select id="ed-sub"></select></div>
+      <div class="field"><label>金额（元）</label><input id="ed-amt" type="number" min="0" step="0.01" value="${r.amount}"></div>
+      <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
+      <div class="field"><label>备注</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
+      <div class="field"><label>心仪物品</label>
+        <label class="fav-check"><input type="checkbox" id="ed-fav" ${r.favorite ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
+      </div>
+      <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
+      <div class="modal-acts">
+        <button class="btn btn-ghost" data-close>取消</button>
+        <button class="btn btn-primary" id="ed-save">保存</button>
+      </div>
+    `);
+
+    const catSel = document.getElementById('ed-cat'), subSel = document.getElementById('ed-sub');
+    const fillSubs = (keep) => {
+      const c = this.catByName(ledgerId, catSel.value);
+      subSel.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '" ' + (s === keep ? 'selected' : '') + '>' + esc(s) + '</option>').join('');
+    };
+    fillSubs(r.sub);
+    catSel.onchange = () => fillSubs();
+    const edDate = document.getElementById('ed-date');
+    edDate.onclick = () => this.openCalendar(edDate);
+    document.querySelectorAll('#ed-stars button').forEach(b => {
+      b.onclick = () => {
+        const v = Number(b.dataset.v);
+        rating = rating === v ? 0 : v;
+        document.querySelectorAll('#ed-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
+      };
+    });
+    document.getElementById('ed-save').onclick = async () => {
+      const amount = parseFloat(document.getElementById('ed-amt').value);
+      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      try {
+        await Store.update('records', rid, {
+          category: catSel.value, sub: subSel.value, amount,
+          date: document.getElementById('ed-date').dataset.date || r.date,
+          note: document.getElementById('ed-note').value.trim(),
+          favorite: document.getElementById('ed-fav').checked,
+          rating, kind: this.kindOf(ledgerId, catSel.value)
+        });
+        this.closeModal();
+        this.toast('已保存修改', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+  },
+
+  /* ---------- 日历组件 ---------- */
+  openCalendar(inp) {
+    if (this._cal && this._cal.inp === inp) { this.closeCalendar(); return; }
+    this.closeCalendar();
+    const sel = inp.dataset.date || todayStr();
+    const [y, m] = sel.split('-').map(Number);
+    this._cal = { inp, y, m, sel };
+    const pop = document.createElement('div');
+    pop.className = 'cal-pop';
+    pop.id = 'cal-pop';
+    document.body.appendChild(pop);
+    this._renderCal();
+    this._positionCal();
+
+    this._calOutside = (e) => {
+      if (!pop.contains(e.target) && e.target !== inp) this.closeCalendar();
+    };
+    this._calKey = (e) => { if (e.key === 'Escape') this.closeCalendar(); };
+    this._calRepos = () => { if (this._cal) this._positionCal(); };
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._calOutside, true);
+      document.addEventListener('keydown', this._calKey, true);
+      window.addEventListener('resize', this._calRepos);
+      window.addEventListener('scroll', this._calRepos, true);
+    }, 0);
+  },
+
+  _positionCal() {
+    const pop = document.getElementById('cal-pop');
+    if (!pop || !this._cal) return;
+    const r = this._cal.inp.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = Math.min(Math.max(8, r.left), window.innerWidth - pw - 8);
+    let top = r.bottom + 8;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 8);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  },
+
+  closeCalendar() {
+    const pop = document.getElementById('cal-pop');
+    if (pop) pop.remove();
+    if (this._calOutside) { document.removeEventListener('mousedown', this._calOutside, true); this._calOutside = null; }
+    if (this._calKey) { document.removeEventListener('keydown', this._calKey, true); this._calKey = null; }
+    if (this._calRepos) { window.removeEventListener('resize', this._calRepos); window.removeEventListener('scroll', this._calRepos, true); this._calRepos = null; }
+    this._cal = null;
+  },
+
+  _renderCal() {
+    const pop = document.getElementById('cal-pop');
+    if (!pop || !this._cal) return;
+    const { y, m, sel } = this._cal;
+    const today = todayStr();
+    const mk = (yy, mm, dd) => {
+      const dt = new Date(yy, mm - 1, dd);
+      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+    };
+    const startDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 周一为一周开始
+    const dim = new Date(y, m, 0).getDate();
+    const prevDim = new Date(y, m - 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < 42; i++) {
+      const d = i - startDow + 1;
+      if (d < 1) cells.push({ d: prevDim + d, out: true, key: mk(y, m - 1, prevDim + d) });
+      else if (d > dim) cells.push({ d: d - dim, out: true, key: mk(y, m + 1, d - dim) });
+      else cells.push({ d, out: false, key: mk(y, m, d) });
+    }
+    pop.innerHTML = `
+      <div class="cal-card">
+        <div class="cal-head">
+          <button type="button" class="cal-nav" data-nav="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg></button>
+          <div class="cal-title">${y} 年 ${m} 月</div>
+          <button type="button" class="cal-nav" data-nav="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
+        </div>
+        <div class="cal-grid">
+          ${['一', '二', '三', '四', '五', '六', '日'].map(w => '<div class="cal-wd">' + w + '</div>').join('')}
+          ${cells.map(c => '<button type="button" class="cal-cell' + (c.out ? ' out' : '') + (c.key === today ? ' today' : '') + (c.key === sel ? ' sel' : '') + '" data-key="' + c.key + '">' + c.d + '</button>').join('')}
+        </div>
+        <div class="cal-foot"><button type="button" class="cal-today-btn" data-today>回到今天</button></div>
+      </div>`;
+
+    pop.querySelectorAll('[data-nav]').forEach(b => {
+      b.onclick = () => {
+        const dt = new Date(this._cal.y, this._cal.m - 1 + Number(b.dataset.nav), 1);
+        this._cal.y = dt.getFullYear();
+        this._cal.m = dt.getMonth() + 1;
+        this._renderCal();
+      };
+    });
+    pop.querySelectorAll('.cal-cell').forEach(c => {
+      c.onclick = () => {
+        const key = c.dataset.key;
+        const inp = this._cal.inp;
+        inp.dataset.date = key;
+        inp.value = key;
+        this.closeCalendar();
+      };
+    });
+    const tb = pop.querySelector('[data-today]');
+    if (tb) tb.onclick = () => {
+      const inp = this._cal.inp;
+      inp.dataset.date = today;
+      inp.value = today;
+      this.closeCalendar();
+    };
+  },
+
+  /* ---------- 弹窗 / 提示 ---------- */
+  openModal(html, wide) {
+    this.closeModal();
+    const root = document.getElementById('modal-root');
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + '">' + html + '</div>';
+    mask.onclick = e => { if (e.target === mask) this.closeModal(); };
+    mask.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.closeModal());
+    root.appendChild(mask);
+    return mask;
+  },
+  closeModal() { document.getElementById('modal-root').innerHTML = ''; },
+
+  confirmDialog(title, msg) {
+    return new Promise(resolve => {
+      const m = this.openModal(`
+        <div class="modal-title">${esc(title)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+        <p style="font-size:13.5px;color:var(--muted)">${esc(msg)}</p>
+        <div class="modal-acts">
+          <button class="btn btn-ghost" data-no>取消</button>
+          <button class="btn btn-primary" data-yes>确定</button>
+        </div>`);
+      m.querySelector('[data-no]').onclick = () => { this.closeModal(); resolve(false); };
+      m.querySelector('[data-yes]').onclick = () => { this.closeModal(); resolve(true); };
+      m.querySelector('[data-close]').onclick = () => { this.closeModal(); resolve(false); };
+    });
+  },
+
+  promptDialog(title, msg, def) {
+    return new Promise(resolve => {
+      const m = this.openModal(`
+        <div class="modal-title">${esc(title)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+        <div class="field"><label>${esc(msg)}</label><input id="prm-val" type="text" value="${esc(def || '')}"></div>
+        <div class="modal-acts">
+          <button class="btn btn-ghost" data-no>取消</button>
+          <button class="btn btn-primary" data-yes>确定</button>
+        </div>`);
+      const inp = m.querySelector('#prm-val');
+      inp.focus(); inp.select();
+      m.querySelector('[data-no]').onclick = () => { this.closeModal(); resolve(null); };
+      m.querySelector('[data-close]').onclick = () => { this.closeModal(); resolve(null); };
+      m.querySelector('[data-yes]').onclick = () => { this.closeModal(); resolve(inp.value.trim() || null); };
+    });
+  },
+
+  toast(msg, type) {
+    const root = document.getElementById('toast-root');
+    const t = document.createElement('div');
+    t.className = 'toast' + (type ? ' ' + type : '');
+    t.textContent = msg;
+    root.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 2400);
+    setTimeout(() => t.remove(), 2800);
+  }
+};
+
+/* ============ 建表 SQL ============ */
+const SQL_SCHEMA = `-- 财务管家 · Supabase 建表脚本（含行级安全 RLS，按用户隔离）
+-- 在 Supabase 控制台 → SQL Editor → New query 中粘贴并运行
+
+create table if not exists ledgers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  type text not null default 'personal',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  ledger_id uuid not null references ledgers(id) on delete cascade,
+  name text not null,
+  kind text not null default 'expense',
+  subs jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists records (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  ledger_id uuid not null references ledgers(id) on delete cascade,
+  category text not null default '',
+  sub text not null default '',
+  amount numeric not null default 0,
+  note text not null default '',
+  favorite boolean not null default false,
+  rating integer not null default 0,
+  date text not null default '',
+  image text,
+  kind text not null default 'expense',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists budgets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  ledger_id uuid not null references ledgers(id) on delete cascade,
+  category text not null default '',
+  sub text not null default '',
+  amount numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists templates (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  ledger_id uuid not null references ledgers(id) on delete cascade,
+  category text not null default '',
+  sub text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- 行级安全：每个用户只能读写自己的数据
+alter table ledgers    enable row level security;
+alter table categories enable row level security;
+alter table records    enable row level security;
+alter table budgets    enable row level security;
+alter table templates  enable row level security;
+
+drop policy if exists "own ledgers" on ledgers;
+create policy "own ledgers" on ledgers for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own categories" on categories;
+create policy "own categories" on categories for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own records" on records;
+create policy "own records" on records for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own budgets" on budgets;
+create policy "own budgets" on budgets for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own templates" on templates;
+create policy "own templates" on templates for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 实时同步（多设备一致）
+alter publication supabase_realtime add table ledgers;
+alter publication supabase_realtime add table categories;
+alter publication supabase_realtime add table records;
+alter publication supabase_realtime add table budgets;
+alter publication supabase_realtime add table templates;`;
+
+window.addEventListener('DOMContentLoaded', () => App.init());
