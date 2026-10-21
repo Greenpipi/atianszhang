@@ -5,34 +5,8 @@ const DEFAULT_CFG = {
   key: 'sb_publishable_5892YBRrQR_lE0raFn5eAQ_u5EWOy3J'
 };
 
-/* 背景头图默认插画：浅绿植物（宽幅 1200×200，cover 适配） */
-const HERO_PLANT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMid slice">
-<defs>
-<linearGradient id="hbg" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#ECFDF5"/><stop offset=".55" stop-color="#F0FDF4"/><stop offset="1" stop-color="#EFF6FF"/>
-</linearGradient>
-<g id="hsprig">
-<path d="M60 150C52 104 38 66 10 38" stroke="#A7F3D0" stroke-width="3" fill="none" stroke-linecap="round"/>
-<path d="M54 108c-18-6-30-22-30-40 18 4 30 20 30 40z" fill="#D1FAE5"/>
-<path d="M38 76c16-10 22-28 18-46-16 8-22 26-18 46z" fill="#A7F3D0"/>
-<path d="M24 54c-16-4-28-18-30-36 17 3 29 17 30 36z" fill="#D1FAE5"/>
-<path d="M14 36c15-8 23-24 21-42-15 7-23 23-21 42z" fill="#ECFDF5"/>
-<circle cx="44" cy="88" r="5" fill="#A7F3D0"/>
-<circle cx="34" cy="104" r="4" fill="#D1FAE5"/>
-</g>
-</defs>
-<rect width="1200" height="200" fill="url(#hbg)"/>
-<circle cx="1055" cy="42" r="26" fill="#D1FAE5" opacity=".55"/>
-<circle cx="150" cy="34" r="18" fill="#D1FAE5" opacity=".5"/>
-<use href="#hsprig" transform="translate(46,44) scale(1.15)"/>
-<use href="#hsprig" transform="translate(178,86) scale(.8)"/>
-<use href="#hsprig" transform="translate(1154,156) scale(-1.15,1.15)"/>
-<use href="#hsprig" transform="translate(1022,114) scale(-.8,.8)"/>
-<circle cx="600" cy="170" r="4" fill="#A7F3D0"/>
-<circle cx="640" cy="186" r="3" fill="#A7F3D0"/>
-<circle cx="560" cy="188" r="3" fill="#A7F3D0"/>
-</svg>`;
-const HERO_DEFAULT_BG = 'data:image/svg+xml;utf8,' + encodeURIComponent(HERO_PLANT_SVG);
+/* 背景头图默认插画：奶油底 + 满铺柳枝浆果纹样（Morris 风格，参考 Notion 植物封面） */
+const HERO_DEFAULT_BG = 'assets/hero-default.jpg';
 
 const LEDGER_PERSONAL = '个人记账本';
 

@@ -71,7 +71,19 @@
 <!-- ============ 主应用 ============ -->
 <div id="app-view" class="app-shell" hidden>
 
-  <!-- 背景头图：默认浅绿植物插画，可上传本地图片并拖动调整位置 -->
+  <header class="topbar">
+    <button class="icon-btn" id="menu-btn" aria-label="菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <div class="topbar-page" id="page-title">记账本</div>
+    <div class="topbar-right">
+      <div class="ledger-switch" id="ledger-switch"></div>
+      <div class="sync-chip" id="sync-chip" title="同步状态"></div>
+      <div class="user-chip" id="user-chip"></div>
+    </div>
+  </header>
+
+  <!-- 背景头图：默认柳枝浆果纹样插画（位于标题栏下方），可上传本地图片并拖动调整位置 -->
   <div class="page-hero" id="page-hero">
     <div class="hero-tools">
       <button type="button" class="hero-btn" id="hero-change">更换背景</button>
@@ -132,17 +144,6 @@
   </div>
 
   <div class="main">
-    <header class="topbar">
-      <button class="icon-btn" id="menu-btn" aria-label="菜单">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-      <div class="topbar-page" id="page-title">记账本</div>
-      <div class="topbar-right">
-        <div class="ledger-switch" id="ledger-switch"></div>
-        <div class="sync-chip" id="sync-chip" title="同步状态"></div>
-        <div class="user-chip" id="user-chip"></div>
-      </div>
-    </header>
     <main class="content" id="content">
       <section class="view" id="view-ledger"></section>
       <section class="view" id="view-wishlist"></section>
