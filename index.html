@@ -71,57 +71,37 @@
 <!-- ============ 主应用 ============ -->
 <div id="app-view" class="app-shell" hidden>
 
-  <header class="topbar">
-    <button class="icon-btn" id="menu-btn" aria-label="菜单">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
-    <div class="topbar-page" id="page-title">记账本</div>
-    <div class="topbar-right">
-      <div class="ledger-switch" id="ledger-switch"></div>
-      <div class="sync-chip" id="sync-chip" title="同步状态"></div>
-      <div class="user-chip" id="user-chip"></div>
-    </div>
-  </header>
-
-  <!-- 背景头图：默认柳枝浆果纹样插画（位于标题栏下方），可上传本地图片并拖动调整位置 -->
-  <div class="page-hero" id="page-hero">
-    <div class="hero-tools">
-      <button type="button" class="hero-btn" id="hero-change">更换背景</button>
-      <button type="button" class="hero-btn" id="hero-reset" hidden>恢复默认</button>
-      <button type="button" class="hero-btn hero-btn-main" id="hero-adjust">调整位置</button>
-    </div>
-    <div class="hero-hint" id="hero-hint" hidden>拖动图片调整位置，调到满意后点「保存位置」</div>
-    <input type="file" id="hero-file" accept="image/*" hidden>
-  </div>
-
   <div class="shell-body">
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-brand">
       <img src="logo.png" alt="" width="30" height="30">
       <span>财务管家</span>
+      <button type="button" class="nav-collapse-btn" id="nav-collapse" title="收起导航栏" aria-label="收起导航栏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
     </div>
     <nav class="sidebar-nav" id="sidebar-nav">
-      <a href="#/ledger" data-route="ledger" class="nav-item">
+      <a href="#/ledger" data-route="ledger" class="nav-item" title="记账本">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v18l-4-2.6L12.4 22 8.8 19.4 5.6 22V5z"/><path d="M8 7h8M8 11h5"/></svg>
         <span>记账本</span>
       </a>
-      <a href="#/wishlist" data-route="wishlist" class="nav-item">
+      <a href="#/wishlist" data-route="wishlist" class="nav-item" title="好物仓库">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.6a5.5 5.5 0 0 0-9.3-2.4l-.5.6-.5-.6a5.5 5.5 0 0 0-9.3 6.3l8.4 8.9a1.8 1.8 0 0 0 2.7 0l8.5-9.1a5.5 5.5 0 0 0 0-3.7z"/></svg>
         <span>好物仓库</span>
       </a>
-      <a href="#/stats" data-route="stats" class="nav-item">
+      <a href="#/stats" data-route="stats" class="nav-item" title="统计">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         <span>统计</span>
       </a>
-      <a href="#/rental" data-route="rental" class="nav-item">
+      <a href="#/rental" data-route="rental" class="nav-item" title="出租屋">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21h14V9.8"/><path d="M9.5 21v-6h5v6"/></svg>
         <span>出租屋</span>
       </a>
-      <a href="#/budget" data-route="budget" class="nav-item">
+      <a href="#/budget" data-route="budget" class="nav-item" title="预算设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
         <span>预算设置</span>
       </a>
-      <a href="#/settings" data-route="settings" class="nav-item">
+      <a href="#/settings" data-route="settings" class="nav-item" title="设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09c0 .68.4 1.3 1.03 1.56.62.26 1.34.13 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.26.62.88 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09c-.68 0-1.3.4-1.51 1.03z"/></svg>
         <span>设置</span>
       </a>
@@ -144,6 +124,29 @@
   </div>
 
   <div class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="menu-btn" aria-label="菜单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="topbar-page" id="page-title">记账本</div>
+      <div class="topbar-right">
+        <div class="ledger-switch" id="ledger-switch"></div>
+        <div class="sync-chip" id="sync-chip" title="同步状态"></div>
+        <div class="user-chip" id="user-chip"></div>
+      </div>
+    </header>
+
+    <!-- 背景头图：默认柳枝浆果纹样插画，紧贴标题栏底线；可上传本地图片并拖动调整位置 -->
+    <div class="page-hero" id="page-hero">
+      <div class="hero-tools">
+        <button type="button" class="hero-btn" id="hero-change">更换背景</button>
+        <button type="button" class="hero-btn" id="hero-reset" hidden>恢复默认</button>
+        <button type="button" class="hero-btn hero-btn-main" id="hero-adjust">调整位置</button>
+      </div>
+      <div class="hero-hint" id="hero-hint" hidden>拖动图片调整位置，调到满意后点「保存位置」</div>
+      <input type="file" id="hero-file" accept="image/*" hidden>
+    </div>
+
     <main class="content" id="content">
       <section class="view" id="view-ledger"></section>
       <section class="view" id="view-wishlist"></section>

@@ -136,10 +136,30 @@ const App = {
   async enterApp() {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
+    this.initNavToggle();
     this.initHero();
     await this.loadData();
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
+  },
+
+  /* ---------- 导航栏收起/展开 ---------- */
+  initNavToggle() {
+    const shell = document.getElementById('app-view');
+    const btn = document.getElementById('nav-collapse');
+    if (!shell || !btn || this._navBound) return;
+    this._navBound = true;
+    try { if (localStorage.getItem('fin_nav_collapsed') === '1') shell.classList.add('nav-collapsed'); } catch (e) { /* ignore */ }
+    const sync = () => {
+      const collapsed = shell.classList.contains('nav-collapsed');
+      btn.title = collapsed ? '展开导航栏' : '收起导航栏';
+    };
+    sync();
+    btn.onclick = () => {
+      shell.classList.toggle('nav-collapsed');
+      try { localStorage.setItem('fin_nav_collapsed', shell.classList.contains('nav-collapsed') ? '1' : '0'); } catch (e) { /* ignore */ }
+      sync();
+    };
   },
 
   /* ---------- 背景头图 ---------- */
