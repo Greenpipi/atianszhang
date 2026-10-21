@@ -64,7 +64,7 @@ const App = {
     const chip = document.getElementById('sync-chip');
     const off = !navigator.onLine;
     chip.className = 'sync-chip' + (Store.mode === 'local' ? ' local' : '') + (off ? ' off' : '');
-    const label = off ? '离线' : (Store.mode === 'supabase' ? '云端同步' : '本地模式');
+    const label = off ? '离线' : (Store.mode === 'supabase' ? '云端模式' : '本地模式');
     chip.innerHTML = '<span class="sync-dot"></span><span>' + label + '</span>';
     chip.title = off ? '网络已断开' : (Store.mode === 'supabase' ? '数据实时云端同步' : '数据仅保存在本浏览器');
   },

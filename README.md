@@ -42,6 +42,8 @@ finance-app/
 ├── styles.css            # 样式（响应式、浅灰白 #F5F7FA + 深蓝 #1A2B4C + 亮绿 #4ADE80 + 蓝紫 #6366F1）
 ├── supabase-schema.sql   # 建表 + RLS + 实时同步 SQL
 ├── js/
+│   ├── vendor/
+│   │   └── supabase.js   # Supabase SDK（本地内置，避免 CDN 加载失败；CDN 仅作兜底）
 │   ├── data.js           # 默认分类 / 模板 / 工具函数
 │   ├── store.js          # Supabase / 本地双模式数据层 + Auth + 实时订阅
 │   ├── charts.js         # Canvas 环形图 / 折线图（零依赖）
