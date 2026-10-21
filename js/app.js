@@ -6,7 +6,7 @@ const App = {
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
     wish: { sort: 'date-desc', cat: '' },
-    home: { view: 'week', anchor: todayStr() },
+    home: { view: 'week', anchor: todayStr(), sel: todayStr() },
     rentalMonth: thisMonth(),
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
     settingsLedgerType: 'personal',
@@ -697,19 +697,25 @@ const App = {
       const [y, m] = home.anchor.split('-').map(Number);
       titleEl.textContent = y + ' 年 ' + m + ' 月';
       const dim = new Date(y, m, 0).getDate();
+      const startDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 周一起始
+      const prevDim = new Date(y, m - 1, 0).getDate();
+      const mk = (yy, mm, dd) => {
+        const dt = new Date(yy, mm - 1, dd);
+        return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      };
       const recsByDate = {};
       this.recsOf(lid).forEach(r => { (recsByDate[r.date] = recsByDate[r.date] || []).push(r); });
-      let cells = '';
-      for (let dd = 1; dd <= dim; dd++) {
-        const key = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
-        const recs = recsByDate[key] || [];
+      const mkCell = (dd, key, out) => {
+        const recs = out ? [] : (recsByDate[key] || []);
         const tdy = key === todayStr();
-        cells += `
-        <div class="m2cell${tdy ? ' today' : ''}" data-date="${key}">
+        const sel = !out && key === home.sel;
+        return `
+        <div class="m2cell${out ? ' out' : ''}${tdy ? ' today' : ''}${sel ? ' sel' : ''}" data-date="${key}">
           <div class="m2-top">
-            ${recs.length ? '<span class="m2-badge">' + recs.length + '</span>' : ''}
             <span class="m2-num">${dd}</span>
-            ${recs.length ? '' : '<button type="button" class="m2-plus" data-add="' + key + '">+</button>'}
+            ${recs.length
+              ? '<span class="m2-badge">' + recs.length + '</span>'
+              : (out ? '' : '<button type="button" class="m2-plus" data-add="' + key + '">+</button>')}
           </div>
           <div class="m2-body">
             ${recs.slice(0, 3).map(r => {
@@ -722,24 +728,29 @@ const App = {
             ${recs.length > 3 ? '<div class="m2-more">+' + (recs.length - 3) + ' 笔</div>' : ''}
           </div>
         </div>`;
-      }
-      host.innerHTML = '<div class="m2-grid">' + cells + '</div>';
+      };
+      let cells = '';
+      for (let i = 0; i < startDow; i++) cells += mkCell(prevDim - startDow + 1 + i, mk(y, m - 1, prevDim - startDow + 1 + i), true);
+      for (let dd = 1; dd <= dim; dd++) cells += mkCell(dd, mk(y, m, dd), false);
+      const tail = (7 - (startDow + dim) % 7) % 7;
+      for (let i = 1; i <= tail; i++) cells += mkCell(i, mk(y, m + 1, i), true);
+      const wdHead = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map(w => '<div class="m2-wd">' + w + '</div>').join('');
+      host.innerHTML = '<div class="m2-head">' + wdHead + '</div><div class="m2-grid">' + cells + '</div>';
     } else {
       const y = Number(home.anchor.slice(0, 4));
       titleEl.textContent = y + ' 年';
       const months = [];
-      let exp = 0, inc = 0;
+      let exp = 0;
       for (let mm = 1; mm <= 12; mm++) {
         const month = y + '-' + String(mm).padStart(2, '0');
         const ss = this.monthSummary(lid, month);
-        exp += ss.expense; inc += ss.income;
+        exp += ss.expense;
         months.push({ mm, ...ss });
       }
       host.innerHTML = '<div class="y2-grid">' + months.map(o => `
         <button class="y2-card" data-ym="${y}-${String(o.mm).padStart(2, '0')}-01">
           <div class="y2-m">${o.mm} 月</div>
-          <div class="y2-row"><span>支出</span><b class="expense">${fmtMoney(o.expense, { plain: true })}</b></div>
-          <div class="y2-row"><span>收入</span><b class="income">${fmtMoney(o.income, { plain: true })}</b></div>
+          <div class="y2-row"><span>总支出</span><b class="expense">${fmtMoney(o.expense, { plain: true })}</b></div>
         </button>`).join('') + '</div>';
     }
 
@@ -750,11 +761,16 @@ const App = {
     host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
       item.onclick = () => this.editRecord(item.dataset.rid, lid);
     });
-    host.querySelectorAll('.wk-col, .m2-cell, .m2cell').forEach(col => {
-      col.onclick = (e) => { if (e.target.closest('.wk-rec, .m2-rec, [data-add]')) return; this.addRecordModal(lid, col.dataset.date); };
+    host.querySelectorAll('.wk-col, .m2cell').forEach(col => {
+      col.onclick = (e) => {
+        if (e.target.closest('.wk-rec, .m2-rec, [data-add]')) return;
+        if (col.classList.contains('out')) return;
+        if (col.classList.contains('m2cell')) home.sel = col.dataset.date;
+        this.addRecordModal(lid, col.dataset.date);
+      };
     });
     host.querySelectorAll('.y2-card').forEach(c => {
-      c.onclick = () => { home.view = 'month'; home.anchor = c.dataset.ym; this.renderLedgerHome(); };
+      c.onclick = () => { home.view = 'month'; home.anchor = c.dataset.ym; home.sel = c.dataset.ym; this.renderLedgerHome(); };
     });
   },
 
@@ -1029,8 +1045,8 @@ const App = {
           </div>
           <div class="chart-box"><canvas id="line-canvas" height="240"></canvas></div>
           <div class="chart-legend">
-            <div class="legend-item"><span class="legend-dot" style="background:#4ADE80"></span>收入</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#2F5D50"></span>支出</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#34D399"></span>收入</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#3B82F6"></span>支出</div>
           </div>
         </div>
       </div>
@@ -1059,8 +1075,8 @@ const App = {
 
     Charts.donut(el.querySelector('#pie-canvas'), pieItems, { label: '合计', value: fmtMoney(pieTotal, { plain: true }) });
     Charts.line(el.querySelector('#line-canvas'), labels, [
-      { name: '收入', color: '#4ADE80', data: incSeries },
-      { name: '支出', color: '#2F5D50', data: expSeries }
+      { name: '收入', color: '#34D399', data: incSeries },
+      { name: '支出', color: '#3B82F6', data: expSeries }
     ]);
     this.enhanceSelects(el);
   },
@@ -1285,7 +1301,7 @@ const App = {
     this.enhanceSelects(el);
 
     if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, '本月合计');
-    Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#4E8A5A', data: trendData }]);
+    Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#3B82F6', data: trendData }]);
   },
 
   /* ---------- 视图：预算设置 ---------- */
@@ -1331,7 +1347,7 @@ const App = {
       <div class="card">
         <div class="card-title" style="margin-bottom:10px">颜色规则</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#4ADE80;margin-right:6px"></span>70% 以下 · 绿色正常</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#34D399;margin-right:6px"></span>70% 以下 · 绿色正常</span>
           <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F59E0B;margin-right:6px"></span>70%–100% · 黄色警告</span>
           <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF4444;margin-right:6px"></span>超过 100% · 红色超支</span>
         </div>

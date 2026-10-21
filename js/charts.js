@@ -44,7 +44,7 @@ const Charts = {
     const r = R * 0.64;
 
     if (!total) {
-      ctx.fillStyle = '#9B9A94';
+      ctx.fillStyle = '#9CA3AF';
       ctx.textAlign = 'center';
       ctx.font = '13px Inter, sans-serif';
       ctx.fillText('暂无数据', cx, cy);
@@ -74,7 +74,7 @@ const Charts = {
       ctx.fillStyle = '#6B7280';
       ctx.font = '11px Inter, sans-serif';
       ctx.fillText(centerLabel.label || '', cx, cy - 6);
-      ctx.fillStyle = '#1A2B4C';
+      ctx.fillStyle = '#374151';
       ctx.font = '700 19px Inter, sans-serif';
       ctx.fillText(centerLabel.value || '', cx, cy + 16);
     }
@@ -115,8 +115,8 @@ const Charts = {
     const n = labels.length;
 
     // 网格与 Y 轴
-    ctx.strokeStyle = '#F1F1EF';
-    ctx.fillStyle = '#9B9A94';
+    ctx.strokeStyle = '#F3F4F6';
+    ctx.fillStyle = '#9CA3AF';
     ctx.textAlign = 'right';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {

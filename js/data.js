@@ -15,15 +15,15 @@ const RENTAL_CAT = '出租屋';
 const RENTAL_SUBS = ['房租', '水费', '电费', '燃气费', '物业费', '装修硬装费', '装修材料费', '租房软装', '搬家搬物'];
 /* 出租屋子类图标与主题色 */
 const RENTAL_META = {
-  '房租': { emoji: '🏠', color: '#4E8A5A' },
-  '水费': { emoji: '💧', color: '#4C8DB5' },
-  '电费': { emoji: '💡', color: '#C9A227' },
-  '燃气费': { emoji: '🔥', color: '#C96F4A' },
-  '物业费': { emoji: '🧹', color: '#7A8B99' },
-  '装修硬装费': { emoji: '🛠️', color: '#8A7A5F' },
-  '装修材料费': { emoji: '🧱', color: '#A0765A' },
-  '租房软装': { emoji: '🛋️', color: '#9B7BA6' },
-  '搬家搬物': { emoji: '📦', color: '#6E8B3D' }
+  '房租': { emoji: '🏠', color: '#3B82F6' },
+  '水费': { emoji: '💧', color: '#0EA5E9' },
+  '电费': { emoji: '💡', color: '#F59E0B' },
+  '燃气费': { emoji: '🔥', color: '#F97316' },
+  '物业费': { emoji: '🧹', color: '#10B981' },
+  '装修硬装费': { emoji: '🛠️', color: '#6366F1' },
+  '装修材料费': { emoji: '🧱', color: '#84CC16' },
+  '租房软装': { emoji: '🛋️', color: '#14B8A6' },
+  '搬家搬物': { emoji: '📦', color: '#64748B' }
 };
 
 const DEFAULT_CATEGORIES = {
@@ -82,7 +82,7 @@ function quickShort(label) {
   return QUICK_SHORT[label] || String(label || '').slice(0, 2);
 }
 
-const PALETTE = ['#4E8A5A', '#C9A227', '#4C8DB5', '#C96F4A', '#7A8B99', '#9B7BA6', '#6E8B3D', '#A0765A', '#5B8C6E', '#94A3B8'];
+const PALETTE = ['#3B82F6', '#34D399', '#F97316', '#0EA5E9', '#10B981', '#F59E0B', '#6366F1', '#84CC16', '#14B8A6', '#94A3B8'];
 
 /* ---------- 工具 ---------- */
 function uid() {
@@ -127,7 +127,7 @@ function daysBetween(dateStr) {
 }
 function starsStr(n) {
   n = Math.round(Number(n) || 0);
-  return n > 0 ? '★'.repeat(n) + '<span style="color:#E3E7EE">' + '★'.repeat(5 - n) + '</span>' : '';
+  return n > 0 ? '★'.repeat(n) + '<span style="color:#E5E7EB">' + '★'.repeat(5 - n) + '</span>' : '';
 }
 function downloadJSON(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
