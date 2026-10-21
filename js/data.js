@@ -6,16 +6,30 @@ const DEFAULT_CFG = {
 };
 
 const LEDGER_PERSONAL = '个人记账本';
-const LEDGER_RENTAL = '出租屋账本';
 
 const DEFAULT_LEDGERS = [
-  { name: LEDGER_PERSONAL, type: 'personal' },
-  { name: LEDGER_RENTAL, type: 'rental' }
+  { name: LEDGER_PERSONAL, type: 'personal' }
 ];
+
+const RENTAL_CAT = '出租屋';
+const RENTAL_SUBS = ['房租', '水费', '电费', '燃气费', '物业费', '装修硬装费', '装修材料费', '租房软装', '搬家搬物'];
+/* 出租屋子类图标与主题色 */
+const RENTAL_META = {
+  '房租': { emoji: '🏠', color: '#4E8A5A' },
+  '水费': { emoji: '💧', color: '#4C8DB5' },
+  '电费': { emoji: '💡', color: '#C9A227' },
+  '燃气费': { emoji: '🔥', color: '#C96F4A' },
+  '物业费': { emoji: '🧹', color: '#7A8B99' },
+  '装修硬装费': { emoji: '🛠️', color: '#8A7A5F' },
+  '装修材料费': { emoji: '🧱', color: '#A0765A' },
+  '租房软装': { emoji: '🛋️', color: '#9B7BA6' },
+  '搬家搬物': { emoji: '📦', color: '#6E8B3D' }
+};
 
 const DEFAULT_CATEGORIES = {
   personal: [
     { name: '固定支出', kind: 'expense', subs: ['房贷', '保险', '电话网络费', '燃气费', '物业费', '租房房租', '租房支出'] },
+    { name: RENTAL_CAT, kind: 'expense', subs: RENTAL_SUBS },
     { name: '日常支出', kind: 'expense', subs: ['日用品', '山姆购物', '衣服鞋袜', '食物', '餐厨具', '电器', '家具', '杂货', '收纳用品'] },
     { name: '饮食支出', kind: 'expense', subs: ['早餐', '外出就餐', '外卖', '奶茶饮料', '咖啡', '甜食', '零食'] },
     { name: '健康支出', kind: 'expense', subs: ['养生按摩', '医疗健康', '美容美发', '运动健康'] },
@@ -24,17 +38,6 @@ const DEFAULT_CATEGORIES = {
     { name: '娱乐支出', kind: 'expense', subs: ['酒店度假', '演唱会', '电影', '内容消费', '景区景点'] },
     { name: '光酱专区', kind: 'expense', subs: ['猫清洁', '猫粮'] },
     { name: '综合收入', kind: 'income', subs: ['工资', '理财', '进出差额', '人情'] }
-  ],
-  rental: [
-    { name: '房租', kind: 'expense', subs: ['房租'] },
-    { name: '水费', kind: 'expense', subs: ['水费'] },
-    { name: '电费', kind: 'expense', subs: ['电费'] },
-    { name: '燃气费', kind: 'expense', subs: ['燃气费'] },
-    { name: '物业费', kind: 'expense', subs: ['物业费'] },
-    { name: '装修硬装费', kind: 'expense', subs: ['装修硬装费'] },
-    { name: '装修材料费', kind: 'expense', subs: ['装修材料费'] },
-    { name: '租房软装', kind: 'expense', subs: ['租房软装'] },
-    { name: '搬家搬物', kind: 'expense', subs: ['搬家搬物'] }
   ]
 };
 
@@ -69,7 +72,7 @@ const QUICK_SECTION_TITLE = {
   '旅游外出板块': '旅游外出'
 };
 
-const PALETTE = ['#1A2B4C', '#4ADE80', '#6366F1', '#38BDF8', '#F59E0B', '#F472B6', '#34D399', '#A78BFA', '#FB923C', '#94A3B8'];
+const PALETTE = ['#4E8A5A', '#C9A227', '#4C8DB5', '#C96F4A', '#7A8B99', '#9B7BA6', '#6E8B3D', '#A0765A', '#5B8C6E', '#94A3B8'];
 
 /* ---------- 工具 ---------- */
 function uid() {

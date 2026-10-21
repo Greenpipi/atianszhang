@@ -8,6 +8,7 @@ const App = {
     wish: { sort: 'date-desc', cat: '' },
     cal: { month: thisMonth(), selected: todayStr(), view: 'calendar' },
     home: { view: 'week', anchor: todayStr() },
+    rentalMonth: thisMonth(),
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
     settingsLedgerType: 'personal',
     rating: 0,
@@ -154,6 +155,17 @@ const App = {
         for (const l of DEFAULT_LEDGERS) await Store.insert('ledgers', l);
         changed = true;
       }
+      // 旧版数据清理：出租屋曾是独立账本，现改为主账本的记录标记
+      const staleRental = ledgers.filter(l => l.type === 'rental');
+      if (staleRental.length) {
+        for (const l of staleRental) {
+          for (const r of records.filter(x => x.ledger_id === l.id)) await Store.remove('records', r.id);
+          for (const c of categories.filter(x => x.ledger_id === l.id)) await Store.remove('categories', c.id);
+          for (const b of budgets.filter(x => x.ledger_id === l.id)) await Store.remove('budgets', b.id);
+          await Store.remove('ledgers', l.id);
+        }
+        changed = true;
+      }
       if (!categories.length) {
         const ls = await Store.list('ledgers');
         for (const l of ls) {
@@ -161,6 +173,13 @@ const App = {
           for (const c of defs) await Store.insert('categories', { ledger_id: l.id, name: c.name, kind: c.kind, subs: c.subs });
         }
         changed = true;
+      } else {
+        // 老用户补「出租屋」大类
+        const personal = (await Store.list('ledgers')).find(l => l.type === 'personal') || ledgers[0];
+        if (personal && !categories.some(c => c.ledger_id === personal.id && c.name === RENTAL_CAT)) {
+          const def = (DEFAULT_CATEGORIES.personal || []).find(c => c.name === RENTAL_CAT);
+          if (def) { await Store.insert('categories', { ledger_id: personal.id, name: def.name, kind: def.kind, subs: def.subs }); changed = true; }
+        }
       }
       if (!templates.length) {
         const ls = await Store.list('ledgers');
@@ -202,12 +221,8 @@ const App = {
   /* ---------- 路由 ---------- */
   route() {
     const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
-    const names = { ledger: '记账本', calendar: '日历记账', wishlist: '好物仓库', stats: '统计', rental: '出租屋账本', budget: '预算设置', settings: '设置' };
+    const names = { ledger: '记账本', calendar: '日历记账', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
     this.state.route = names[r] ? r : 'ledger';
-    if (this.state.route === 'rental') {
-      const rental = this.state.ledgers.find(l => l.type === 'rental');
-      if (rental) this.state.currentLedgerId = rental.id;
-    }
     document.getElementById('page-title').textContent = names[this.state.route];
     document.querySelectorAll('.nav-item').forEach(a => {
       a.classList.toggle('active', a.dataset.route === this.state.route);
@@ -451,11 +466,11 @@ const App = {
   },
 
   /* ---------- 记录列表 ---------- */
-  recordsListHTML(ledgerId, month) {
+  recordsListHTML(ledgerId, month, onlyRental) {
     const recs = this.recsOf(ledgerId)
-      .filter(r => monthOf(r.date) === month)
+      .filter(r => monthOf(r.date) === month && (!onlyRental || r.rental))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created_at < b.created_at ? 1 : -1)));
-    if (!recs.length) return '<div class="empty"><p>本月还没有记录，记一笔吧</p></div>';
+    if (!recs.length) return '<div class="empty"><p>' + (onlyRental ? '本月还没有出租屋支出' : '本月还没有记录，记一笔吧') + '</p></div>';
     const days = {};
     recs.forEach(r => { (days[r.date] = days[r.date] || []).push(r); });
     return Object.keys(days).sort().reverse().map(d => {
@@ -472,11 +487,13 @@ const App = {
   recItemHTML(r, ledgerId) {
     const kind = r.kind || this.kindOf(ledgerId, r.category);
     const inc = kind === 'income';
+    const rm = (r.category === RENTAL_CAT && RENTAL_META[r.sub]) ? RENTAL_META[r.sub] : null;
     return `
-    <div class="rec-item" data-rid="${r.id}">
-      <div class="rec-icon ${inc ? 'inc' : ''}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
+    <div class="rec-item${r.rental ? ' is-rental' : ''}" data-rid="${r.id}">
+      <div class="rec-icon ${inc ? 'inc' : ''}"${rm ? ' style="background:' + rm.color + '1F;color:' + rm.color + '"' : ''}>${inc ? '收' : (rm ? rm.emoji : esc((r.category || '?').slice(0, 1)))}</div>
       <div class="rec-main">
         <div class="rec-title">${esc(r.category)} <span class="sub">· ${esc(r.sub)}</span>
+          ${r.rental ? '<span class="badge badge-green" title="归入出租屋">🏠 出租屋</span>' : ''}
           ${r.favorite ? '<span class="badge badge-green">心仪</span>' : ''}</div>
         ${r.note ? '<div class="rec-note">' + esc(r.note) + '</div>' : ''}
       </div>
@@ -515,7 +532,7 @@ const App = {
       <button class="btn btn-ghost btn-sm" data-nav="prev">‹ 上月</button>
       <b style="font-size:13.5px;min-width:76px;text-align:center">${y} 年 ${m} 月</b>
       <button class="btn btn-ghost btn-sm" data-nav="next">下月 ›</button>
-      <input type="month" value="${month}" data-jump style="height:32px;border:1.5px solid var(--line);border-radius:9px;padding:0 8px;background:#FAFBFD">
+      <input type="month" value="${month}" data-jump style="height:32px;border:1px solid var(--line);border-radius:9px;padding:0 8px;background:#fff">
     </div>`;
   },
 
@@ -535,9 +552,6 @@ const App = {
 
   /* ---------- 视图：记账本 ---------- */
   renderLedger() {
-    const lid = this.state.currentLedgerId;
-    const l = this.curLedger();
-    if (l && l.type === 'rental') return this.renderLedgerRental();
     return this.renderLedgerHome();
   },
 
@@ -683,7 +697,7 @@ const App = {
               return `<div class="wk-rec" data-rid="${r.id}">
                 <div class="rec-icon ${inc ? 'inc' : ''}" style="${inc ? '' : 'background:' + col + '1F;color:' + col}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
                 <div class="wk-rec-main">
-                  <div class="wk-rec-name">${esc(r.note || r.sub || r.category)}</div>
+                  <div class="wk-rec-name">${r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : ''}${esc(r.note || r.sub || r.category)}</div>
                   <div class="wk-rec-amt ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount, { plain: true })}</div>
                 </div>
               </div>`;
@@ -752,52 +766,6 @@ const App = {
     host.querySelectorAll('.y2-card').forEach(c => {
       c.onclick = () => { home.view = 'month'; home.anchor = c.dataset.ym; this.renderLedgerHome(); };
     });
-  },
-
-  renderLedgerRental() {
-    const el = document.getElementById('view-ledger');
-    const lid = this.state.currentLedgerId;
-    const month = this.state.ledgerMonth;
-    const s = this.monthSummary(lid, month);
-    const alerts = this.budgetAlerts(lid, month);
-
-    el.innerHTML = `
-      <div class="grid grid-3" style="margin-bottom:20px">
-        <div class="stat-card">
-          <div class="stat-label">本月支出</div>
-          <div class="stat-value expense">${fmtMoney(s.expense)}</div>
-          <div class="stat-foot">${s.count} 笔记录</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">本月收入</div>
-          <div class="stat-value income">${fmtMoney(s.income)}</div>
-          <div class="stat-foot">工资 / 奖金 / 报销等</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">本月结余</div>
-          <div class="stat-value" style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</div>
-          <div class="stat-foot">${month.replace('-', ' 年 ')} 月</div>
-        </div>
-      </div>
-      ${alerts.length ? this.alertStripHTML(alerts) : ''}
-      <div id="ledger-entry"></div>
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">收支明细</div>
-          ${this.monthSwitcherHTML('ledgerMonth', month)}
-        </div>
-        <div id="ledger-recs"></div>
-      </div>`;
-
-    const entry = el.querySelector('#ledger-entry');
-    entry.innerHTML = this.entryFormHTML(lid);
-    this.bindEntryForm(entry, lid);
-    const recs = el.querySelector('#ledger-recs');
-    recs.innerHTML = this.recordsListHTML(lid, month);
-    this.bindRecordsList(recs, lid);
-    const sw = el.querySelector('.card-head');
-    this.bindMonthSwitcher(sw, 'ledgerMonth', () => this.renderLedger());
-    this.enhanceSelects(el);
   },
 
   alertStripHTML(alerts) {
@@ -1055,7 +1023,7 @@ const App = {
         <div class="card">
           <div class="card-head">
             <div><div class="card-title">分类占比</div><div class="card-sub">${st.pie === 'expense' ? '支出' : '收入'}按大类划分</div></div>
-            <select id="st-pie" style="height:34px;border:1.5px solid var(--line);border-radius:9px;padding:0 10px;background:#FAFBFD">
+            <select id="st-pie" style="height:34px;border:1px solid var(--line);border-radius:9px;padding:0 10px;background:#fff">
               <option value="expense" ${st.pie === 'expense' ? 'selected' : ''}>支出</option>
               <option value="income" ${st.pie === 'income' ? 'selected' : ''}>收入</option>
             </select>
@@ -1072,7 +1040,7 @@ const App = {
           <div class="chart-box"><canvas id="line-canvas" height="240"></canvas></div>
           <div class="chart-legend">
             <div class="legend-item"><span class="legend-dot" style="background:#4ADE80"></span>收入</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#1A2B4C"></span>支出</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#2F5D50"></span>支出</div>
           </div>
         </div>
       </div>
@@ -1102,7 +1070,7 @@ const App = {
     Charts.donut(el.querySelector('#pie-canvas'), pieItems, { label: '合计', value: fmtMoney(pieTotal, { plain: true }) });
     Charts.line(el.querySelector('#line-canvas'), labels, [
       { name: '收入', color: '#4ADE80', data: incSeries },
-      { name: '支出', color: '#1A2B4C', data: expSeries }
+      { name: '支出', color: '#2F5D50', data: expSeries }
     ]);
     this.enhanceSelects(el);
   },
@@ -1253,15 +1221,19 @@ const App = {
   },
 
   /* ---------- 新增记账弹窗（日历页用） ---------- */
-  addRecordModal(ledgerId, date, preCat, preSub) {
+  addRecordModal(ledgerId, date, preCat, preSub, rental) {
     const cats = this.catsOf(ledgerId);
     let rating = 0;
+    if (rental && !preCat) preCat = RENTAL_CAT;
     this.openModal(`
       <div class="modal-title">新增记账 · ${esc(date)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
       <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
       <div class="field"><label>小类</label><select id="ad-sub"></select></div>
       <div class="field"><label>金额（元）</label><input id="ad-amt" type="number" min="0" step="0.01" placeholder="0.00"></div>
       <div class="field"><label>备注</label><input id="ad-note" type="text" placeholder="选填"></div>
+      <div class="field"><label>标记</label>
+        <label class="fav-check"><input type="checkbox" id="ad-rental" ${rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
+      </div>
       <div class="field"><label>心仪物品</label>
         <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
       </div>
@@ -1300,6 +1272,7 @@ const App = {
           ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
           note: document.getElementById('ad-note').value.trim(),
           favorite: document.getElementById('ad-fav').checked,
+          rental: document.getElementById('ad-rental').checked,
           rating, date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
         this.closeModal();
@@ -1309,92 +1282,166 @@ const App = {
     };
   },
 
-  /* ---------- 视图：出租屋账本 ---------- */
+  /* ---------- 视图：出租屋（主账本中标记了「出租屋」的记录） ---------- */
   renderRental() {
     const el = document.getElementById('view-rental');
-    const rental = this.state.ledgers.find(l => l.type === 'rental');
-    if (!rental) { el.innerHTML = '<div class="empty"><p>未找到出租屋账本</p></div>'; return; }
-    const lid = rental.id;
-    const month = thisMonth();
-    const s = this.monthSummary(lid, month);
+    const lid = this.state.currentLedgerId;
+    const month = this.state.rentalMonth;
+    const rentalRecs = this.recsOf(lid).filter(r => r.rental);
+    const monthRecs = rentalRecs.filter(r => monthOf(r.date) === month);
+    const expense = monthRecs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
 
+    // 固定费用月金额（挂在「出租屋」大类下）
+    const fixedBudget = name => {
+      const b = this.state.budgets.find(x => x.ledger_id === lid && x.category === RENTAL_CAT && x.sub === name);
+      return b ? Number(b.amount) || 0 : 0;
+    };
+    const fixedTotal = RENTAL_FIXED.reduce((s, n) => s + fixedBudget(n), 0);
     const fixedRows = RENTAL_FIXED.map(name => {
-      const b = this.budgetOf(lid, name, name);
-      const limit = b ? Number(b.amount) || 0 : 0;
-      const generated = this.recsOf(lid).some(r => monthOf(r.date) === month && r.category === name);
+      const limit = fixedBudget(name);
+      const generated = monthRecs.some(r => r.sub === name);
       return `
       <div class="budget-row">
         <div class="budget-top">
-          <div class="budget-name">${esc(name)}</div>
+          <div class="budget-name">${(RENTAL_META[name] || {}).emoji || '•'} ${esc(name)}</div>
           <input class="budget-input" type="number" min="0" step="0.01" value="${limit || ''}" placeholder="月金额" data-fixed="${esc(name)}">
           <span class="badge ${generated ? 'badge-green' : 'badge-gray'}">${generated ? '本月已生成' : '待生成'}</span>
         </div>
       </div>`;
     }).join('');
 
+    // 分类统计（按小类）
+    const bySub = {};
+    monthRecs.forEach(r => {
+      const k = r.sub || '其他';
+      bySub[k] = bySub[k] || { amount: 0, count: 0 };
+      bySub[k].amount += Number(r.amount) || 0;
+      bySub[k].count += 1;
+    });
+    const subRows = Object.keys(bySub).sort((a, b) => bySub[b].amount - bySub[a].amount);
+    const subMax = Math.max(...subRows.map(k => bySub[k].amount), 1);
+    const donutItems = subRows.map((k, i) => ({
+      label: k, value: bySub[k].amount,
+      color: (RENTAL_META[k] || {}).color || PALETTE[i % PALETTE.length]
+    }));
+
+    // 近 6 个月趋势
+    const trendLabels = [], trendData = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(month.slice(0, 4), Number(month.slice(5, 7)) - 1 - i, 1);
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      trendLabels.push((d.getMonth() + 1) + ' 月');
+      trendData.push(rentalRecs.filter(r => monthOf(r.date) === key).reduce((s, r) => s + (Number(r.amount) || 0), 0));
+    }
+
     el.innerHTML = `
+      <div class="rental-head">
+        <div>
+          <div class="card-title">出租屋</div>
+          <div class="card-sub">主账本中标记为「出租屋」的支出，同时计入总账</div>
+        </div>
+        <button class="btn btn-accent" id="rental-add">＋ 记一笔出租屋支出</button>
+      </div>
       <div class="grid grid-3" style="margin-bottom:20px">
-        <div class="stat-card"><div class="stat-label">本月支出</div><div class="stat-value expense">${fmtMoney(s.expense)}</div><div class="stat-foot">${month.replace('-', ' 年 ')} 月</div></div>
-        <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${s.count}</div></div>
-        <div class="stat-card"><div class="stat-label">固定费用合计</div><div class="stat-value" style="color:var(--purple)">${fmtMoney(RENTAL_FIXED.reduce((sum, n) => { const b = this.budgetOf(lid, n, n); return sum + (b ? Number(b.amount) || 0 : 0); }, 0))}</div><div class="stat-foot">每月自动生成的费用</div></div>
+        <div class="stat-card"><div class="stat-label">本月出租屋支出</div><div class="stat-value expense">${fmtMoney(expense)}</div><div class="stat-foot">${month.replace('-', ' 年 ')} 月 · ${monthRecs.length} 笔</div></div>
+        <div class="stat-card"><div class="stat-label">记录总数</div><div class="stat-value">${rentalRecs.length}</div><div class="stat-foot">全部标记为出租屋的支出</div></div>
+        <div class="stat-card"><div class="stat-label">月度固定费用合计</div><div class="stat-value" style="color:var(--accent-deep)">${fmtMoney(fixedTotal)}</div><div class="stat-foot">${RENTAL_FIXED.join(' / ')}</div></div>
       </div>
 
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">固定费用</div><div class="card-sub">设置每月金额，一键生成本月记录</div></div>
-          <button class="btn btn-accent" id="gen-fixed">⚡ 一键生成本月记录</button>
+          <button class="btn btn-primary" id="gen-fixed">⚡ 一键生成本月记录</button>
         </div>
         ${fixedRows}
       </div>
 
-      <div id="rental-entry"></div>
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">分类统计</div><div class="card-sub">${month.replace('-', ' 年 ')} 月各分类占比</div></div>
+        </div>
+        ${subRows.length ? `
+          <div class="rental-stat-grid">
+            <div class="chart-box" style="max-width:280px;margin:0 auto"><canvas id="rental-donut" height="240"></canvas></div>
+            <div class="mini-bars">
+              ${subRows.map(k => {
+                const meta = RENTAL_META[k] || {};
+                return `
+                <div class="mini-bar-row">
+                  <div class="mini-bar-top"><span>${meta.emoji || '•'} ${esc(k)} <span style="color:var(--muted)">×${bySub[k].count}</span></span><b>${fmtMoney(bySub[k].amount)}</b></div>
+                  <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.max(2, bySub[k].amount / subMax * 100)}%;background:${meta.color || 'var(--accent)'}"></div></div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        ` : '<div class="empty"><p>本月暂无出租屋支出</p></div>'}
+      </div>
 
       <div class="card">
-        <div class="card-head"><div class="card-title">出租屋明细</div></div>
+        <div class="card-head"><div><div class="card-title">近 6 个月趋势</div><div class="card-sub">出租屋月度支出</div></div></div>
+        <div class="chart-box"><canvas id="rental-line" height="180"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">出租屋明细</div>
+          ${this.monthSwitcherHTML('rentalMonth', month)}
+        </div>
         <div id="rental-recs"></div>
       </div>`;
 
+    // 固定费用金额设置
     el.querySelectorAll('[data-fixed]').forEach(inp => {
       inp.onchange = async () => {
         const name = inp.dataset.fixed;
         const v = parseFloat(inp.value) || 0;
         try {
-          const b = this.budgetOf(lid, name, name);
+          const b = this.state.budgets.find(x => x.ledger_id === lid && x.category === RENTAL_CAT && x.sub === name);
           if (b) await Store.update('budgets', b.id, { amount: v });
-          else if (v > 0) await Store.insert('budgets', { ledger_id: lid, category: name, sub: name, amount: v });
+          else if (v > 0) await Store.insert('budgets', { ledger_id: lid, category: RENTAL_CAT, sub: name, amount: v });
           this.toast(name + ' 月金额已设为 ' + fmtMoney(v, { plain: true }), 'ok');
           await this.loadData();
+          this.renderRental();
         } catch (e) { this.toast(e.message, 'err'); }
       };
     });
 
+    // 一键生成
     el.querySelector('#gen-fixed').onclick = async () => {
+      const isCur = month === thisMonth();
+      const date = isCur ? todayStr() : month + '-01';
       let n = 0;
       for (const name of RENTAL_FIXED) {
-        const b = this.budgetOf(lid, name, name);
-        const amt = b ? Number(b.amount) || 0 : 0;
+        const amt = fixedBudget(name);
         if (amt <= 0) continue;
-        const exists = this.recsOf(lid).some(r => monthOf(r.date) === month && r.category === name);
-        if (exists) continue;
+        if (monthRecs.some(r => r.sub === name)) continue;
         try {
           await Store.insert('records', {
-            ledger_id: lid, category: name, sub: name, amount: amt,
-            note: '本月固定费用', favorite: false, rating: 0, date: todayStr(), image: null, kind: 'expense'
+            ledger_id: lid, category: RENTAL_CAT, sub: name, amount: amt,
+            note: '本月固定费用', favorite: false, rental: true, rating: 0, date, image: null, kind: 'expense'
           });
           n++;
         } catch (e) { this.toast(e.message, 'err'); }
       }
       this.toast(n ? '已生成 ' + n + ' 条固定费用记录' : '本月固定费用已全部生成', n ? 'ok' : '');
       await this.loadData();
+      this.renderRental();
     };
 
-    const entry = el.querySelector('#rental-entry');
-    entry.innerHTML = this.entryFormHTML(lid);
-    this.bindEntryForm(entry, lid);
+    el.querySelector('#rental-add').onclick = () => {
+      const isCur = month === thisMonth();
+      this.addRecordModal(lid, isCur ? todayStr() : month + '-01', RENTAL_CAT, null, true);
+    };
+
     const recs = el.querySelector('#rental-recs');
-    recs.innerHTML = this.recordsListHTML(lid, month);
+    recs.innerHTML = this.recordsListHTML(lid, month, true);
     this.bindRecordsList(recs, lid);
+    const sw = recs.closest('.card').querySelector('.card-head');
+    this.bindMonthSwitcher(sw, 'rentalMonth', () => this.renderRental());
     this.enhanceSelects(el);
+
+    if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, '本月合计');
+    Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#4E8A5A', data: trendData }]);
   },
 
   /* ---------- 视图：预算设置 ---------- */
@@ -1518,14 +1565,14 @@ const App = {
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">分类管理</div><div class="card-sub">增删改查大类与小类</div></div>
-          <select id="cfg-ledger" style="height:36px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD">
+          <select id="cfg-ledger" style="height:36px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff">
             ${this.state.ledgers.map(l => '<option value="' + l.id + '" ' + (l.type === this.state.settingsLedgerType ? 'selected' : '') + '>' + esc(l.name) + '</option>').join('')}
           </select>
         </div>
         <div id="cat-mgr"></div>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <input id="new-cat-name" placeholder="新大类名称" style="flex:1;min-width:140px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 12px;background:#FAFBFD">
-          <select id="new-cat-kind" style="height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD">
+          <input id="new-cat-name" placeholder="新大类名称" style="flex:1;min-width:140px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#fff">
+          <select id="new-cat-kind" style="height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff">
             <option value="expense">支出</option><option value="income">收入</option>
           </select>
           <button class="btn btn-primary" id="add-cat">添加大类</button>
@@ -1536,8 +1583,8 @@ const App = {
         <div class="card-head"><div><div class="card-title">快捷模板</div><div class="card-sub">记账面板底部的一键模板</div></div></div>
         <div id="tpl-mgr"></div>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-          <select id="tpl-cat" style="flex:1;min-width:130px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD"></select>
-          <select id="tpl-sub" style="flex:1;min-width:130px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:#FAFBFD"></select>
+          <select id="tpl-cat" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
+          <select id="tpl-sub" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
           <button class="btn btn-primary" id="add-tpl">添加模板</button>
         </div>
       </div>`;
@@ -1746,6 +1793,9 @@ const App = {
       <div class="field"><label>金额（元）</label><input id="ed-amt" type="number" min="0" step="0.01" value="${r.amount}"></div>
       <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
       <div class="field"><label>备注</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
+      <div class="field"><label>标记</label>
+        <label class="fav-check"><input type="checkbox" id="ed-rental" ${r.rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
+      </div>
       <div class="field"><label>心仪物品</label>
         <label class="fav-check"><input type="checkbox" id="ed-fav" ${r.favorite ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
       </div>
@@ -1783,6 +1833,7 @@ const App = {
           date: document.getElementById('ed-date').dataset.date || r.date,
           note: document.getElementById('ed-note').value.trim(),
           favorite: document.getElementById('ed-fav').checked,
+          rental: document.getElementById('ed-rental').checked,
           rating, kind: this.kindOf(ledgerId, catSel.value)
         });
         this.closeModal();

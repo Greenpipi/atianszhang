@@ -44,7 +44,7 @@ const Charts = {
     const r = R * 0.64;
 
     if (!total) {
-      ctx.fillStyle = '#9AA3B2';
+      ctx.fillStyle = '#9B9A94';
       ctx.textAlign = 'center';
       ctx.font = '13px Inter, sans-serif';
       ctx.fillText('暂无数据', cx, cy);
@@ -115,8 +115,8 @@ const Charts = {
     const n = labels.length;
 
     // 网格与 Y 轴
-    ctx.strokeStyle = '#EDF1F7';
-    ctx.fillStyle = '#9AA3B2';
+    ctx.strokeStyle = '#F1F1EF';
+    ctx.fillStyle = '#9B9A94';
     ctx.textAlign = 'right';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
