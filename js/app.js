@@ -136,9 +136,88 @@ const App = {
   async enterApp() {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
+    this.initHero();
     await this.loadData();
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
+  },
+
+  /* ---------- 背景头图 ---------- */
+  initHero() {
+    const hero = document.getElementById('page-hero');
+    if (!hero || this._heroBound) return;
+    this._heroBound = true;
+    this.hero = { img: '', x: 50, y: 50 };
+    try {
+      const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
+      if (s && typeof s === 'object') {
+        this.hero.img = typeof s.img === 'string' ? s.img : '';
+        this.hero.x = Math.max(0, Math.min(100, Number(s.x) || 50));
+        this.hero.y = Math.max(0, Math.min(100, Number(s.y) || 50));
+      }
+    } catch (e) { /* ignore */ }
+    this.applyHero();
+
+    const file = document.getElementById('hero-file');
+    const btnChange = document.getElementById('hero-change');
+    const btnReset = document.getElementById('hero-reset');
+    const btnAdjust = document.getElementById('hero-adjust');
+    const hint = document.getElementById('hero-hint');
+
+    btnChange.onclick = () => file.click();
+    file.onchange = async () => {
+      const f = file.files && file.files[0];
+      if (!f) return;
+      try {
+        this.hero.img = await compressImage(f, 1600, 0.82);
+        this.hero.x = 50; this.hero.y = 50;
+        this.saveHero(); this.applyHero();
+        this.toast('背景已更换', 'ok');
+      } catch (e) { this.toast(e.message || '图片读取失败', 'err'); }
+      file.value = '';
+    };
+    btnReset.onclick = () => {
+      this.hero.img = ''; this.hero.x = 50; this.hero.y = 50;
+      this.saveHero(); this.applyHero();
+      this.toast('已恢复默认背景', 'ok');
+    };
+    btnAdjust.onclick = () => {
+      this.heroAdjusting = !this.heroAdjusting;
+      hero.classList.toggle('adjusting', !!this.heroAdjusting);
+      hint.hidden = !this.heroAdjusting;
+      btnAdjust.textContent = this.heroAdjusting ? '保存位置' : '调整位置';
+      if (!this.heroAdjusting) { this.saveHero(); this.toast('位置已保存', 'ok'); }
+    };
+    // 拖动调整（鼠标 + 触摸统一走 pointer 事件）
+    let drag = null;
+    hero.addEventListener('pointerdown', e => {
+      if (!this.heroAdjusting) return;
+      if (e.target.closest('.hero-tools')) return; // 工具按钮不触发拖动
+      drag = { sx: e.clientX, sy: e.clientY, x: this.hero.x, y: this.hero.y };
+      try { hero.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      e.preventDefault();
+    });
+    hero.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const w = hero.clientWidth || 1, h = hero.clientHeight || 1;
+      this.hero.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.sx) / w * 100));
+      this.hero.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.sy) / h * 100));
+      this.applyHero();
+    });
+    const endDrag = () => { drag = null; };
+    hero.addEventListener('pointerup', endDrag);
+    hero.addEventListener('pointercancel', endDrag);
+  },
+  applyHero() {
+    const hero = document.getElementById('page-hero');
+    if (!hero) return;
+    hero.style.backgroundImage = 'url("' + (this.hero.img || HERO_DEFAULT_BG) + '")';
+    hero.style.backgroundPosition = this.hero.x + '% ' + this.hero.y + '%';
+    const r = document.getElementById('hero-reset');
+    if (r) r.hidden = !this.hero.img;
+  },
+  saveHero() {
+    try { localStorage.setItem('fin_bg', JSON.stringify({ img: this.hero.img, x: this.hero.x, y: this.hero.y })); } catch (e) { /* ignore */ }
   },
 
   /* ---------- 数据加载 ---------- */
@@ -553,27 +632,21 @@ const App = {
     return this.renderLedgerHome();
   },
 
-  /* ---------- 记账本主页（左右分栏） ---------- */
+  /* ---------- 记账本主页（顶部快捷横排 + 日历） ---------- */
   renderLedgerHome() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
     const home = this.state.home;
     const s = this.monthSummary(lid, thisMonth());
 
-    const quickHTML = QUICK_SECTIONS.map(sec => {
-      const btns = (DEFAULT_TEMPLATES || [])
-        .filter(t => t.section === sec)
-        .map(t => `
+    // 快捷记账：日历上方横排一行（日常 → 爱好 → 旅游）
+    const quickHTML = QUICK_SECTIONS.map(sec => (DEFAULT_TEMPLATES || [])
+      .filter(t => t.section === sec)
+      .map(t => `
           <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
             <span class="qemoji">${t.emoji || '•'}</span>
             <span class="qlabel">${esc(quickShort(t.label))}</span>
-          </button>`).join('');
-      return `
-        <div class="qgroup">
-          <div class="qgroup-title">${esc(QUICK_SECTION_TITLE[sec] || sec)}</div>
-          <div class="qgrid">${btns}</div>
-        </div>`;
-    }).join('');
+          </button>`).join('')).join('');
 
     el.innerHTML = `
       <div class="home-summary">
@@ -581,28 +654,23 @@ const App = {
         <div class="hs-item"><span>本月收入</span><b class="income">${fmtMoney(s.income)}</b></div>
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
-      <div class="home-split">
-        <aside class="quick-pane">
-          <div class="quick-head">快捷记账</div>
-          ${quickHTML}
-        </aside>
-        <section class="cal-pane">
-          <div class="cal-pane-bar">
-            <div class="seg">
-              <button data-hv="week" class="${home.view === 'week' ? 'on' : ''}">周</button>
-              <button data-hv="month" class="${home.view === 'month' ? 'on' : ''}">月</button>
-              <button data-hv="year" class="${home.view === 'year' ? 'on' : ''}">年</button>
-            </div>
-            <div class="cal-pane-nav">
-              <button class="btn btn-ghost btn-sm" data-hnav="-1">‹</button>
-              <b id="hp-title" style="min-width:120px;text-align:center;font-size:15px"></b>
-              <button class="btn btn-ghost btn-sm" data-hnav="1">›</button>
-              <button class="btn btn-ghost btn-sm" data-htoday>今天</button>
-            </div>
+      <div class="qbar">${quickHTML}</div>
+      <section class="cal-pane">
+        <div class="cal-pane-bar">
+          <div class="seg">
+            <button data-hv="week" class="${home.view === 'week' ? 'on' : ''}">周</button>
+            <button data-hv="month" class="${home.view === 'month' ? 'on' : ''}">月</button>
+            <button data-hv="year" class="${home.view === 'year' ? 'on' : ''}">年</button>
           </div>
-          <div id="home-calendar"></div>
-        </section>
-      </div>`;
+          <div class="cal-pane-nav">
+            <button class="btn btn-ghost btn-sm" data-hnav="-1">‹</button>
+            <b id="hp-title" style="min-width:120px;text-align:center;font-size:15px"></b>
+            <button class="btn btn-ghost btn-sm" data-hnav="1">›</button>
+            <button class="btn btn-ghost btn-sm" data-htoday>今天</button>
+          </div>
+        </div>
+        <div id="home-calendar"></div>
+      </section>`;
 
     // 快捷按钮 → 带出分类记账
     el.querySelectorAll('.qbtn').forEach(b => {
@@ -682,12 +750,11 @@ const App = {
           <div class="wk-body">
             ${recs.length ? recs.map(r => {
               const inc = kindOfR(r) === 'income';
-              return `<div class="wk-rec${inc ? ' income' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}">
-                <span class="wk-emoji">${catEmoji(r.category)}</span>
-                <div class="wk-rec-main">
-                  <div class="wk-rec-amt">${inc ? '+' : '-'}${fmtShort(r.amount)}</div>
-                  <div class="wk-rec-name">${r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : ''}${esc(r.note || r.sub || r.category)}</div>
-                </div>
+              return `<div class="wk-rec${inc ? ' income' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}${r.note ? '｜' + esc(r.note) : ''}">
+                <div class="wk-rec-cat">${r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : ''}${catEmoji(r.category)} ${esc(r.category)}</div>
+                ${r.sub ? `<div class="wk-rec-sub">${subEmoji(r.sub)} ${esc(r.sub)}</div>` : ''}
+                ${r.note ? `<div class="wk-rec-note">${esc(r.note)}</div>` : ''}
+                <div class="wk-rec-amt">${inc ? '+' : ''}${fmtMoney(r.amount)}</div>
               </div>`;
             }).join('') : '<div class="wk-empty">无记录</div>'}
           </div>
@@ -718,14 +785,15 @@ const App = {
               : (out ? '' : '<button type="button" class="m2-plus" data-add="' + key + '">+</button>')}
           </div>
           <div class="m2-body">
-            ${recs.slice(0, 3).map(r => {
+            ${recs.slice(0, 2).map(r => {
               const inc = kindOfR(r) === 'income';
-              return '<div class="m2-rec' + (inc ? ' income' : '') + '" data-rid="' + r.id + '" title="' + esc(r.category) + '｜' + fmtMoney(r.amount) + '">' +
-                '<span class="m2-emoji">' + catEmoji(r.category) + '</span>' +
-                '<span class="m2-rec-amt">' + (inc ? '+' : '-') + fmtShort(r.amount) + '</span>' +
-                '<span class="m2-rec-name">' + esc(r.note || r.sub || r.category) + '</span></div>';
+              return '<div class="m2-rec' + (inc ? ' income' : '') + '" data-rid="' + r.id + '" title="' + esc(r.category) + '｜' + fmtMoney(r.amount) + (r.note ? '｜' + esc(r.note) : '') + '">' +
+                '<div class="m2-rec-cat">' + (r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : '') + catEmoji(r.category) + ' ' + esc(r.category) + '</div>' +
+                (r.sub ? '<div class="m2-rec-sub">' + subEmoji(r.sub) + ' ' + esc(r.sub) + '</div>' : '') +
+                (r.note ? '<div class="m2-rec-note">' + esc(r.note) + '</div>' : '') +
+                '<div class="m2-rec-amt">' + (inc ? '+' : '') + fmtMoney(r.amount) + '</div></div>';
             }).join('')}
-            ${recs.length > 3 ? '<div class="m2-more">+' + (recs.length - 3) + ' 笔</div>' : ''}
+            ${recs.length > 2 ? '<div class="m2-more">+' + (recs.length - 2) + ' 笔</div>' : ''}
           </div>
         </div>`;
       };

@@ -71,6 +71,18 @@
 <!-- ============ 主应用 ============ -->
 <div id="app-view" class="app-shell" hidden>
 
+  <!-- 背景头图：默认浅绿植物插画，可上传本地图片并拖动调整位置 -->
+  <div class="page-hero" id="page-hero">
+    <div class="hero-tools">
+      <button type="button" class="hero-btn" id="hero-change">更换背景</button>
+      <button type="button" class="hero-btn" id="hero-reset" hidden>恢复默认</button>
+      <button type="button" class="hero-btn hero-btn-main" id="hero-adjust">调整位置</button>
+    </div>
+    <div class="hero-hint" id="hero-hint" hidden>拖动图片调整位置，调到满意后点「保存位置」</div>
+    <input type="file" id="hero-file" accept="image/*" hidden>
+  </div>
+
+  <div class="shell-body">
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-brand">
       <img src="logo.png" alt="" width="30" height="30">
@@ -139,6 +151,7 @@
       <section class="view" id="view-budget"></section>
       <section class="view" id="view-settings"></section>
     </main>
+  </div>
   </div>
 </div>
 

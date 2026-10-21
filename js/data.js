@@ -5,6 +5,35 @@ const DEFAULT_CFG = {
   key: 'sb_publishable_5892YBRrQR_lE0raFn5eAQ_u5EWOy3J'
 };
 
+/* 背景头图默认插画：浅绿植物（宽幅 1200×200，cover 适配） */
+const HERO_PLANT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 200" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="hbg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#ECFDF5"/><stop offset=".55" stop-color="#F0FDF4"/><stop offset="1" stop-color="#EFF6FF"/>
+</linearGradient>
+<g id="hsprig">
+<path d="M60 150C52 104 38 66 10 38" stroke="#A7F3D0" stroke-width="3" fill="none" stroke-linecap="round"/>
+<path d="M54 108c-18-6-30-22-30-40 18 4 30 20 30 40z" fill="#D1FAE5"/>
+<path d="M38 76c16-10 22-28 18-46-16 8-22 26-18 46z" fill="#A7F3D0"/>
+<path d="M24 54c-16-4-28-18-30-36 17 3 29 17 30 36z" fill="#D1FAE5"/>
+<path d="M14 36c15-8 23-24 21-42-15 7-23 23-21 42z" fill="#ECFDF5"/>
+<circle cx="44" cy="88" r="5" fill="#A7F3D0"/>
+<circle cx="34" cy="104" r="4" fill="#D1FAE5"/>
+</g>
+</defs>
+<rect width="1200" height="200" fill="url(#hbg)"/>
+<circle cx="1055" cy="42" r="26" fill="#D1FAE5" opacity=".55"/>
+<circle cx="150" cy="34" r="18" fill="#D1FAE5" opacity=".5"/>
+<use href="#hsprig" transform="translate(46,44) scale(1.15)"/>
+<use href="#hsprig" transform="translate(178,86) scale(.8)"/>
+<use href="#hsprig" transform="translate(1154,156) scale(-1.15,1.15)"/>
+<use href="#hsprig" transform="translate(1022,114) scale(-.8,.8)"/>
+<circle cx="600" cy="170" r="4" fill="#A7F3D0"/>
+<circle cx="640" cy="186" r="3" fill="#A7F3D0"/>
+<circle cx="560" cy="188" r="3" fill="#A7F3D0"/>
+</svg>`;
+const HERO_DEFAULT_BG = 'data:image/svg+xml;utf8,' + encodeURIComponent(HERO_PLANT_SVG);
+
 const LEDGER_PERSONAL = '个人记账本';
 
 const DEFAULT_LEDGERS = [
@@ -66,11 +95,6 @@ const DEFAULT_TEMPLATES = [
 ];
 
 const QUICK_SECTIONS = ['日常支出板块', '爱好就是一切板块', '旅游外出板块'];
-const QUICK_SECTION_TITLE = {
-  '日常支出板块': '日常支出',
-  '爱好就是一切板块': '爱好就是一切',
-  '旅游外出板块': '旅游外出'
-};
 /* 快捷按钮短标签（≤2 字，宽度固定不被文字撑开；老数据无 short 字段时按 label 回退） */
 const QUICK_SHORT = {
   '早餐': '早餐', '吃吃喝喝': '吃喝', '奶茶零食': '奶茶', '休闲娱乐': '休闲',
@@ -113,12 +137,45 @@ function fmtShort(n) {
   if (a >= 1000) return sign + +(a / 1000).toFixed(1) + 'k';
   return sign + (+a.toFixed(2));
 }
-/* 分类 emoji：按内置模板匹配，出租屋/收入等无模板的走兜底 */
+/* 分类 emoji：按内置模板匹配，出租屋/收入等无模板的走兜底；
+ * 用户自建/改名的分类（如「车消费」）按关键词规则匹配 */
 const CAT_EMOJI_FALLBACK = { '出租屋': '🏠', '综合收入': '💰' };
+/* 关键词 → emoji（按顺序优先匹配，覆盖用户自定义分类/小类名） */
+const EMOJI_RULES = [
+  [/奶茶|咖啡|饮料|饮品/, '🧋'],
+  [/早餐|早点|包子|豆浆|油条/, '🥪'],
+  [/外卖|午饭|晚饭|午餐|晚餐|吃饭|聚餐|餐饮|美食|小吃|吃/, '🍱'],
+  [/零食|甜食|甜品|蛋糕/, '🍰'],
+  [/游戏/, '🎮'],
+  [/谷子|动漫|二次元|周边|徽章|吧唧|手办/, '🪶'],
+  [/文创|文具|书店|图书|书/, '🖋️'],
+  [/数码|电子|电脑|手机|耳机|硬件|软件/, '💻'],
+  [/景点|门票|旅游|旅行|酒店|度假|民宿|机票|车票/, '🏨'],
+  [/演唱会|电影|观影|娱乐|休闲|剧本|桌游/, '🎬'],
+  [/医|药|健康|养生|按摩|美容|美发|运动|健身|牙/, '💊'],
+  [/工资|薪水|收入|理财|奖金|分红|人情|红包|报销/, '💰'],
+  [/购物|日用|百货|衣服|鞋|袜|山姆|超市|商超/, '🛒'],
+  [/宠|猫|狗|铲屎/, '🐱'],
+  [/租|房|物业|水费|电费|燃气|暖气|装修|搬家|房贷|保险/, '🏠'],
+  [/车|加油|停车|充电|驾|交通|地铁|公交|滴滴|打车|过路|停车/, '🚗'],
+  [/餐厨|厨具|电器|杂货|收纳/, '📦']
+];
+function emojiByKeyword(name) {
+  for (const [re, e] of EMOJI_RULES) if (re.test(name)) return e;
+  return '💸';
+}
 function catEmoji(cat) {
   if (CAT_EMOJI_FALLBACK[cat]) return CAT_EMOJI_FALLBACK[cat];
   const t = DEFAULT_TEMPLATES.find(t => t.category === cat);
-  return t ? (t.emoji || '💸') : '💸';
+  if (t) return t.emoji || '💸';
+  return emojiByKeyword(cat);
+}
+/* 小类 emoji：优先模板精确匹配，再走关键词 */
+function subEmoji(sub) {
+  if (!sub) return '';
+  const t = DEFAULT_TEMPLATES.find(t => t.sub === sub);
+  if (t) return t.emoji || '💸';
+  return emojiByKeyword(sub);
 }
 function daysBetween(dateStr) {
   const a = new Date(dateStr + 'T00:00:00');
