@@ -5,6 +5,7 @@ const Store = {
   user: null,             // { id, email }
   cfg: { url: '', key: '' },
   _realtimeOn: false,
+  _noTagsCol: false,      // records.tags 列缺失（云端未执行升级 SQL）时置 true
   _onDataChange: null,
   _onAuthChange: null,
 
@@ -143,6 +144,12 @@ const Store = {
       || /PGRST205/i.test(m)
       || (/relation/i.test(m) && /does not exist/i.test(m));
   },
+  /* records.tags 列尚未添加（PGRST204）时：剥离 tags 重试，后续不再发送 */
+  _isTagsColErr(e) {
+    const m = (e && e.message) || String(e || '');
+    return /PGRST204/.test(m) || /Could not find the 'tags' column/i.test(m);
+  },
+  _stripTags(row) { const r = { ...row }; delete r.tags; return r; },
   _fallbackToLocal() {
     if (this.mode !== 'supabase') return;
     this.mode = 'local';
@@ -170,8 +177,17 @@ const Store = {
     if (this.mode === 'supabase') {
       try {
         const payload = { ...row, user_id: this.user.id };
+        if (this._noTagsCol) delete payload.tags;
         const { data, error } = await this.sb.from(table).insert(payload).select().single();
-        if (error) throw error;
+        if (error) {
+          if (table === 'records' && 'tags' in payload && this._isTagsColErr(error)) {
+            this._noTagsCol = true;
+            const { data: d2, error: e2 } = await this.sb.from(table).insert(this._stripTags(payload)).select().single();
+            if (e2) throw e2;
+            return d2;
+          }
+          throw error;
+        }
         return data;
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
@@ -189,8 +205,17 @@ const Store = {
   async update(table, id, patch) {
     if (this.mode === 'supabase') {
       try {
-        const { error } = await this.sb.from(table).update(patch).eq('id', id);
-        if (error) throw error;
+        const payload = this._noTagsCol ? this._stripTags(patch) : { ...patch };
+        const { error } = await this.sb.from(table).update(payload).eq('id', id);
+        if (error) {
+          if (table === 'records' && 'tags' in patch && this._isTagsColErr(error)) {
+            this._noTagsCol = true;
+            const { error: e2 } = await this.sb.from(table).update(this._stripTags(patch)).eq('id', id);
+            if (e2) throw e2;
+            return;
+          }
+          throw error;
+        }
         return;
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
@@ -247,6 +272,9 @@ const Store = {
           return { ok: true, msg: '连接成功（数据表尚未创建，请在 Supabase SQL Editor 执行建表 SQL）' };
         }
         return { ok: false, msg: this._dbErr(error) };
+      }
+      if (this._noTagsCol) {
+        return { ok: true, msg: '连接成功（records 表缺 tags 列，好物标签暂不生效，请在 Supabase 执行：alter table records add column if not exists tags text[] not null default \'{}\';）' };
       }
       return { ok: true, msg: '连接成功，数据表可访问' };
     } catch (e) {

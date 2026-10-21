@@ -72,6 +72,63 @@ const DEFAULT_CATEGORIES = {
 
 const RENTAL_FIXED = ['房租', '水费', '电费', '燃气费', '物业费'];
 
+/* ---------- 好物仓库：多标签体系 ----------
+ * 每个好物可同时拥有多个标签；标签 = 「大类-小类」，无小类的大类本身即标签 */
+const GOODS_TAG_GROUPS = [
+  { name: '兴趣分类', subs: ['数码电子', '电子耗材', '数码配件'] },
+  { name: '衣裤鞋袜', subs: ['外套', '上衣', '家居服', '裙子', '裤子', '休闲鞋', '凉鞋', '帽子', '袜子', '围巾', '配饰', '内衣'] },
+  { name: '通用', subs: ['夏季', '冬季', '春秋季'] },
+  { name: '日用品', subs: ['美容美发', '杂货', '家电', '收纳'] },
+  { name: '餐厨用品', subs: [] },
+  { name: '家具', subs: ['家具'] }
+];
+/* 全部合法标签（按体系顺序） */
+function allGoodsTags() {
+  const out = [];
+  for (const g of GOODS_TAG_GROUPS) {
+    if (g.subs.length) g.subs.forEach(s => out.push(g.name + '-' + s));
+    else out.push(g.name);
+  }
+  return out;
+}
+/* 标签短名：衣裤鞋袜-外套 → 外套；餐厨用品 → 餐厨用品（徽章/导航显示用） */
+function goodsTagShort(tag) {
+  const t = String(tag || '');
+  const i = t.indexOf('-');
+  return i > 0 ? t.slice(i + 1) : t;
+}
+/* 规范化：转数组、去空白、去重、过滤非体系内标签 */
+function normGoodsTags(tags) {
+  const valid = new Set(allGoodsTags());
+  const out = [];
+  (Array.isArray(tags) ? tags : []).forEach(t => {
+    const v = String(t == null ? '' : t).trim();
+    if (v && valid.has(v) && !out.includes(v)) out.push(v);
+  });
+  return out;
+}
+/* 老数据迁移：无 tags 的心仪记录，按 category/sub 名称匹配体系标签 */
+function legacyGoodsTags(r) {
+  const all = allGoodsTags();
+  const out = [];
+  [r && r.category, r && r.sub].forEach(n => {
+    const v = String(n == null ? '' : n).trim();
+    if (!v) return;
+    const hit = all.find(t => t === v || t.endsWith('-' + v));
+    if (hit && !out.includes(hit)) out.push(hit);
+  });
+  return out;
+}
+/* 记录的有效标签（兼容 tags 为 null/字符串的老数据） */
+function recTags(r) {
+  if (!r) return [];
+  if (Array.isArray(r.tags)) return normGoodsTags(r.tags);
+  if (typeof r.tags === 'string' && r.tags.trim()) {
+    try { return normGoodsTags(JSON.parse(r.tags)); } catch (e) { return normGoodsTags(r.tags.split(',')); }
+  }
+  return [];
+}
+
 const DEFAULT_TEMPLATES = [
   // 日常支出板块
   { ledger: 'personal', section: '日常支出板块', label: '早餐', emoji: '🥪', category: '饮食支出', sub: '早餐' },

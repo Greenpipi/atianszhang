@@ -5,7 +5,7 @@ const App = {
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
-    wish: { sort: 'date-desc', cat: '' },
+    wish: { sort: 'date-desc', tag: '' },
     home: { view: 'week', anchor: todayStr(), sel: todayStr() },
     rentalMonth: thisMonth(),
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
@@ -269,6 +269,15 @@ const App = {
       }
       if (changed) return this.loadData(silent);
 
+      // 好物仓库多标签迁移：老数据无 tags 字段，按分类名匹配补默认标签（每次会话最多尝试一次，防止缺列时无限递归）
+      const needTags = !this._wishTagsMigrated && records.filter(r => r.favorite && r.tags == null);
+      if (needTags.length) {
+        this._wishTagsMigrated = true;
+        for (const r of needTags) await Store.update('records', r.id, { tags: legacyGoodsTags(r) });
+        changed = true;
+      }
+      if (changed) return this.loadData(silent);
+
       this.state.ledgers = ledgers;
       this.state.categories = categories;
       this.state.records = records;
@@ -436,6 +445,10 @@ const App = {
             </span>心仪物品
           </label>
         </div>
+        <div class="f-tags" id="en-tags-field" style="display:none">
+          <label>好物标签（可多选）</label>
+          <div class="tag-picker" id="en-tagpicker">${this.goodsTagPickerHTML()}</div>
+        </div>
         <div class="f-star">
           <label>评分</label>
           <div class="stars" id="en-stars">
@@ -498,6 +511,8 @@ const App = {
     const dateInp = $('en-date');
     dateInp.onclick = () => this.openCalendar(dateInp);
 
+    this.bindFavTags($('en-fav'), $('en-tags-field'), '#en-tagpicker');
+
     root.querySelectorAll('[data-tpl]').forEach(btn => {
       btn.onclick = () => {
         const t = this.state.templates.filter(x => x.ledger_id === ledgerId)[Number(btn.dataset.tpl)];
@@ -515,6 +530,8 @@ const App = {
       $('en-amt').value = ''; $('en-note').value = ''; $('en-fav').checked = false;
       this.state.rating = 0; paintStars();
       $('en-date').value = todayStr(); $('en-date').dataset.date = todayStr();
+      document.querySelectorAll('#en-tagpicker input[type=checkbox]').forEach(i => { i.checked = false; });
+      $('en-tags-field').style.display = 'none';
     };
     $('en-reset').onclick = reset;
 
@@ -522,6 +539,7 @@ const App = {
       const amount = parseFloat($('en-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
       const date = $('en-date').dataset.date || todayStr();
+      const fav = $('en-fav').checked;
       try {
         await Store.insert('records', {
           ledger_id: ledgerId,
@@ -529,7 +547,8 @@ const App = {
           sub: sub.value,
           amount,
           note: $('en-note').value.trim(),
-          favorite: $('en-fav').checked,
+          favorite: fav,
+          tags: fav ? this.pickedTags('#en-tagpicker') : [],
           rating: this.state.rating,
           date,
           image: null,
@@ -853,15 +872,18 @@ const App = {
     return '<div class="alert-strip ' + cls + '">' + icon + '<span>' + parts.join('；') + '</span></div>';
   },
 
-  /* ---------- 视图：好物仓库 ---------- */
+  /* ---------- 视图：好物仓库（多标签） ---------- */
   renderWishlist() {
     const el = document.getElementById('view-wishlist');
     const lid = this.state.currentLedgerId;
-    let items = this.recsOf(lid).filter(r => r.favorite);
-    const cats = [...new Set(items.map(r => r.category))];
+    const all = this.recsOf(lid).filter(r => r.favorite);
     const f = this.state.wish;
 
-    if (f.cat) items = items.filter(r => r.category === f.cat);
+    // 标签导航计数（按全部好物统计，一个物品可计入多个标签）
+    const tagCounts = {};
+    all.forEach(r => recTags(r).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+
+    let items = f.tag ? all.filter(r => recTags(r).includes(f.tag)) : all;
     const sorters = {
       'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
@@ -876,16 +898,18 @@ const App = {
         <div class="card-head">
           <div>
             <div class="card-title">好物仓库</div>
-            <div class="card-sub">记账时勾选「心仪物品」即可收入这里 · 共 ${items.length} 件</div>
+            <div class="card-sub">${f.tag ? '标签 · ' + esc(goodsTagShort(f.tag)) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
           </div>
         </div>
+        <div class="tag-nav" id="w-tagnav">
+          <button class="tag-chip${f.tag ? '' : ' on'}" data-tag="">全部<b>${all.length}</b></button>
+          ${GOODS_TAG_GROUPS.map(g => {
+            const tags = g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name];
+            return '<div class="tag-group"><span class="tag-group-name">' + esc(g.name) + '</span>' + tags.map(t =>
+              '<button class="tag-chip' + (f.tag === t ? ' on' : '') + '" data-tag="' + esc(t) + '" title="' + esc(t) + '">' + esc(goodsTagShort(t)) + '<b>' + (tagCounts[t] || 0) + '</b></button>').join('') + '</div>';
+          }).join('')}
+        </div>
         <div class="filter-bar">
-          <div class="field"><label>大类筛选</label>
-            <select id="w-cat">
-              <option value="">全部大类</option>
-              ${cats.map(c => '<option value="' + esc(c) + '" ' + (f.cat === c ? 'selected' : '') + '>' + esc(c) + '</option>').join('')}
-            </select>
-          </div>
           <div class="field"><label>排序</label>
             <select id="w-sort">
               <option value="date-desc" ${f.sort === 'date-desc' ? 'selected' : ''}>日期 · 最新</option>
@@ -899,39 +923,36 @@ const App = {
       </div>
       <div class="wish-grid" id="wish-grid"></div>`;
 
-    el.querySelector('#w-cat').onchange = e => { this.state.wish.cat = e.target.value; this.renderWishlist(); };
     el.querySelector('#w-sort').onchange = e => { this.state.wish.sort = e.target.value; this.renderWishlist(); };
+    el.querySelectorAll('#w-tagnav .tag-chip').forEach(ch => {
+      ch.onclick = () => { this.state.wish.tag = ch.dataset.tag; this.renderWishlist(); };
+    });
 
     const grid = el.querySelector('#wish-grid');
     if (!items.length) {
-      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里</p></div>';
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>' + (f.tag ? '该标签下还没有好物' : '还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里') + '</p>';
       return;
     }
     grid.innerHTML = items.map(r => {
       const days = daysBetween(r.date);
       const cost = (Number(r.amount) || 0) / days;
       const name = r.note || (r.category + ' · ' + r.sub);
+      const tags = recTags(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
-        <div class="wish-img" data-act="img">
-          ${r.image
-            ? '<img src="' + r.image + '" alt="' + esc(name) + '">'
-            : '<span class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m5 17 4.5-4.5 3.5 3.5 3-3L19 16"/></svg></span>'}
-          <span class="upload-tip">${r.image ? '点击更换图片' : '点击上传图片'}</span>
-        </div>
         <div class="wish-body">
           <div class="wish-name"><span>${esc(name)}</span><span class="badge ${r.favorite ? 'badge-green' : 'badge-gray'}">${r.favorite ? '使用中' : '已闲置'}</span></div>
           <div class="wish-amount">${fmtMoney(r.amount)}</div>
+          <div class="wish-tags">${tags.length
+            ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + esc(goodsTagShort(t)) + '</span>').join('')
+            : '<span class="wtag none">未贴标签</span>'}</div>
           <div class="wish-meta">
             <div>购入日期<b>${r.date}</b></div>
             <div>已陪伴<b>${days} 天</b></div>
             <div>每日成本<b>${fmtMoney(cost)}</b></div>
-            <div>来源<b>${esc(r.category)} · ${esc(r.sub)}</b></div>
           </div>
         </div>
         <div class="wish-acts">
-          <button class="btn btn-ghost btn-sm" data-act="img">图片</button>
-          <button class="btn btn-ghost btn-sm" data-act="status">${r.favorite ? '标为闲置' : '标为使用中'}</button>
           <button class="btn btn-ghost btn-sm" data-act="edit">编辑</button>
           <button class="btn btn-danger btn-sm" data-act="del">删除</button>
         </div>
@@ -945,14 +966,7 @@ const App = {
           const act = btn.dataset.act;
           const rec = this.state.records.find(r => r.id === rid);
           if (!rec) return;
-          if (act === 'img') {
-            if (btn.tagName === 'DIV' && rec.image) return this.viewImage(rec);
-            this.pickImage(rid);
-          } else if (act === 'status') {
-            await Store.update('records', rid, { favorite: !rec.favorite });
-            this.toast(rec.favorite ? '已标为闲置' : '已标为使用中');
-            await this.loadData();
-          } else if (act === 'edit') {
+          if (act === 'edit') {
             this.editRecord(rid, rec.ledger_id);
           } else if (act === 'del') {
             const ok = await this.confirmDialog('删除好物', '删除后无法恢复，确定删除吗？');
@@ -965,33 +979,6 @@ const App = {
       });
     });
     this.enhanceSelects(el);
-  },
-
-  pickImage(rid) {
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = 'image/*';
-    inp.onchange = async () => {
-      const f = inp.files && inp.files[0];
-      if (!f) return;
-      try {
-        this.toast('图片处理中…');
-        const data = await compressImage(f);
-        await Store.update('records', rid, { image: data });
-        this.toast('图片已保存', 'ok');
-        await this.loadData();
-      } catch (e) { this.toast(e.message || '图片处理失败', 'err'); }
-    };
-    inp.click();
-  },
-
-  viewImage(rec) {
-    this.openModal(`
-      <div class="modal-title">${esc(rec.note || (rec.category + ' · ' + rec.sub))}
-        <button class="icon-btn" style="display:flex" data-close>✕</button>
-      </div>
-      <img src="${rec.image}" style="width:100%;border-radius:12px" alt="">
-    `, true);
   },
 
   /* ---------- 视图：统计 ---------- */
@@ -1148,6 +1135,36 @@ const App = {
     ]);
     this.enhanceSelects(el);
   },
+  /* ---------- 好物标签多选面板（记账/编辑弹窗共用） ---------- */
+  goodsTagPickerHTML() {
+    return GOODS_TAG_GROUPS.map(g => {
+      const opts = g.subs.length
+        ? g.subs.map(s => ({ tag: g.name + '-' + s, label: s }))
+        : [{ tag: g.name, label: g.name }];
+      return `
+      <div class="tag-picker-group">
+        <span class="tag-picker-name">${esc(g.name)}</span>
+        <div class="tag-picker-opts">
+          ${opts.map(o => '<label class="tag-opt"><input type="checkbox" value="' + esc(o.tag) + '"><span>' + esc(o.label) + '</span></label>').join('')}
+        </div>
+      </div>`;
+    }).join('');
+  },
+  /* 勾选/取消「收入好物仓库」时显示/隐藏标签面板，取消时清空已选 */
+  bindFavTags(favEl, fieldEl, pickerSel) {
+    if (!favEl || !fieldEl) return;
+    const sync = () => {
+      fieldEl.style.display = favEl.checked ? '' : 'none';
+      if (!favEl.checked) document.querySelectorAll(pickerSel + ' input[type=checkbox]').forEach(i => { i.checked = false; });
+    };
+    favEl.onchange = sync;
+    sync();
+  },
+  /* 读取面板内勾选的标签（规范化） */
+  pickedTags(pickerSel) {
+    return normGoodsTags(Array.from(document.querySelectorAll(pickerSel + ' input[type=checkbox]:checked')).map(i => i.value));
+  },
+
   /* ---------- 新增记账弹窗 ---------- */
   addRecordModal(ledgerId, date, preCat, preSub, rental) {
     const cats = this.catsOf(ledgerId);
@@ -1164,6 +1181,9 @@ const App = {
       </div>
       <div class="field"><label>心仪物品</label>
         <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
+      </div>
+      <div class="field" id="ad-tags-field" style="display:none"><label>好物标签（可多选）</label>
+        <div class="tag-picker" id="ad-tagpicker">${this.goodsTagPickerHTML()}</div>
       </div>
       <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
@@ -1184,6 +1204,7 @@ const App = {
       this.enhanceSelects(subSel);
     }
     catSel.onchange = fillSubs;
+    this.bindFavTags(document.getElementById('ad-fav'), document.getElementById('ad-tags-field'), '#ad-tagpicker');
     this.enhanceSelects(document.getElementById('modal-root'));
     document.querySelectorAll('#ad-stars button').forEach(b => {
       b.onclick = () => {
@@ -1195,11 +1216,13 @@ const App = {
     document.getElementById('ad-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ad-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      const fav = document.getElementById('ad-fav').checked;
       try {
         await Store.insert('records', {
           ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
           note: document.getElementById('ad-note').value.trim(),
-          favorite: document.getElementById('ad-fav').checked,
+          favorite: fav,
+          tags: fav ? this.pickedTags('#ad-tagpicker') : [],
           rental: document.getElementById('ad-rental').checked,
           rating, date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
@@ -1727,6 +1750,18 @@ const App = {
       <div class="field"><label>心仪物品</label>
         <label class="fav-check"><input type="checkbox" id="ed-fav" ${r.favorite ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
       </div>
+      <div class="field" id="ed-tags-field" style="display:none"><label>好物标签（可多选）</label>
+        <div class="tag-picker" id="ed-tagpicker">${this.goodsTagPickerHTML()}</div>
+      </div>
+      <div class="field" id="ed-img-field" style="display:none"><label>图片</label>
+        <div class="rec-img-row">
+          <div class="rec-img-prev" id="ed-img-prev">${r.image ? '<img src="' + r.image + '" alt="">' : '<span class="ph">暂无图片</span>'}</div>
+          <div class="rec-img-btns">
+            <button class="btn btn-ghost btn-sm" id="ed-img-up" type="button">${r.image ? '更换图片' : '上传图片'}</button>
+            <button class="btn btn-ghost btn-sm" id="ed-img-del" type="button" style="display:${r.image ? '' : 'none'}">移除图片</button>
+          </div>
+        </div>
+      </div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
         <button class="btn btn-ghost" data-close>取消</button>
@@ -1743,6 +1778,49 @@ const App = {
     fillSubs(r.sub);
     catSel.onchange = () => fillSubs();
     this.enhanceSelects(document.getElementById('modal-root'));
+    // 好物标签：回显已选 + 勾选仓库时显示面板/图片
+    const favEl = document.getElementById('ed-fav');
+    recTags(r).forEach(t => {
+      const box = document.querySelector('#ed-tagpicker input[value="' + t.replace(/"/g, '\\"') + '"]');
+      if (box) box.checked = true;
+    });
+    this.bindFavTags(favEl, document.getElementById('ed-tags-field'), '#ed-tagpicker');
+    const imgField = document.getElementById('ed-img-field');
+    const imgPrev = document.getElementById('ed-img-prev');
+    const imgUp = document.getElementById('ed-img-up');
+    const imgDel = document.getElementById('ed-img-del');
+    const syncImgField = () => { if (imgField) imgField.style.display = favEl.checked ? '' : 'none'; };
+    favEl.addEventListener('change', syncImgField);
+    syncImgField();
+    imgUp.onclick = () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = async () => {
+        const f = inp.files && inp.files[0];
+        if (!f) return;
+        try {
+          this.toast('图片处理中…');
+          const data = await compressImage(f);
+          await Store.update('records', rid, { image: data });
+          imgPrev.innerHTML = '<img src="' + data + '" alt="">';
+          imgDel.style.display = '';
+          imgUp.textContent = '更换图片';
+          this.toast('图片已保存', 'ok');
+          await this.loadData(true);
+        } catch (e) { this.toast(e.message || '图片处理失败', 'err'); }
+      };
+      inp.click();
+    };
+    imgDel.onclick = async () => {
+      try {
+        await Store.update('records', rid, { image: null });
+        imgPrev.innerHTML = '<span class="ph">暂无图片</span>';
+        imgDel.style.display = 'none';
+        imgUp.textContent = '上传图片';
+        this.toast('图片已移除', 'ok');
+        await this.loadData(true);
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
     const edDate = document.getElementById('ed-date');
     edDate.onclick = () => this.openCalendar(edDate);
     document.querySelectorAll('#ed-stars button').forEach(b => {
@@ -1755,12 +1833,14 @@ const App = {
     document.getElementById('ed-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ed-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      const fav = document.getElementById('ed-fav').checked;
       try {
         await Store.update('records', rid, {
           category: catSel.value, sub: subSel.value, amount,
           date: document.getElementById('ed-date').dataset.date || r.date,
           note: document.getElementById('ed-note').value.trim(),
-          favorite: document.getElementById('ed-fav').checked,
+          favorite: fav,
+          tags: fav ? this.pickedTags('#ed-tagpicker') : [],
           rental: document.getElementById('ed-rental').checked,
           rating, kind: this.kindOf(ledgerId, catSel.value)
         });
@@ -2074,12 +2154,16 @@ begin
     amount numeric not null default 0,
     note text not null default '',
     favorite boolean not null default false,
+    tags text[] not null default '{}',
     rating integer not null default 0,
     date text not null default '',
     image text,
     kind text not null default 'expense',
     created_at timestamptz not null default now()
   ) $ddl$;
+
+  -- 好物仓库多标签：已建库的旧版本补 tags 列（幂等）
+  execute $ddl$ alter table records add column if not exists tags text[] not null default '{}' $ddl$;
 
   execute $ddl$ create table if not exists budgets (
     id uuid primary key default gen_random_uuid(),
