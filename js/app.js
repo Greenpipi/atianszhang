@@ -910,7 +910,7 @@ const App = {
           }).join('')}
         </div>
         <div class="filter-bar">
-          <div class="field"><label>排序</label>
+          <div class="field" style="min-width:190px"><label>排序</label>
             <select id="w-sort">
               <option value="date-desc" ${f.sort === 'date-desc' ? 'selected' : ''}>日期 · 最新</option>
               <option value="date-asc" ${f.sort === 'date-asc' ? 'selected' : ''}>日期 · 最早</option>
@@ -927,6 +927,7 @@ const App = {
     el.querySelectorAll('#w-tagnav .tag-chip').forEach(ch => {
       ch.onclick = () => { this.state.wish.tag = ch.dataset.tag; this.renderWishlist(); };
     });
+    this.enhanceSelects(el);
 
     const grid = el.querySelector('#wish-grid');
     if (!items.length) {
@@ -978,7 +979,6 @@ const App = {
         };
       });
     });
-    this.enhanceSelects(el);
   },
 
   /* ---------- 视图：统计 ---------- */
