@@ -71,6 +71,16 @@ const QUICK_SECTION_TITLE = {
   '爱好就是一切板块': '爱好就是一切',
   '旅游外出板块': '旅游外出'
 };
+/* 快捷按钮短标签（≤2 字，宽度固定不被文字撑开；老数据无 short 字段时按 label 回退） */
+const QUICK_SHORT = {
+  '早餐': '早餐', '吃吃喝喝': '吃喝', '奶茶零食': '奶茶', '休闲娱乐': '休闲',
+  '日常购物': '购物', '养生医疗': '医疗', '租房支出': '租房', '车仙人': '车',
+  '猫仙人': '猫', '游戏氪金': '游戏', '谷子氪金': '谷子', '文创氪金': '文创',
+  '数码氪金': '数码', '景点门票': '门票', '交通费用': '交通', '旅游酒店': '酒店'
+};
+function quickShort(label) {
+  return QUICK_SHORT[label] || String(label || '').slice(0, 2);
+}
 
 const PALETTE = ['#4E8A5A', '#C9A227', '#4C8DB5', '#C96F4A', '#7A8B99', '#9B7BA6', '#6E8B3D', '#A0765A', '#5B8C6E', '#94A3B8'];
 
@@ -93,6 +103,22 @@ function fmtMoney(n, opts) {
   const v = Number(n) || 0;
   const s = v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return opts && opts.plain ? s : '¥' + s;
+}
+/* 金额缩写：3822.4 → 3.8k；12345 → 1.2w；35.5 → 35.5 */
+function fmtShort(n) {
+  const v = Number(n) || 0;
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (a >= 10000) return sign + +(a / 10000).toFixed(1) + 'w';
+  if (a >= 1000) return sign + +(a / 1000).toFixed(1) + 'k';
+  return sign + (+a.toFixed(2));
+}
+/* 分类 emoji：按内置模板匹配，出租屋/收入等无模板的走兜底 */
+const CAT_EMOJI_FALLBACK = { '出租屋': '🏠', '综合收入': '💰' };
+function catEmoji(cat) {
+  if (CAT_EMOJI_FALLBACK[cat]) return CAT_EMOJI_FALLBACK[cat];
+  const t = DEFAULT_TEMPLATES.find(t => t.category === cat);
+  return t ? (t.emoji || '💸') : '💸';
 }
 function daysBetween(dateStr) {
   const a = new Date(dateStr + 'T00:00:00');

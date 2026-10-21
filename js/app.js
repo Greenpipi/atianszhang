@@ -6,7 +6,6 @@ const App = {
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
     wish: { sort: 'date-desc', cat: '' },
-    cal: { month: thisMonth(), selected: todayStr(), view: 'calendar' },
     home: { view: 'week', anchor: todayStr() },
     rentalMonth: thisMonth(),
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
@@ -221,7 +220,7 @@ const App = {
   /* ---------- 路由 ---------- */
   route() {
     const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
-    const names = { ledger: '记账本', calendar: '日历记账', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
+    const names = { ledger: '记账本', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
     this.state.route = names[r] ? r : 'ledger';
     document.getElementById('page-title').textContent = names[this.state.route];
     document.querySelectorAll('.nav-item').forEach(a => {
@@ -261,7 +260,6 @@ const App = {
   renderView() {
     const map = {
       ledger: () => this.renderLedger(),
-      calendar: () => this.renderCalendar(),
       wishlist: () => this.renderWishlist(),
       stats: () => this.renderStats(),
       rental: () => this.renderRental(),
@@ -568,7 +566,7 @@ const App = {
         .map(t => `
           <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
             <span class="qemoji">${t.emoji || '•'}</span>
-            <span class="qlabel">${esc(t.label)}</span>
+            <span class="qlabel">${esc(quickShort(t.label))}</span>
           </button>`).join('');
       return `
         <div class="qgroup">
@@ -651,20 +649,11 @@ const App = {
     return out;
   },
 
-  colorOf() {
-    const lid = this.state.currentLedgerId;
-    const cats = this.catsOf(lid);
-    const map = {};
-    cats.forEach((c, i) => { map[c.name] = PALETTE[i % PALETTE.length]; });
-    return map;
-  },
-
   renderHomeCalendar() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
     const home = this.state.home;
     const host = el.querySelector('#home-calendar');
-    const colOf = this.colorOf();
     const kindOfR = r => r.kind || this.kindOf(lid, r.category);
     const titleEl = el.querySelector('#hp-title');
 
@@ -692,13 +681,12 @@ const App = {
           </div>
           <div class="wk-body">
             ${recs.length ? recs.map(r => {
-              const col = colOf[r.category] || '#6B7280';
               const inc = kindOfR(r) === 'income';
-              return `<div class="wk-rec" data-rid="${r.id}">
-                <div class="rec-icon ${inc ? 'inc' : ''}" style="${inc ? '' : 'background:' + col + '1F;color:' + col}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
+              return `<div class="wk-rec${inc ? ' income' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}">
+                <span class="wk-emoji">${catEmoji(r.category)}</span>
                 <div class="wk-rec-main">
+                  <div class="wk-rec-amt">${inc ? '+' : '-'}${fmtShort(r.amount)}</div>
                   <div class="wk-rec-name">${r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : ''}${esc(r.note || r.sub || r.category)}</div>
-                  <div class="wk-rec-amt ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount, { plain: true })}</div>
                 </div>
               </div>`;
             }).join('') : '<div class="wk-empty">无记录</div>'}
@@ -725,9 +713,11 @@ const App = {
           </div>
           <div class="m2-body">
             ${recs.slice(0, 3).map(r => {
-              const col = colOf[r.category] || '#6B7280';
               const inc = kindOfR(r) === 'income';
-              return '<div class="m2-rec' + (inc ? ' income' : '') + '"><span class="m2-dot" style="background:' + col + '"></span>' + esc(r.note || r.sub || r.category) + '</div>';
+              return '<div class="m2-rec' + (inc ? ' income' : '') + '" data-rid="' + r.id + '" title="' + esc(r.category) + '｜' + fmtMoney(r.amount) + '">' +
+                '<span class="m2-emoji">' + catEmoji(r.category) + '</span>' +
+                '<span class="m2-rec-amt">' + (inc ? '+' : '-') + fmtShort(r.amount) + '</span>' +
+                '<span class="m2-rec-name">' + esc(r.note || r.sub || r.category) + '</span></div>';
             }).join('')}
             ${recs.length > 3 ? '<div class="m2-more">+' + (recs.length - 3) + ' 笔</div>' : ''}
           </div>
@@ -1074,153 +1064,7 @@ const App = {
     ]);
     this.enhanceSelects(el);
   },
-
-  /* ---------- 视图：日历记账 ---------- */
-  renderCalendar() {
-    const el = document.getElementById('view-calendar');
-    const lid = this.state.currentLedgerId;
-    const c = this.state.cal;
-    const l = this.curLedger();
-    const [y, m] = c.month.split('-').map(Number);
-    const cats = this.catsOf(lid);
-    const colorOf = {};
-    cats.forEach((cat, i) => { colorOf[cat.name] = PALETTE[i % PALETTE.length]; });
-    const kindOfR = r => r.kind || this.kindOf(lid, r.category);
-
-    const monthRecs = this.recsOf(lid).filter(r => monthOf(r.date) === c.month)
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created_at < b.created_at ? 1 : -1)));
-    const byDate = {};
-    monthRecs.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
-
-    const dayGroupHTML = (d) => {
-      const items = byDate[d] || [];
-      if (!items.length) return '';
-      const dayExp = items.reduce((s, r) => s + (kindOfR(r) === 'expense' ? Number(r.amount) || 0 : 0), 0);
-      const wd = '日一二三四五六'[new Date(d + 'T00:00:00').getDay()];
-      return `
-      <div class="cal-daygroup" data-date="${d}">
-        <div class="cal-daygroup-head" data-goto="${d}">
-          <span>${d.slice(5).replace('-', ' 月 ')} 日 · 周${wd}${d === todayStr() ? ' · 今天' : ''}</span>
-          <span>${items.length} 笔 · 支出 ${fmtMoney(dayExp, { plain: true })}</span>
-        </div>
-        ${items.map(r => {
-          const col = colorOf[r.category] || '#6B7280';
-          const inc = kindOfR(r) === 'income';
-          return `
-          <div class="cal-item" data-rid="${r.id}">
-            <div class="rec-icon ${inc ? 'inc' : ''}" style="${inc ? '' : 'background:' + col + '1F;color:' + col}">${inc ? '收' : esc((r.category || '?').slice(0, 1))}</div>
-            <div class="cal-item-main">
-              <div class="cal-item-name">${esc(r.note || r.sub)}</div>
-              <div class="cal-item-sub">${esc(r.category)} · ${esc(r.sub)}</div>
-            </div>
-            <div class="cal-item-amt ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount)}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    };
-
-    const dates = Object.keys(byDate).sort().reverse();
-    const listHTML = dates.map(dayGroupHTML).join('') || '<div class="empty"><p>本月还没有记录，点日历里的 + 记一笔</p></div>';
-
-    // 月历网格（周日为一周开始）
-    const startDow = new Date(y, m - 1, 1).getDay();
-    const dim = new Date(y, m, 0).getDate();
-    const prevDim = new Date(y, m - 1, 0).getDate();
-    const today = todayStr();
-    const mk = (yy, mm, dd) => {
-      const dt = new Date(yy, mm - 1, dd);
-      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
-    };
-    let cellsHTML = '';
-    for (let i = 0; i < 42; i++) {
-      const d = i - startDow + 1;
-      let key, dayNum, out;
-      if (d < 1) { key = mk(y, m - 1, prevDim + d); dayNum = prevDim + d; out = true; }
-      else if (d > dim) { key = mk(y, m + 1, d - dim); dayNum = d - dim; out = true; }
-      else { key = mk(y, m, d); dayNum = d; out = false; }
-      const items = byDate[key] || [];
-      cellsHTML += `
-      <div class="mcell${out ? ' out' : ''}${key === today ? ' today' : ''}${key === c.selected ? ' sel' : ''}" data-date="${key}">
-        <div class="mcell-top">
-          ${items.length
-            ? '<span class="mcell-badge">' + items.length + '</span>'
-            : '<button type="button" class="mcell-plus" data-add="' + key + '" title="新增记账">+</button>'}
-          <span class="mcell-num">${dayNum}</span>
-        </div>
-        <div class="mcell-body">
-          ${items.map(r => {
-            const col = colorOf[r.category] || '#6B7280';
-            const inc = kindOfR(r) === 'income';
-            return '<div class="mrec" data-rid="' + r.id + '">' +
-              '<div class="mrec-line"><span class="mdot" style="background:' + col + '"></span><b>' + esc(r.note || r.category) + '</b></div>' +
-              '<div class="mrec-sub">' + esc(r.category) + ' · ' + esc(r.sub) + '</div>' +
-              '<div class="mrec-amt' + (inc ? ' income' : '') + '">' + (inc ? '+' : '') + fmtMoney(r.amount, { plain: true }) + '</div></div>';
-          }).join('')}
-        </div>
-      </div>`;
-    }
-
-    el.innerHTML = `
-      <div class="card" style="padding:14px 20px">
-        <div class="card-head" style="margin-bottom:0">
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="btn btn-ghost btn-sm" data-mnav="-1">‹</button>
-            <b style="font-size:15.5px;min-width:96px;text-align:center">${y} 年 ${m} 月</b>
-            <button class="btn btn-ghost btn-sm" data-mnav="1">›</button>
-            <button class="btn btn-ghost btn-sm" data-mtoday>今天</button>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <span class="badge badge-blue">${esc(l ? l.name : '')}</span>
-            <button class="btn btn-purple btn-sm" id="cal-view-toggle">${c.view === 'calendar' ? '在列表中管理' : '在日历中管理'}</button>
-          </div>
-        </div>
-      </div>
-      ${c.view === 'calendar' ? `
-      <div class="cal-wrap">
-        <div class="cal-left">${listHTML}</div>
-        <div class="cal-right">
-          <div class="mgrid-head">${['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(w => '<div>' + w + '</div>').join('')}</div>
-          <div class="mgrid">${cellsHTML}</div>
-        </div>
-      </div>` : `
-      <div class="card"><div>${listHTML}</div></div>`}`;
-
-    // 月份导航
-    el.querySelectorAll('[data-mnav]').forEach(b => {
-      b.onclick = () => {
-        const dt = new Date(y, m - 1 + Number(b.dataset.mnav), 1);
-        c.month = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
-        c.selected = c.month + '-01';
-        this.renderCalendar();
-      };
-    });
-    el.querySelector('[data-mtoday]').onclick = () => { c.month = thisMonth(); c.selected = todayStr(); this.renderCalendar(); };
-    el.querySelector('#cal-view-toggle').onclick = () => { c.view = c.view === 'calendar' ? 'list' : 'calendar'; this.renderCalendar(); };
-
-    // 点击日期格选中 → 左侧列表滚动定位
-    el.querySelectorAll('.mcell').forEach(cell => {
-      cell.onclick = (e) => {
-        if (e.target.closest('.mrec') || e.target.closest('.mcell-plus')) return;
-        c.selected = cell.dataset.date;
-        this.renderCalendar();
-        const g = el.querySelector('.cal-daygroup[data-date="' + c.selected + '"]');
-        if (g) g.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      };
-    });
-    // + 新增记账
-    el.querySelectorAll('[data-add]').forEach(b => {
-      b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add); };
-    });
-    // 点条目编辑
-    el.querySelectorAll('.mrec, .cal-item').forEach(item => {
-      item.onclick = () => this.editRecord(item.dataset.rid, lid);
-    });
-    el.querySelectorAll('[data-goto]').forEach(h => {
-      h.onclick = () => { c.selected = h.dataset.goto; this.renderCalendar(); };
-    });
-  },
-
-  /* ---------- 新增记账弹窗（日历页用） ---------- */
+  /* ---------- 新增记账弹窗 ---------- */
   addRecordModal(ledgerId, date, preCat, preSub, rental) {
     const cats = this.catsOf(ledgerId);
     let rating = 0;
