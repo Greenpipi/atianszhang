@@ -396,6 +396,8 @@ a{color:inherit;text-decoration:none}
 .tag-chip:hover{border-color:#93C5FD;background:#F8FAFF}
 .tag-chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
 .tag-chip.on b{color:rgba(255,255,255,.85)}
+/* 仓库分类图标（emoji 套装，chips/徽章/标签面板共用） */
+.tag-emo{font-size:1.1em;line-height:1;margin-right:2px;flex-shrink:0}
 
 /* 标签多选面板（记账/编辑弹窗、记账本页内联表单） */
 .tag-picker{display:flex;flex-direction:column;gap:9px;max-height:236px;overflow:auto;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#FBFDFE}

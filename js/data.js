@@ -71,6 +71,19 @@ function goodsTagShort(tag) {
   const i = t.indexOf('-');
   return i > 0 ? t.slice(i + 1) : t;
 }
+/* 仓库分类图标：与参考 App 一模一样的 emoji 套装（按标签短名取，无配置返回空串） */
+const GOODS_TAG_EMOJI = {
+  '数码电子': '💻', '电子耗材': '🔌', '数码配件': '⌨️',
+  '外套': '🧥', '上衣': '👚', '家居服': '🩱', '裙子': '👗', '裤子': '👖',
+  '休闲鞋': '👟', '凉鞋': '🩴', '帽子': '👒', '袜子': '🧦', '围巾': '🧣',
+  '配饰': '🕶', '内衣': '🩲',
+  '夏季': '☀️', '冬季': '❄️', '春秋季': '🌸',
+  '美容美发': '💦', '杂货': '📔', '家电': '⚡', '收纳': '🧺',
+  '餐厨用品': '🍴', '家具': '🛋'
+};
+function goodsTagEmoji(tag) {
+  return GOODS_TAG_EMOJI[goodsTagShort(tag)] || '';
+}
 /* 规范化：转数组、去空白、去重、过滤非体系内标签 */
 function normGoodsTags(tags) {
   const valid = new Set(allGoodsTags());

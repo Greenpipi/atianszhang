@@ -918,7 +918,7 @@ const App = {
         <div class="card-head">
           <div>
             <div class="card-title">好物仓库</div>
-            <div class="card-sub">${f.tag ? '标签 · ' + esc(goodsTagShort(f.tag)) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
+            <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
           </div>
         </div>
         <div class="tag-nav" id="w-tagnav">
@@ -926,7 +926,7 @@ const App = {
           ${GOODS_TAG_GROUPS.map(g => {
             const tags = g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name];
             return '<div class="tag-group"><span class="tag-group-name">' + esc(g.name) + '</span>' + tags.map(t =>
-              '<button class="tag-chip' + (f.tag === t ? ' on' : '') + '" data-tag="' + esc(t) + '" title="' + esc(t) + '">' + esc(goodsTagShort(t)) + '<b>' + (tagCounts[t] || 0) + '</b></button>').join('') + '</div>';
+              '<button class="tag-chip' + (f.tag === t ? ' on' : '') + '" data-tag="' + esc(t) + '" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '<b>' + (tagCounts[t] || 0) + '</b></button>').join('') + '</div>';
           }).join('')}
         </div>
         <div class="filter-bar">
@@ -965,7 +965,7 @@ const App = {
           <div class="wish-name"><span>${esc(name)}</span><span class="badge ${r.favorite ? 'badge-green' : 'badge-gray'}">${r.favorite ? '使用中' : '已闲置'}</span></div>
           <div class="wish-amount">${fmtMoney(r.amount)}</div>
           <div class="wish-tags">${tags.length
-            ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + esc(goodsTagShort(t)) + '</span>').join('')
+            ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '</span>').join('')
             : '<span class="wtag none">未贴标签</span>'}</div>
           <div class="wish-meta">
             <div>购入日期<b>${r.date}</b></div>
@@ -1156,6 +1156,11 @@ const App = {
     this.enhanceSelects(el);
   },
   /* ---------- 好物标签多选面板（记账/编辑弹窗共用） ---------- */
+  /* 标签图标 HTML（无图标返回空字符串） */
+  tagEmoHTML(tag) {
+    const em = goodsTagEmoji(tag);
+    return em ? '<span class="tag-emo">' + em + '</span>' : '';
+  },
   goodsTagPickerHTML() {
     return GOODS_TAG_GROUPS.map(g => {
       const opts = g.subs.length
@@ -1165,7 +1170,7 @@ const App = {
       <div class="tag-picker-group">
         <span class="tag-picker-name">${esc(g.name)}</span>
         <div class="tag-picker-opts">
-          ${opts.map(o => '<label class="tag-opt"><input type="checkbox" value="' + esc(o.tag) + '"><span>' + esc(o.label) + '</span></label>').join('')}
+          ${opts.map(o => '<label class="tag-opt"><input type="checkbox" value="' + esc(o.tag) + '"><span>' + this.tagEmoHTML(o.tag) + esc(o.label) + '</span></label>').join('')}
         </div>
       </div>`;
     }).join('');
