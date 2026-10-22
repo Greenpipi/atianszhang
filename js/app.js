@@ -790,7 +790,7 @@ const App = {
             ${recs.length ? recs.map(r => {
               const inc = kindOfR(r) === 'income';
               return `<div class="wk-rec${inc ? ' income' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}${r.note ? '｜' + esc(r.note) : ''}">
-                <div class="wk-rec-cat">${r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : ''}${catEmoji(r.category)} ${esc(r.category)}</div>
+                <div class="wk-rec-cat">${catEmoji(r.category)} ${esc(r.category)}</div>
                 ${r.sub ? `<div class="wk-rec-sub">${subEmoji(r.sub)} ${esc(r.sub)}</div>` : ''}
                 ${r.note ? `<div class="wk-rec-note">${esc(r.note)}</div>` : ''}
                 <div class="wk-rec-amt">${inc ? '+' : ''}${fmtMoney(r.amount)}</div>
@@ -827,7 +827,7 @@ const App = {
             ${recs.slice(0, 2).map(r => {
               const inc = kindOfR(r) === 'income';
               return '<div class="m2-rec' + (inc ? ' income' : '') + '" data-rid="' + r.id + '" title="' + esc(r.category) + '｜' + fmtMoney(r.amount) + (r.note ? '｜' + esc(r.note) : '') + '">' +
-                '<div class="m2-rec-cat">' + (r.rental ? '<span class="wk-rental" title="出租屋">🏠</span>' : '') + catEmoji(r.category) + ' ' + esc(r.category) + '</div>' +
+                '<div class="m2-rec-cat">' + catEmoji(r.category) + ' ' + esc(r.category) + '</div>' +
                 (r.sub ? '<div class="m2-rec-sub">' + subEmoji(r.sub) + ' ' + esc(r.sub) + '</div>' : '') +
                 (r.note ? '<div class="m2-rec-note">' + esc(r.note) + '</div>' : '') +
                 '<div class="m2-rec-amt">' + (inc ? '+' : '') + fmtMoney(r.amount) + '</div></div>';
@@ -867,6 +867,12 @@ const App = {
     });
     host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
       item.onclick = () => this.editRecord(item.dataset.rid, lid);
+      // 右键菜单：删除该账单
+      item.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.openRecMenu(e.clientX, e.clientY, item.dataset.rid);
+      };
     });
     host.querySelectorAll('.wk-col, .m2cell').forEach(col => {
       col.onclick = (e) => {
@@ -1196,7 +1202,8 @@ const App = {
     let rating = 0;
     if (rental && !preCat) preCat = RENTAL_CAT;
     this.openModal(`
-      <div class="modal-title">新增记账 · ${esc(date)}<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <div class="modal-title"><span id="ad-title">新增记账 · ${esc(date)}</span><button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <div class="field"><label>日期</label><input id="ad-date" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
       <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
       <div class="field"><label>小类</label><select id="ad-sub"></select></div>
       <div class="field"><label>金额（元）</label><input id="ad-amt" type="number" min="0" step="0.01" placeholder="0.00"></div>
@@ -1229,6 +1236,13 @@ const App = {
       this.enhanceSelects(subSel);
     }
     catSel.onchange = fillSubs;
+    // 日期字段：点开日历选择，选中后同步弹窗标题
+    const adDate = document.getElementById('ad-date');
+    adDate.onclick = () => this.openCalendar(adDate);
+    adDate.addEventListener('change', () => {
+      const t = document.getElementById('ad-title');
+      if (t) t.textContent = '新增记账 · ' + (adDate.dataset.date || date);
+    });
     this.bindFavTags(document.getElementById('ad-fav'), document.getElementById('ad-tags-field'), '#ad-tagpicker');
     this.enhanceSelects(document.getElementById('modal-root'));
     document.querySelectorAll('#ad-stars button').forEach(b => {
@@ -1249,7 +1263,7 @@ const App = {
           favorite: fav,
           tags: fav ? this.pickedTags('#ad-tagpicker') : [],
           rental: document.getElementById('ad-rental').checked,
-          rating, date, image: null, kind: this.kindOf(ledgerId, catSel.value)
+          rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
         this.closeModal();
         this.toast('已记账 ' + fmtMoney(amount), 'ok');
@@ -1954,7 +1968,7 @@ const App = {
           ${['一', '二', '三', '四', '五', '六', '日'].map(w => '<div class="cal-wd">' + w + '</div>').join('')}
           ${cells.map(c => '<button type="button" class="cal-cell' + (c.out ? ' out' : '') + (c.key === today ? ' today' : '') + (c.key === sel ? ' sel' : '') + '" data-key="' + c.key + '">' + c.d + '</button>').join('')}
         </div>
-        <div class="cal-foot"><button type="button" class="cal-today-btn" data-today>回到今天</button></div>
+        <div class="cal-foot"><button type="button" class="cal-today-btn" data-quick="0">今天</button><button type="button" class="cal-today-btn" data-quick="1">昨天</button><button type="button" class="cal-today-btn" data-quick="2">前天</button></div>
       </div>`;
 
     pop.querySelectorAll('[data-nav]').forEach(b => {
@@ -1971,16 +1985,58 @@ const App = {
         const inp = this._cal.inp;
         inp.dataset.date = key;
         inp.value = key;
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
         this.closeCalendar();
       };
     });
-    const tb = pop.querySelector('[data-today]');
-    if (tb) tb.onclick = () => {
-      const inp = this._cal.inp;
-      inp.dataset.date = today;
-      inp.value = today;
-      this.closeCalendar();
+    // 快捷选项：今天 / 昨天 / 前天（方便补记）
+    pop.querySelectorAll('[data-quick]').forEach(b => {
+      b.onclick = () => {
+        const inp = this._cal.inp;
+        const d = new Date();
+        d.setDate(d.getDate() - Number(b.dataset.quick));
+        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        inp.dataset.date = key;
+        inp.value = key;
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+        this.closeCalendar();
+      };
+    });
+  },
+
+  /* ---------- 账单卡片右键菜单（删除） ---------- */
+  openRecMenu(x, y, rid) {
+    this.closeRecMenu();
+    const r = this.state.records.find(v => v.id === rid);
+    if (!r) return;
+    const menu = document.createElement('div');
+    menu.className = 'rec-menu';
+    menu.id = 'rec-menu';
+    menu.innerHTML = '<button type="button" class="rec-menu-item danger" data-act="del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>删除该账单</button>';
+    document.body.appendChild(menu);
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.left = Math.max(8, Math.min(x, window.innerWidth - mw - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(y, window.innerHeight - mh - 8)) + 'px';
+    menu.querySelector('[data-act="del"]').onclick = async () => {
+      this.closeRecMenu();
+      const ok = await this.confirmDialog('删除账单', '确定删除「' + (r.sub || r.category) + '」' + fmtMoney(r.amount) + ' 这笔吗？删除后无法恢复。');
+      if (!ok) return;
+      await Store.remove('records', rid);
+      this.toast('已删除');
+      await this.loadData();
     };
+    this._recMenuOut = (e) => { if (!menu.contains(e.target)) this.closeRecMenu(); };
+    this._recMenuKey = (e) => { if (e.key === 'Escape') this.closeRecMenu(); };
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._recMenuOut, true);
+      document.addEventListener('keydown', this._recMenuKey, true);
+    }, 0);
+  },
+  closeRecMenu() {
+    const m = document.getElementById('rec-menu');
+    if (m) m.remove();
+    if (this._recMenuOut) { document.removeEventListener('mousedown', this._recMenuOut, true); this._recMenuOut = null; }
+    if (this._recMenuKey) { document.removeEventListener('keydown', this._recMenuKey, true); this._recMenuKey = null; }
   },
 
   /* ---------- 弹窗 / 提示 ---------- */
