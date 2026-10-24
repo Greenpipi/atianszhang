@@ -664,13 +664,15 @@ a{color:inherit;text-decoration:none}
 .wk-col.today{border-color:var(--primary);background:var(--primary-soft)}
 .wk-col.today .wk-col-head{background:var(--primary);border-bottom-color:transparent}
 .wk-col.today .wk-col-head span{color:#fff}
+/* 头部三槽：左=笔数角标（有账才显示）｜中=日期｜右=加号（常驻） */
 .wk-col-head{
-  display:flex;flex-direction:column;align-items:center;gap:1px;
-  padding:9px 4px 7px;border-bottom:1px solid var(--line);background:#fff;
+  display:grid;grid-template-columns:26px 1fr 26px;align-items:center;
+  padding:7px 6px;border-bottom:1px solid var(--line);background:#fff;
 }
-.wk-col-head span:first-child{font-size:12px;font-weight:700;color:var(--primary)}
-.wk-date{font-size:11px;color:var(--muted)}
-.wk-badge-wrap{position:absolute;top:7px;right:7px;padding:0}
+.wk-head-ph{display:block}
+.wk-head-mid{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+.wk-wd{font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap}
+.wk-date{font-size:11px;color:var(--muted);white-space:nowrap}
 .wk-badge{
   min-width:20px;height:20px;padding:0 6px;border-radius:11px;background:var(--danger);color:#fff;
   font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
@@ -681,16 +683,23 @@ a{color:inherit;text-decoration:none}
   transition:background .12s,border-color .12s;
 }
 .wk-plus:hover{background:var(--primary-soft);border-color:#BFDBFE}
+.wk-col.today .wk-plus{background:#fff;color:var(--primary);border-color:transparent}
 .wk-body{padding:8px;display:flex;flex-direction:column;gap:6px;flex:1}
 .wk-empty{font-size:11.5px;color:#9CA3AF;text-align:center;margin-top:6px}
 /* 账单卡片：大类 → 小类 → 备注 → 金额，自上而下 */
 .wk-rec{
   background:#fff;border:1px solid var(--line);border-radius:9px;padding:6px 8px;
-  display:flex;flex-direction:column;gap:1px;cursor:pointer;flex-shrink:0;
+  display:flex;flex-direction:column;gap:1px;cursor:grab;flex-shrink:0;
   min-height:78px;overflow:hidden;
-  transition:box-shadow .12s,border-color .12s;
+  transition:box-shadow .12s,border-color .12s,opacity .12s;
+  user-select:none;-webkit-user-select:none;touch-action:pan-y;
 }
 .wk-rec:hover{box-shadow:var(--shadow-hover);border-color:#BFDBFE}
+.wk-rec.dragging{opacity:.35;cursor:grabbing}
+/* 拖拽虚影 + 目标格子高亮 */
+.drag-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.8;cursor:grabbing;
+  box-shadow:0 10px 28px rgba(17,24,39,.22);transform:rotate(1.5deg);}
+.wk-col.drop-target,.m2cell.drop-target{outline:2px dashed var(--primary);outline-offset:-3px}
 .wk-rec-cat{font-size:11.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 .wk-rec-sub{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 .wk-rec-note{font-size:10.5px;color:#9CA3AF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
@@ -718,7 +727,7 @@ a{color:inherit;text-decoration:none}
 .m2-top{display:flex;align-items:center;gap:4px;padding:6px 8px 2px}
 .m2-badge{
   min-width:18px;height:18px;padding:0 5px;border-radius:10px;background:var(--danger);color:#fff;
-  font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
 }
 .m2-num{font-size:12px;font-weight:600;color:var(--muted)}
 .m2-plus{width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid var(--line);
@@ -728,10 +737,12 @@ a{color:inherit;text-decoration:none}
 /* 月视图账单卡片：同为 大类 → 小类 → 备注 → 金额 */
 .m2-rec{
   background:#fff;border:1px solid var(--line);border-radius:7px;padding:4px 6px;
-  display:flex;flex-direction:column;cursor:pointer;flex-shrink:0;overflow:hidden;
+  display:flex;flex-direction:column;cursor:grab;flex-shrink:0;overflow:hidden;
   min-height:58px;transition:background .12s;
+  user-select:none;-webkit-user-select:none;touch-action:pan-y;
 }
 .m2-rec:hover{background:#EFF6FF}
+.m2-rec.dragging{opacity:.35;cursor:grabbing}
 .m2-rec-cat{font-size:10.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .m2-rec-sub{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .m2-rec-note{font-size:10px;color:#9CA3AF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}

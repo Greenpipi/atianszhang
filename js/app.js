@@ -807,13 +807,9 @@ const App = {
         return `
         <div class="wk-col${tdy ? ' today' : ''}" data-date="${d}">
           <div class="wk-col-head">
-            <span>周${wd[(new Date(d + 'T00:00:00').getDay() + 6) % 7]}</span>
-            <span class="wk-date">${d.slice(5).replace('-', '/')}</span>
-          </div>
-          <div class="wk-badge-wrap">
-            ${recs.length
-              ? '<span class="wk-badge">' + recs.length + '</span>'
-              : '<button type="button" class="wk-plus" data-add="' + d + '">+</button>'}
+            ${recs.length ? '<span class="wk-badge">' + recs.length + '</span>' : '<span class="wk-head-ph"></span>'}
+            <span class="wk-head-mid"><span class="wk-wd">周${wd[(new Date(d + 'T00:00:00').getDay() + 6) % 7]}</span><span class="wk-date">${d.slice(5).replace('-', '/')}</span></span>
+            <button type="button" class="wk-plus" data-add="${d}" title="记一笔">+</button>
           </div>
           <div class="wk-body">
             ${recs.length ? recs.map(r => {
@@ -848,9 +844,8 @@ const App = {
         <div class="m2cell${out ? ' out' : ''}${tdy ? ' today' : ''}${sel ? ' sel' : ''}" data-date="${key}">
           <div class="m2-top">
             <span class="m2-num">${dd}</span>
-            ${recs.length
-              ? '<span class="m2-badge">' + recs.length + '</span>'
-              : (out ? '' : '<button type="button" class="m2-plus" data-add="' + key + '">+</button>')}
+            ${recs.length ? '<span class="m2-badge">' + recs.length + '</span>' : ''}
+            ${out ? '' : '<button type="button" class="m2-plus" data-add="' + key + '" title="记一笔">+</button>'}
           </div>
           <div class="m2-body">
             ${recs.slice(0, 2).map(r => {
@@ -892,16 +887,21 @@ const App = {
 
     // 事件绑定
     host.querySelectorAll('[data-add]').forEach(b => {
-      b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add); };
+      b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add, null, null, false, true); };
     });
     host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
-      item.onclick = () => this.editRecord(item.dataset.rid, lid);
+      item.onclick = () => {
+        if (item._skipClick) { item._skipClick = false; return; }
+        this.editRecord(item.dataset.rid, lid);
+      };
       // 右键菜单：删除该账单
       item.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
         this.openRecMenu(e.clientX, e.clientY, item.dataset.rid);
       };
+      // 拖拽改期
+      this.bindRecDrag(item);
     });
     host.querySelectorAll('.wk-col, .m2cell').forEach(col => {
       col.onclick = (e) => {
@@ -1226,7 +1226,7 @@ const App = {
   },
 
   /* ---------- 新增记账弹窗 ---------- */
-  addRecordModal(ledgerId, date, preCat, preSub, rental) {
+  addRecordModal(ledgerId, date, preCat, preSub, rental, continuous) {
     const cats = this.catsOf(ledgerId);
     let rating = 0;
     if (rental && !preCat) preCat = RENTAL_CAT;
@@ -1248,8 +1248,8 @@ const App = {
       </div>
       <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
-        <button class="btn btn-ghost" data-close>取消</button>
-        <button class="btn btn-primary" id="ad-save">保存</button>
+        <button class="btn btn-ghost" data-close>${continuous ? '完成' : '取消'}</button>
+        <button class="btn btn-primary" id="ad-save">${continuous ? '保存并继续' : '保存'}</button>
       </div>
     `);
     const catSel = document.getElementById('ad-cat'), subSel = document.getElementById('ad-sub');
@@ -1294,6 +1294,21 @@ const App = {
           rental: document.getElementById('ad-rental').checked,
           rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
+        if (continuous) {
+          // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
+          document.getElementById('ad-amt').value = '';
+          document.getElementById('ad-note').value = '';
+          document.getElementById('ad-fav').checked = false;
+          document.getElementById('ad-tags-field').style.display = 'none';
+          document.querySelectorAll('#ad-tagpicker input').forEach(i => { i.checked = false; });
+          document.getElementById('ad-rental').checked = false;
+          rating = 0;
+          document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
+          document.getElementById('ad-amt').focus();
+          this.toast('已保存，可继续记下一笔', 'ok');
+          await this.loadData();
+          return;
+        }
         this.closeModal();
         this.toast('已记账 ' + fmtMoney(amount), 'ok');
         await this.loadData();
@@ -2066,6 +2081,99 @@ const App = {
     if (m) m.remove();
     if (this._recMenuOut) { document.removeEventListener('mousedown', this._recMenuOut, true); this._recMenuOut = null; }
     if (this._recMenuKey) { document.removeEventListener('keydown', this._recMenuKey, true); this._recMenuKey = null; }
+  },
+
+  /* ---------- 账单卡片拖拽改期 ---------- */
+  bindRecDrag(el) {
+    if (!el || el._dragBound) return;
+    el._dragBound = true;
+    let sx = 0, sy = 0, gx = 0, gy = 0, started = false, clone = null, overCol = null, timer = null;
+    const clearOver = () => {
+      document.querySelectorAll('.wk-col.drop-target, .m2cell.drop-target').forEach(c => c.classList.remove('drop-target'));
+      overCol = null;
+    };
+    const placeGhost = (x, y) => {
+      if (!clone) return;
+      clone.style.left = (x - gx) + 'px';
+      clone.style.top = (y - gy) + 'px';
+      const t = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+      const col = t && t.closest ? t.closest('.wk-col:not(.out), .m2cell:not(.out)') : null;
+      if (col !== overCol) {
+        clearOver();
+        overCol = col;
+        if (col) col.classList.add('drop-target');
+      }
+    };
+    const start = (x, y) => {
+      started = true;
+      const rect = el.getBoundingClientRect();
+      gx = sx - rect.left; gy = sy - rect.top;
+      clone = el.cloneNode(true);
+      clone.classList.add('drag-ghost');
+      clone.style.width = rect.width + 'px';
+      document.body.appendChild(clone);
+      el.classList.add('dragging');
+      el.style.pointerEvents = 'none';
+      el.style.touchAction = 'none';
+      window.addEventListener('touchmove', blockTouch, { passive: false });
+      placeGhost(x, y);
+    };
+    const blockTouch = (e) => { if (started) e.preventDefault(); };
+    const finish = (commit) => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('touchmove', blockTouch);
+      document.removeEventListener('keydown', onKey);
+      if (clone) { clone.remove(); clone = null; }
+      el.classList.remove('dragging');
+      el.style.pointerEvents = '';
+      el.style.touchAction = '';
+      const target = overCol;
+      clearOver();
+      const wasStarted = started;
+      started = false;
+      if (!wasStarted || !commit || !target) return; // 未真正拖动 / 松手时无目标格子 / Esc → 取消
+      el._skipClick = true;
+      this.changeRecDate(el.dataset.rid, target.dataset.date);
+    };
+    function onMove(e) {
+      if (!started) {
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (e.pointerType === 'touch') {
+          if (Math.hypot(dx, dy) > 10) { if (timer) { clearTimeout(timer); timer = null; } finish(false); } // 手指移动 = 页面滚动，放弃拖拽
+          return;
+        }
+        if (Math.hypot(dx, dy) > 6) start(e.clientX, e.clientY);
+        return;
+      }
+      e.preventDefault();
+      placeGhost(e.clientX, e.clientY);
+    }
+    function onUp() { finish(true); }
+    function onCancel() { finish(false); } // 手势被浏览器中断（如滚动接管）→ 取消，不改期
+    function onKey(e) { if (e.key === 'Escape') finish(false); }
+    el.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || (e.target.closest && e.target.closest('button'))) return;
+      sx = e.clientX; sy = e.clientY; started = false;
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onCancel);
+      document.addEventListener('keydown', onKey);
+      if (e.pointerType === 'touch') {
+        timer = setTimeout(() => { timer = null; if (!started) start(sx, sy); }, 350); // 触屏长按 350ms 才进入拖拽，避免和滚动冲突
+      }
+    });
+  },
+  async changeRecDate(rid, date) {
+    const r = this.state.records.find(v => v.id === rid);
+    if (!r || !date || r.date === date) return;
+    try {
+      await Store.update('records', rid, { date });
+      this.toast('已改期到 ' + date.slice(5).replace('-', '/'), 'ok');
+      await this.loadData();
+    } catch (e) { this.toast(e.message, 'err'); }
   },
 
   /* ---------- 弹窗 / 提示 ---------- */
