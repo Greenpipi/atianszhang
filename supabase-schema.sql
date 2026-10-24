@@ -7,6 +7,7 @@
 --   第 2 步：新建查询，粘贴下面这一行，点 Run，看到 done 即建表成功
 --       select public.setup_finance_tables();
 --
+-- 幂等安全：重复执行不会报错，只会补齐缺失的表/列/策略。
 -- ============================================================
 create or replace function public.setup_finance_tables() returns text
 language plpgsql
@@ -65,12 +66,25 @@ begin
     created_at timestamptz not null default now()
   ) $ddl$;
 
+  -- 顶部横幅配置（每用户一行，banner 图 + 位置）
+  execute $ddl$ create table if not exists banners (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    img text not null default '',
+    pos_x double precision not null default 50,
+    pos_y double precision not null default 30,
+    updated_at timestamptz not null default now()
+  ) $ddl$;
+
+  -- 账单标签列（多选标签，文本数组）
+  execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
+
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;
   execute $ddl$ alter table categories enable row level security $ddl$;
   execute $ddl$ alter table records    enable row level security $ddl$;
   execute $ddl$ alter table budgets    enable row level security $ddl$;
   execute $ddl$ alter table templates  enable row level security $ddl$;
+  execute $ddl$ alter table banners    enable row level security $ddl$;
 
   execute $ddl$ drop policy if exists "own ledgers" on ledgers $ddl$;
   execute $ddl$ create policy "own ledgers" on ledgers for all
@@ -92,6 +106,10 @@ begin
   execute $ddl$ create policy "own templates" on templates for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：5 张表已创建，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  execute $ddl$ drop policy if exists "own banners" on banners $ddl$;
+  execute $ddl$ create policy "own banners" on banners for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
+
+  return 'done：6 张表已创建（含 banners），records.tags 列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;

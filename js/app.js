@@ -137,10 +137,41 @@ const App = {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
     this.initNavToggle();
-    this.initHero();
+    await this.initHero();
+    await this.migrateLocalIfNeeded();
     await this.loadData();
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
+  },
+
+  /* ---------- 本地数据自动上云（一次性） ---------- */
+  async migrateLocalIfNeeded() {
+    if (Store.mode !== 'supabase' || !Store.user) return;
+    const email = Store.user.email || '';
+    const marker = 'fin_migrated_' + email;
+    try { if (localStorage.getItem(marker)) return; } catch (e) { return; }
+    let db = null;
+    try { db = JSON.parse(localStorage.getItem('fin_db_' + email) || 'null'); } catch (e) { /* ignore */ }
+    const tables = ['ledgers', 'categories', 'records', 'budgets', 'templates'];
+    const hasData = db && typeof db === 'object' && tables.some(t => Array.isArray(db[t]) && db[t].length);
+    if (!hasData) { try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ } return; }
+    try {
+      const cloud = await Store.list('ledgers');
+      if (cloud && cloud.length) { try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ } return; }
+      let n = 0;
+      for (const t of tables) {
+        for (const row of (db[t] || [])) {
+          const r = { ...row };
+          delete r.user_id; delete r.created_at;
+          await Store.insert(t, r);
+          n++;
+        }
+      }
+      try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ }
+      this.toast('本地数据已同步到云端（' + n + ' 条）', 'ok');
+    } catch (e) {
+      console.warn('本地数据迁移失败', e);
+    }
   },
 
   /* ---------- 导航栏收起/展开 ---------- */
@@ -163,19 +194,17 @@ const App = {
   },
 
   /* ---------- 背景头图 ---------- */
-  initHero() {
+  async initHero() {
     const hero = document.getElementById('page-hero');
     if (!hero || this._heroBound) return;
     this._heroBound = true;
     this.hero = { img: '', x: 50, y: 50 };
-    try {
-      const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
-      if (s && typeof s === 'object') {
-        this.hero.img = typeof s.img === 'string' ? s.img : '';
-        this.hero.x = Math.max(0, Math.min(100, Number(s.x) || 50));
-        this.hero.y = Math.max(0, Math.min(100, Number(s.y) || 50));
-      }
-    } catch (e) { /* ignore */ }
+    const s = await Store.getBanner();
+    if (s && typeof s === 'object') {
+      this.hero.img = typeof s.img === 'string' ? s.img : '';
+      this.hero.x = Math.max(0, Math.min(100, Number(s.x) || 50));
+      this.hero.y = Math.max(0, Math.min(100, Number(s.y) || 50));
+    }
     this.applyHero();
 
     const file = document.getElementById('hero-file');
@@ -237,7 +266,7 @@ const App = {
     if (r) r.hidden = !this.hero.img;
   },
   saveHero() {
-    try { localStorage.setItem('fin_bg', JSON.stringify({ img: this.hero.img, x: this.hero.x, y: this.hero.y })); } catch (e) { /* ignore */ }
+    Promise.resolve(Store.saveBanner(this.hero)).catch(() => { /* ignore */ });
   },
 
   /* ---------- 数据加载 ---------- */
@@ -2203,6 +2232,7 @@ const SQL_SCHEMA = `-- =========================================================
 --   第 2 步：新建查询，粘贴下面这一行，点 Run，看到 done 即建表成功
 --       select public.setup_finance_tables();
 --
+-- 幂等安全：重复执行不会报错，只会补齐缺失的表/列/策略。
 -- ============================================================
 create or replace function public.setup_finance_tables() returns text
 language plpgsql
@@ -2265,12 +2295,22 @@ begin
     created_at timestamptz not null default now()
   ) $ddl$;
 
+  -- 顶部横幅配置（每用户一行，banner 图 + 位置）
+  execute $ddl$ create table if not exists banners (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    img text not null default '',
+    pos_x double precision not null default 50,
+    pos_y double precision not null default 30,
+    updated_at timestamptz not null default now()
+  ) $ddl$;
+
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;
   execute $ddl$ alter table categories enable row level security $ddl$;
   execute $ddl$ alter table records    enable row level security $ddl$;
   execute $ddl$ alter table budgets    enable row level security $ddl$;
   execute $ddl$ alter table templates  enable row level security $ddl$;
+  execute $ddl$ alter table banners    enable row level security $ddl$;
 
   execute $ddl$ drop policy if exists "own ledgers" on ledgers $ddl$;
   execute $ddl$ create policy "own ledgers" on ledgers for all
@@ -2292,7 +2332,11 @@ begin
   execute $ddl$ create policy "own templates" on templates for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：5 张表已创建，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  execute $ddl$ drop policy if exists "own banners" on banners $ddl$;
+  execute $ddl$ create policy "own banners" on banners for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
+
+  return 'done：6 张表已创建（含 banners），records.tags 列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;`;
 

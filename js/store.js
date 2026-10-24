@@ -243,6 +243,60 @@ const Store = {
     this._localWrite(db);
   },
 
+  /* ---------- 背景头图配置（云端 banners 表；表未建时回退本地） ---------- */
+  async getBanner() {
+    if (this.mode === 'supabase' && this.user) {
+      try {
+        const { data, error } = await this.sb.from('banners').select('img, pos_x, pos_y').single();
+        if (!error && data) {
+          return {
+            img: typeof data.img === 'string' ? data.img : '',
+            x: data.pos_x == null ? 50 : Number(data.pos_x),
+            y: data.pos_y == null ? 50 : Number(data.pos_y)
+          };
+        }
+        if (error && this._isTableErr(error)) {
+          // 表尚未创建：过渡期回退本地配置
+          try { return JSON.parse(localStorage.getItem('fin_bg') || 'null'); } catch (e) { return null; }
+        }
+        if (!error && !data) {
+          // 云端无配置但本地有（首次上云）：搬一份上去，避免自定义背景丢失
+          try {
+            const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
+            if (s && typeof s === 'object') {
+              await this.saveBanner(s);
+              return { img: typeof s.img === 'string' ? s.img : '', x: Number(s.x) || 50, y: Number(s.y) || 50 };
+            }
+          } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
+      return null; // 云端模式以云端为准：无配置 = 默认背景
+    }
+    try { return JSON.parse(localStorage.getItem('fin_bg') || 'null'); } catch (e) { return null; }
+  },
+  async saveBanner(cfg) {
+    const c = { img: (cfg && cfg.img) || '', x: cfg && cfg.x != null ? Number(cfg.x) : 50, y: cfg && cfg.y != null ? Number(cfg.y) : 50 };
+    if (this.mode === 'supabase' && this.user) {
+      try {
+        const { error } = await this.sb.from('banners').upsert({
+          user_id: this.user.id, img: c.img, pos_x: c.x, pos_y: c.y, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+        return true;
+      } catch (e) {
+        if (this._isTableErr(e)) {
+          // 表尚未创建：过渡期写本地，保证功能可用
+          try { localStorage.setItem('fin_bg', JSON.stringify(c)); } catch (e2) { /* ignore */ }
+          return false;
+        }
+        console.warn('背景配置保存失败', e);
+        return false;
+      }
+    }
+    try { localStorage.setItem('fin_bg', JSON.stringify(c)); } catch (e) { /* ignore */ }
+    return false;
+  },
+
   _dbErr(e) {
     const m = (e && e.message) || '保存失败';
     if (/row-level security/i.test(m)) return '权限不足（RLS），请检查 Supabase 安全策略';
