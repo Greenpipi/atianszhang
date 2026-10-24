@@ -74,7 +74,7 @@ a{color:inherit;text-decoration:none}
 .shell-body{display:flex;flex:1;min-width:0}
 .sidebar{
   width:232px;flex-shrink:0;background:#F9FAFB;border-right:1px solid var(--line);
-  display:flex;flex-direction:column;position:sticky;top:0;height:100dvh;z-index:40;
+  display:flex;flex-direction:column;position:fixed;left:0;top:0;height:100vh;z-index:45;
   transition:width .25s ease;
 }
 .sidebar-brand{
@@ -105,13 +105,16 @@ a{color:inherit;text-decoration:none}
 
 /* 收起态：折叠为 64px 图标栏（仅桌面端，移动端仍是抽屉） */
 @media (min-width:921px){
+  .shell-body{padding-left:232px} /* 桌面端导航固定，内容区让出左侧宽度 */
+  .app-shell.nav-collapsed .shell-body{padding-left:64px}
   .app-shell.nav-collapsed .sidebar{width:64px}
   .app-shell.nav-collapsed .sidebar-brand{justify-content:center;gap:4px;padding:14px 0 10px}
   .app-shell.nav-collapsed .sidebar-brand span{display:none}
+  .app-shell.nav-collapsed .sidebar-brand img{display:none}
   .app-shell.nav-collapsed .nav-item{justify-content:center;padding:9px 0}
   .app-shell.nav-collapsed .nav-item span{display:none}
   .app-shell.nav-collapsed .sidebar-foot{display:none}
-  .app-shell.nav-collapsed .nav-collapse-btn{margin-left:0;transform:rotate(180deg)}
+  .app-shell.nav-collapsed .nav-collapse-btn{margin-left:0}
 }
 @media (max-width:920px){.nav-collapse-btn{display:none}}
 
