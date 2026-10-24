@@ -1935,6 +1935,7 @@ const App = {
       </div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
+        <button class="btn btn-danger" id="ed-del" style="margin-right:auto">删除</button>
         <button class="btn btn-ghost" data-close>取消</button>
         <button class="btn btn-primary" id="ed-save">保存</button>
       </div>
@@ -2001,6 +2002,16 @@ const App = {
         document.querySelectorAll('#ed-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
       };
     });
+    document.getElementById('ed-del').onclick = async () => {
+      const ok = await this.confirmDialog('删除记录', '确定删除这笔账单吗？删除后不可恢复。');
+      if (!ok) { this.editRecord(rid, ledgerId); return; } // 确认框会清空弹窗栈，取消后重开编辑窗
+      try {
+        await Store.remove('records', rid);
+        this.closeModal();
+        this.toast('已删除', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
     document.getElementById('ed-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ed-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
