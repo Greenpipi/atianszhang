@@ -330,12 +330,13 @@ a{color:inherit;text-decoration:none}
 }
 .rec-icon.inc{background:#ECFDF5;color:var(--accent-deep)}
 .rec-main{flex:1;min-width:0}
+.rec-side{display:flex;flex-direction:row;align-items:center;gap:6px;flex-shrink:0}
 .rec-title{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .rec-title .sub{color:var(--muted);font-weight:500}
 .rec-note{font-size:12px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rec-amount{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rec-amount.income{color:var(--accent-deep)}
-.rec-stars{font-size:11px;color:#FBBF24;letter-spacing:1px;white-space:nowrap}
+.rec-stars{font-size:11px;color:#FBBF24;letter-spacing:0;white-space:nowrap;flex-shrink:0}
 .rec-acts{display:flex;gap:4px;flex-shrink:0}
 .rec-acts button{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#9CA3AF;border:1px solid transparent}
 .rec-acts button:hover{background:var(--primary-soft);color:var(--primary);border-color:#DBEAFE}
@@ -559,8 +560,12 @@ a{color:inherit;text-decoration:none}
   .ledger-switch button{padding:6px 10px;font-size:12px}
   .sync-chip span{display:none}
   .sync-chip{padding:7px}
-  .rec-item{flex-wrap:wrap}
-  .rec-amount{margin-left:auto}
+  .rec-item{flex-wrap:nowrap;padding:8px 11px;margin-bottom:6px;gap:10px}
+  .rec-icon{width:32px;height:32px;border-radius:9px;font-size:13px}
+  .rec-amount{font-size:14px}
+  .rec-acts button{width:26px;height:26px;border-radius:7px}
+  .rec-acts svg{width:13px;height:13px}
+  .rec-side{margin-left:auto}
   .wish-grid{grid-template-columns:1fr 1fr;gap:12px}
   .wish-body{padding:12px 12px 10px}
   .wish-name{font-size:13px}

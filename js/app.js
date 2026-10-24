@@ -701,12 +701,12 @@ const App = {
       return `
       <div class="rec-day">
         <div class="rec-day-head"><span>${d.slice(5).replace('-', ' 月 ')} 日</span><span>${dayInc ? '收入 ' + fmtMoney(dayInc, { plain: true }) + ' · ' : ''}支出 ${fmtMoney(dayExp, { plain: true })}</span></div>
-        ${days[d].map(r => this.recItemHTML(r, ledgerId)).join('')}
+        ${days[d].map(r => this.recItemHTML(r, ledgerId, !!onlyRental)).join('')}
       </div>`;
     }).join('');
   },
 
-  recItemHTML(r, ledgerId) {
+  recItemHTML(r, ledgerId, hideRentalBadge) {
     const kind = r.kind || this.kindOf(ledgerId, r.category);
     const inc = kind === 'income';
     const rm = (r.category === RENTAL_CAT && RENTAL_META[r.sub]) ? RENTAL_META[r.sub] : null;
@@ -714,13 +714,15 @@ const App = {
     <div class="rec-item${r.rental ? ' is-rental' : ''}" data-rid="${r.id}">
       <div class="rec-icon ${inc ? 'inc' : ''}"${rm ? ' style="background:' + rm.color + '1F;color:' + rm.color + '"' : ''}>${inc ? '收' : (rm ? rm.emoji : esc((r.category || '?').slice(0, 1)))}</div>
       <div class="rec-main">
-        <div class="rec-title">${esc(r.category)} <span class="sub">· ${esc(r.sub)}</span>
-          ${r.rental ? '<span class="badge badge-green" title="归入出租屋">🏠 出租屋</span>' : ''}
+        <div class="rec-title">${esc(r.category)}
+          ${r.rating ? '<span class="rec-stars">' + '★'.repeat(Math.round(r.rating)) + '</span>' : ''}
+          ${r.rental && !hideRentalBadge ? '<span class="badge badge-green" title="归入出租屋">🏠 出租屋</span>' : ''}
           ${r.favorite ? '<span class="badge badge-green">心仪</span>' : ''}</div>
-        ${r.note ? '<div class="rec-note">' + esc(r.note) + '</div>' : ''}
+        ${(r.sub || r.note) ? '<div class="rec-note">' + esc(r.sub || '') + (r.sub && r.note ? ' · ' : '') + esc(r.note || '') + '</div>' : ''}
       </div>
-      <div class="rec-stars">${starsStr(r.rating)}</div>
-      <div class="rec-amount ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount)}</div>
+      <div class="rec-side">
+        <div class="rec-amount ${inc ? 'income' : ''}">${inc ? '+' : '-'}${fmtMoney(r.amount)}</div>
+      </div>
       <div class="rec-acts">
         <button data-act="edit" title="编辑">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
@@ -763,7 +765,8 @@ const App = {
     const [y, m] = month.split('-').map(Number);
     root.querySelectorAll('[data-nav]').forEach(b => {
       b.onclick = () => {
-        const d = new Date(y, m - 2 + (b.dataset.nav === 'next' ? 1 : -1), 1);
+        // 上月=monthIndex-1，下月=monthIndex+1（new Date 的月份从 0 起，m-1 即本月）
+        const d = new Date(y, m - 1 + (b.dataset.nav === 'next' ? 1 : -1), 1);
         this.state[key] = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         rerender();
       };
@@ -1460,7 +1463,6 @@ const App = {
       <div class="rental-head">
         <div>
           <div class="card-title">出租屋</div>
-          <div class="card-sub">主账本中标记为「出租屋」的支出，同时计入总账</div>
         </div>
         <button class="btn btn-accent" id="rental-add">＋ 记一笔出租屋支出</button>
       </div>
