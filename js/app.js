@@ -163,8 +163,8 @@ const App = {
       const lidMap = {}; // 本地账本 id → 云端账本 id
       let n = 0;
       const put = async (t, row) => {
-        try { await Store.insert(t, row); n++; }
-        catch (e) { console.warn('迁移跳过 ' + t, (e && e.message) || e); }
+        try { await Store.insert(t, row); n++; return true; }
+        catch (e) { console.warn('迁移跳过 ' + t, (e && e.message) || e); return false; }
       };
       const clean = r => { const x = { ...r }; delete x.user_id; delete x.created_at; return x; };
       // 本地账本按 name+type 先去重（本地数据历史上也可能有重复，只搬一个，避免云端插出两个同名账本）
@@ -178,8 +178,7 @@ const App = {
       for (const l of localLedgers) {
         const exist = cloudLedgers.find(c => c.name === l.name && (c.type || 'personal') === (l.type || 'personal'));
         if (exist) { lidMap[l.id] = exist.id; continue; }
-        await put('ledgers', clean(l));
-        cloudLedgers.push({ ...l }); // 更新快照，防止本地其余同名账本再插一遍
+        if (await put('ledgers', clean(l))) cloudLedgers.push({ ...l }); // 更新快照，防止本地其余同名账本再插一遍
       }
       const hasCat = (lid, name) => cloudCats.some(c => c.ledger_id === lid && c.name === name);
       const hasBudget = (lid, cat, sub) => cloudBudgets.some(b => b.ledger_id === lid && b.category === cat && (b.sub || '') === (sub || ''));
@@ -188,17 +187,17 @@ const App = {
       for (const c of (db.categories || [])) {
         const lid = lidMap[c.ledger_id] || c.ledger_id;
         if (hasCat(lid, c.name)) continue;
-        await put('categories', clean({ ...c, ledger_id: lid }));
+        if (await put('categories', clean({ ...c, ledger_id: lid }))) cloudCats.push({ ...c, ledger_id: lid }); // 回写快照，本地自身重复时不会插出两份
       }
       for (const b of (db.budgets || [])) {
         const lid = lidMap[b.ledger_id] || b.ledger_id;
         if (hasBudget(lid, b.category, b.sub)) continue;
-        await put('budgets', clean({ ...b, ledger_id: lid }));
+        if (await put('budgets', clean({ ...b, ledger_id: lid }))) cloudBudgets.push({ ...b, ledger_id: lid });
       }
       for (const t of (db.templates || [])) {
         const lid = lidMap[t.ledger_id] || t.ledger_id;
         if (hasTpl(lid, t.category, t.sub)) continue;
-        await put('templates', clean({ ...t, ledger_id: lid }));
+        if (await put('templates', clean({ ...t, ledger_id: lid }))) cloudTpls.push({ ...t, ledger_id: lid });
       }
       for (const r of (db.records || [])) {
         if (recIds.has(r.id)) continue; // 已在云端（含此前缺陷版搬过去的）
@@ -340,21 +339,51 @@ const App = {
         else keepMap[dupKey(l)] = l;
       }
       if (dupLedgers.length) {
+        const movedCats = [], movedTpls = []; // 已改挂到保留账本的（内存数组不随 update 更新，靠它们防同批重复）
         for (const d of dupLedgers) {
           const keep = keepMap[dupKey(d)];
           for (const c of categories.filter(x => x.ledger_id === d.id)) {
-            if (categories.some(x => x.ledger_id === keep.id && x.name === c.name)) {
+            const dupInKeep = categories.some(x => x.ledger_id === keep.id && x.name === c.name) || movedCats.some(x => x.name === c.name);
+            if (dupInKeep) {
               await Store.remove('categories', c.id); // 保留侧已有同名分类
             } else {
               await Store.update('categories', c.id, { ledger_id: keep.id });
+              movedCats.push(c);
             }
           }
           for (const r of records.filter(x => x.ledger_id === d.id)) await Store.update('records', r.id, { ledger_id: keep.id });
           for (const b of budgets.filter(x => x.ledger_id === d.id)) await Store.update('budgets', b.id, { ledger_id: keep.id });
-          for (const t of templates.filter(x => x.ledger_id === d.id)) await Store.update('templates', t.id, { ledger_id: keep.id });
+          for (const t of templates.filter(x => x.ledger_id === d.id)) {
+            const sameTpl = x => x.category === t.category && (x.sub || '') === (t.sub || '');
+            const dupInKeep = templates.some(x => x.ledger_id === keep.id && sameTpl(x)) || movedTpls.some(sameTpl);
+            if (dupInKeep) {
+              await Store.remove('templates', t.id); // 保留侧已有同模板（category+sub 相同）
+            } else {
+              await Store.update('templates', t.id, { ledger_id: keep.id });
+              movedTpls.push(t);
+            }
+          }
           await Store.remove('ledgers', d.id);
         }
         changed = true;
+      }
+      // 快捷模板去重：同一账本下 category+sub 只保留一条（历史迁移/账本合并曾造成重复，
+      // 表现为设置页「快捷模板」一长条重复 n 个）；优先保留元数据完整的一条，其余删除
+      {
+        const tplKeep = {};
+        const dupTpls = [];
+        for (const t of templates) {
+          const k = (t.ledger_id || '') + '|' + (t.category || '') + '|' + (t.sub || '');
+          const kept = tplKeep[k];
+          if (!kept) { tplKeep[k] = t; continue; }
+          const full = x => x.label && x.section && x.emoji;
+          if (full(t) && !full(kept)) { dupTpls.push(kept); tplKeep[k] = t; }
+          else dupTpls.push(t);
+        }
+        if (dupTpls.length) {
+          for (const t of dupTpls) await Store.remove('templates', t.id);
+          changed = true;
+        }
       }
       if (!categories.length) {
         const ls = await Store.list('ledgers');
