@@ -901,6 +901,17 @@ const App = {
           </div>
         </div>`;
       }).join('') + '</div>';
+      // 移动端周视图横向滚动：本周自动定位到今日（居中），非本周停周一
+      const grid = host.querySelector('.wk-grid');
+      if (grid) {
+        const todayCol = grid.querySelector('.wk-col.today');
+        if (todayCol) {
+          const left = (todayCol.offsetLeft - grid.offsetLeft) - (grid.clientWidth - todayCol.offsetWidth) / 2;
+          grid.scrollLeft = Math.max(0, left);
+        } else {
+          grid.scrollLeft = 0;
+        }
+      }
     } else if (home.view === 'month') {
       const [y, m] = home.anchor.split('-').map(Number);
       titleEl.textContent = y + ' 年 ' + m + ' 月';
