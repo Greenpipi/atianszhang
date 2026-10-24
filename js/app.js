@@ -161,24 +161,30 @@ const App = {
         Store.list('ledgers'), Store.list('categories'), Store.list('budgets'), Store.list('templates'), Store.list('records')
       ]);
       const lidMap = {}; // 本地账本 id → 云端账本 id
-      for (const l of (db.ledgers || [])) {
-        const exist = cloudLedgers.find(c => c.name === l.name && (c.type || 'personal') === (l.type || 'personal'));
-        if (exist) lidMap[l.id] = exist.id;
-      }
-      const hasCat = (lid, name) => cloudCats.some(c => c.ledger_id === lid && c.name === name);
-      const hasBudget = (lid, cat, sub) => cloudBudgets.some(b => b.ledger_id === lid && b.category === cat && (b.sub || '') === (sub || ''));
-      const hasTpl = (lid, cat, sub) => cloudTpls.some(t => t.ledger_id === lid && t.category === cat && (t.sub || '') === (sub || ''));
-      const recIds = new Set(cloudRecs.map(r => r.id));
       let n = 0;
       const put = async (t, row) => {
         try { await Store.insert(t, row); n++; }
         catch (e) { console.warn('迁移跳过 ' + t, (e && e.message) || e); }
       };
       const clean = r => { const x = { ...r }; delete x.user_id; delete x.created_at; return x; };
+      // 本地账本按 name+type 先去重（本地数据历史上也可能有重复，只搬一个，避免云端插出两个同名账本）
+      const localLedgers = [];
+      const localKey = l => (l.name || '') + '|' + (l.type || 'personal');
       for (const l of (db.ledgers || [])) {
-        if (lidMap[l.id]) continue; // 云端已有同名账本 → 复用，子数据改挂过去
-        await put('ledgers', clean(l));
+        const kept = localLedgers.find(x => localKey(x) === localKey(l));
+        if (kept) { lidMap[l.id] = kept.id; continue; } // 本地重复账本：子数据改挂到保留的那个
+        localLedgers.push(l);
       }
+      for (const l of localLedgers) {
+        const exist = cloudLedgers.find(c => c.name === l.name && (c.type || 'personal') === (l.type || 'personal'));
+        if (exist) { lidMap[l.id] = exist.id; continue; }
+        await put('ledgers', clean(l));
+        cloudLedgers.push({ ...l }); // 更新快照，防止本地其余同名账本再插一遍
+      }
+      const hasCat = (lid, name) => cloudCats.some(c => c.ledger_id === lid && c.name === name);
+      const hasBudget = (lid, cat, sub) => cloudBudgets.some(b => b.ledger_id === lid && b.category === cat && (b.sub || '') === (sub || ''));
+      const hasTpl = (lid, cat, sub) => cloudTpls.some(t => t.ledger_id === lid && t.category === cat && (t.sub || '') === (sub || ''));
+      const recIds = new Set(cloudRecs.map(r => r.id));
       for (const c of (db.categories || [])) {
         const lid = lidMap[c.ledger_id] || c.ledger_id;
         if (hasCat(lid, c.name)) continue;
@@ -324,6 +330,32 @@ const App = {
         }
         changed = true;
       }
+      // 同名同类型账本合并（历史迁移 bug 曾造成云端重复账本：保留最早的一个，
+      // 把重复账本的分类/记录/预算/模板并过去后删除；分类同名则记录改挂后跳过）
+      const dupKey = l => (l.name || '') + '|' + (l.type || 'personal');
+      const keepMap = {};
+      const dupLedgers = [];
+      for (const l of ledgers) {
+        if (keepMap[dupKey(l)]) dupLedgers.push(l);
+        else keepMap[dupKey(l)] = l;
+      }
+      if (dupLedgers.length) {
+        for (const d of dupLedgers) {
+          const keep = keepMap[dupKey(d)];
+          for (const c of categories.filter(x => x.ledger_id === d.id)) {
+            if (categories.some(x => x.ledger_id === keep.id && x.name === c.name)) {
+              await Store.remove('categories', c.id); // 保留侧已有同名分类
+            } else {
+              await Store.update('categories', c.id, { ledger_id: keep.id });
+            }
+          }
+          for (const r of records.filter(x => x.ledger_id === d.id)) await Store.update('records', r.id, { ledger_id: keep.id });
+          for (const b of budgets.filter(x => x.ledger_id === d.id)) await Store.update('budgets', b.id, { ledger_id: keep.id });
+          for (const t of templates.filter(x => x.ledger_id === d.id)) await Store.update('templates', t.id, { ledger_id: keep.id });
+          await Store.remove('ledgers', d.id);
+        }
+        changed = true;
+      }
       if (!categories.length) {
         const ls = await Store.list('ledgers');
         for (const l of ls) {
@@ -375,7 +407,10 @@ const App = {
       this.state.budgets = budgets;
       this.state.templates = templates;
       if (!this.state.currentLedgerId || !ledgers.find(l => l.id === this.state.currentLedgerId)) {
-        this.state.currentLedgerId = (ledgers.find(l => l.type === 'personal') || ledgers[0] || {}).id || null;
+        const personal = ledgers.filter(l => l.type === 'personal');
+        // 优先选挂着分类的个人账本（历史重复账本遗留时，避免选到空账本导致「大类小类无选项」）
+        const withCats = personal.find(l => categories.some(c => c.ledger_id === l.id));
+        this.state.currentLedgerId = (withCats || personal[0] || ledgers[0] || {}).id || null;
       }
       this.renderChrome();
       if (!silent) this.renderView();
