@@ -144,11 +144,11 @@ const App = {
     this.route();
   },
 
-  /* ---------- 本地数据自动上云（一次性） ---------- */
+  /* ---------- 本地数据自动上云（一次性，幂等去重） ---------- */
   async migrateLocalIfNeeded() {
     if (Store.mode !== 'supabase' || !Store.user) return;
     const email = Store.user.email || '';
-    const marker = 'fin_migrated_' + email;
+    const marker = 'fin_migrated_v2_' + email; // v2：旧标记可能是缺陷版逻辑打的，不再采信
     try { if (localStorage.getItem(marker)) return; } catch (e) { return; }
     let db = null;
     try { db = JSON.parse(localStorage.getItem('fin_db_' + email) || 'null'); } catch (e) { /* ignore */ }
@@ -156,19 +156,50 @@ const App = {
     const hasData = db && typeof db === 'object' && tables.some(t => Array.isArray(db[t]) && db[t].length);
     if (!hasData) { try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ } return; }
     try {
-      const cloud = await Store.list('ledgers');
-      if (cloud && cloud.length) { try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ } return; }
+      // 云端现状：账本按 name+type 配对复用（种子账本不重复建），其余按自然键/ID 去重
+      const [cloudLedgers, cloudCats, cloudBudgets, cloudTpls, cloudRecs] = await Promise.all([
+        Store.list('ledgers'), Store.list('categories'), Store.list('budgets'), Store.list('templates'), Store.list('records')
+      ]);
+      const lidMap = {}; // 本地账本 id → 云端账本 id
+      for (const l of (db.ledgers || [])) {
+        const exist = cloudLedgers.find(c => c.name === l.name && (c.type || 'personal') === (l.type || 'personal'));
+        if (exist) lidMap[l.id] = exist.id;
+      }
+      const hasCat = (lid, name) => cloudCats.some(c => c.ledger_id === lid && c.name === name);
+      const hasBudget = (lid, cat, sub) => cloudBudgets.some(b => b.ledger_id === lid && b.category === cat && (b.sub || '') === (sub || ''));
+      const hasTpl = (lid, cat, sub) => cloudTpls.some(t => t.ledger_id === lid && t.category === cat && (t.sub || '') === (sub || ''));
+      const recIds = new Set(cloudRecs.map(r => r.id));
       let n = 0;
-      for (const t of tables) {
-        for (const row of (db[t] || [])) {
-          const r = { ...row };
-          delete r.user_id; delete r.created_at;
-          await Store.insert(t, r);
-          n++;
-        }
+      const put = async (t, row) => {
+        try { await Store.insert(t, row); n++; }
+        catch (e) { console.warn('迁移跳过 ' + t, (e && e.message) || e); }
+      };
+      const clean = r => { const x = { ...r }; delete x.user_id; delete x.created_at; return x; };
+      for (const l of (db.ledgers || [])) {
+        if (lidMap[l.id]) continue; // 云端已有同名账本 → 复用，子数据改挂过去
+        await put('ledgers', clean(l));
+      }
+      for (const c of (db.categories || [])) {
+        const lid = lidMap[c.ledger_id] || c.ledger_id;
+        if (hasCat(lid, c.name)) continue;
+        await put('categories', clean({ ...c, ledger_id: lid }));
+      }
+      for (const b of (db.budgets || [])) {
+        const lid = lidMap[b.ledger_id] || b.ledger_id;
+        if (hasBudget(lid, b.category, b.sub)) continue;
+        await put('budgets', clean({ ...b, ledger_id: lid }));
+      }
+      for (const t of (db.templates || [])) {
+        const lid = lidMap[t.ledger_id] || t.ledger_id;
+        if (hasTpl(lid, t.category, t.sub)) continue;
+        await put('templates', clean({ ...t, ledger_id: lid }));
+      }
+      for (const r of (db.records || [])) {
+        if (recIds.has(r.id)) continue; // 已在云端（含此前缺陷版搬过去的）
+        await put('records', clean({ ...r, ledger_id: lidMap[r.ledger_id] || r.ledger_id }));
       }
       try { localStorage.setItem(marker, '1'); } catch (e) { /* ignore */ }
-      this.toast('本地数据已同步到云端（' + n + ' 条）', 'ok');
+      if (n) this.toast('本地数据已同步到云端（' + n + ' 条）', 'ok');
     } catch (e) {
       console.warn('本地数据迁移失败', e);
     }
@@ -315,6 +346,17 @@ const App = {
           if (l) await Store.insert('templates', { ledger_id: l.id, category: t.category, sub: t.sub, label: t.label, section: t.section, emoji: t.emoji });
         }
         changed = true;
+      }
+      // 老模板补 label/section/emoji（此前缺列被剥离入库的模板，按 category+sub 回填默认值；每会话只试一次防递归）
+      if (!this._tplMetaMigrated && templates.length && templates.some(t => !t.label || !t.section || !t.emoji)) {
+        this._tplMetaMigrated = true;
+        let fixed = 0;
+        for (const t of templates) {
+          const def = DEFAULT_TEMPLATES.find(d => d.category === t.category && d.sub === t.sub);
+          if (!def || (t.label && t.section && t.emoji)) continue;
+          if (await Store.update('templates', t.id, { label: def.label, section: def.section, emoji: def.emoji })) fixed++;
+        }
+        if (fixed) changed = true;
       }
       if (changed) return this.loadData(silent);
 
@@ -2134,8 +2176,8 @@ const App = {
       clearOver();
       const wasStarted = started;
       started = false;
+      if (wasStarted) el._skipClick = true; // 只要真正拖拽过（含 Esc/取消/无目标），后续 click 一律不触发编辑
       if (!wasStarted || !commit || !target) return; // 未真正拖动 / 松手时无目标格子 / Esc → 取消
-      el._skipClick = true;
       this.changeRecDate(el.dataset.rid, target.dataset.date);
     };
     function onMove(e) {
@@ -2351,6 +2393,11 @@ begin
     user_id uuid not null references auth.users(id) on delete cascade,
     name text not null,
     type text not null default 'personal',
+    kind text not null default '',
+    icon text not null default '',
+    color text not null default '',
+    sort integer not null default 0,
+    archived boolean not null default false,
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -2361,6 +2408,8 @@ begin
     name text not null,
     kind text not null default 'expense',
     subs jsonb not null default '[]'::jsonb,
+    icon text not null default '',
+    sort integer not null default 0,
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -2373,16 +2422,12 @@ begin
     amount numeric not null default 0,
     note text not null default '',
     favorite boolean not null default false,
-    tags text[] not null default '{}',
     rating integer not null default 0,
     date text not null default '',
     image text,
     kind text not null default 'expense',
     created_at timestamptz not null default now()
   ) $ddl$;
-
-  -- 好物仓库多标签：已建库的旧版本补 tags 列（幂等）
-  execute $ddl$ alter table records add column if not exists tags text[] not null default '{}' $ddl$;
 
   execute $ddl$ create table if not exists budgets (
     id uuid primary key default gen_random_uuid(),
@@ -2391,6 +2436,8 @@ begin
     category text not null default '',
     sub text not null default '',
     amount numeric not null default 0,
+    month text not null default '',
+    note text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -2400,6 +2447,9 @@ begin
     ledger_id uuid not null references ledgers(id) on delete cascade,
     category text not null default '',
     sub text not null default '',
+    label text not null default '',
+    section text not null default '',
+    emoji text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -2411,6 +2461,23 @@ begin
     pos_y double precision not null default 30,
     updated_at timestamptz not null default now()
   ) $ddl$;
+
+  -- 账单标签列（多选标签，文本数组）
+  execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
+
+  -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
+  execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists icon     text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists color    text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists sort     integer      not null default 0 $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists archived boolean     not null default false $ddl$;
+  execute $ddl$ alter table categories add column if not exists icon     text         not null default '' $ddl$;
+  execute $ddl$ alter table categories add column if not exists sort     integer      not null default 0 $ddl$;
+  execute $ddl$ alter table templates  add column if not exists label    text         not null default '' $ddl$;
+  execute $ddl$ alter table templates  add column if not exists section  text         not null default '' $ddl$;
+  execute $ddl$ alter table templates  add column if not exists emoji    text         not null default '' $ddl$;
+  execute $ddl$ alter table budgets    add column if not exists month    text         not null default '' $ddl$;
+  execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;
@@ -2444,7 +2511,7 @@ begin
   execute $ddl$ create policy "own banners" on banners for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：6 张表已创建（含 banners），records.tags 列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  return 'done：6 张表已创建（含 banners），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;`;
 

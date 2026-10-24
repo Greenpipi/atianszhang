@@ -5,7 +5,7 @@ const Store = {
   user: null,             // { id, email }
   cfg: { url: '', key: '' },
   _realtimeOn: false,
-  _noTagsCol: false,      // records.tags 列缺失（云端未执行升级 SQL）时置 true
+  _noCols: new Set(),       // 已知缺失的「表.列」（PGRST204），后续不再发送
   _onDataChange: null,
   _onAuthChange: null,
 
@@ -139,17 +139,29 @@ const Store = {
   /* ---------- 云端表缺失自动降级 ---------- */
   _isTableErr(e) {
     const m = (e && e.message) || String(e || '');
-    return /schema cache/i.test(m)
-      || /Could not find the table/i.test(m)
+    // 只认「表不存在」；列缺失（PGRST204）走 _isColErr 自动剥离重试，不当成表缺失回退本地
+    return /Could not find the table/i.test(m)
       || /PGRST205/i.test(m)
       || (/relation/i.test(m) && /does not exist/i.test(m));
   },
-  /* records.tags 列尚未添加（PGRST204）时：剥离 tags 重试，后续不再发送 */
-  _isTagsColErr(e) {
+  /* 列缺失（PGRST204：Could not find the 'x' column of 't' in the schema cache）：
+     记下该列后续不再发送，剥离后重试——表结构升级前功能不中断、不掉本地 */
+  _isColErr(e) {
     const m = (e && e.message) || String(e || '');
-    return /PGRST204/.test(m) || /Could not find the 'tags' column/i.test(m);
+    return /PGRST204/.test(m) || /Could not find the '.*' column/i.test(m);
   },
-  _stripTags(row) { const r = { ...row }; delete r.tags; return r; },
+  _colName(e) {
+    const mm = ((e && e.message) || '').match(/Could not find the '([^']+)' column/);
+    return mm ? mm[1] : null;
+  },
+  _stripNoCols(table, obj) {
+    const p = { ...obj };
+    this._noCols.forEach(key => {
+      if (key.indexOf(table + '.') === 0) delete p[key.slice(table.length + 1)];
+    });
+    return p;
+  },
+  missingCol(table, col) { return this._noCols.has(table + '.' + col); },
   _fallbackToLocal() {
     if (this.mode !== 'supabase') return;
     this.mode = 'local';
@@ -176,15 +188,11 @@ const Store = {
   async insert(table, row) {
     if (this.mode === 'supabase') {
       try {
-        const payload = { ...row, user_id: this.user.id };
-        if (this._noTagsCol) delete payload.tags;
-        const { data, error } = await this.sb.from(table).insert(payload).select().single();
+        const { data, error } = await this.sb.from(table).insert(this._stripNoCols(table, { ...row, user_id: this.user.id })).select().single();
         if (error) {
-          if (table === 'records' && 'tags' in payload && this._isTagsColErr(error)) {
-            this._noTagsCol = true;
-            const { data: d2, error: e2 } = await this.sb.from(table).insert(this._stripTags(payload)).select().single();
-            if (e2) throw e2;
-            return d2;
+          if (this._isColErr(error)) {
+            const col = this._colName(error);
+            if (col) { this._noCols.add(table + '.' + col); return this.insert(table, row); }
           }
           throw error;
         }
@@ -205,18 +213,19 @@ const Store = {
   async update(table, id, patch) {
     if (this.mode === 'supabase') {
       try {
-        const payload = this._noTagsCol ? this._stripTags(patch) : { ...patch };
-        const { error } = await this.sb.from(table).update(payload).eq('id', id);
-        if (error) {
-          if (table === 'records' && 'tags' in patch && this._isTagsColErr(error)) {
-            this._noTagsCol = true;
-            const { error: e2 } = await this.sb.from(table).update(this._stripTags(patch)).eq('id', id);
-            if (e2) throw e2;
-            return;
+        const p = this._stripNoCols(table, patch);
+        if (Object.keys(p).length) {
+          const { error } = await this.sb.from(table).update(p).eq('id', id);
+          if (error) {
+            if (this._isColErr(error)) {
+              const col = this._colName(error);
+              if (col) { this._noCols.add(table + '.' + col); return this.update(table, id, patch); }
+            }
+            throw error;
           }
-          throw error;
+          return true;
         }
-        return;
+        return false; // 字段全部缺失被剥离：未发送任何更新
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
         else throw new Error(this._dbErr(e));
@@ -225,6 +234,7 @@ const Store = {
     const db = this._localRead() || {};
     db[table] = (db[table] || []).map(r => r.id === id ? { ...r, ...patch } : r);
     this._localWrite(db);
+    return true;
   },
 
   async remove(table, id) {
@@ -300,7 +310,8 @@ const Store = {
   _dbErr(e) {
     const m = (e && e.message) || '保存失败';
     if (/row-level security/i.test(m)) return '权限不足（RLS），请检查 Supabase 安全策略';
-    if (/relation/i.test(m) && /not exist/i.test(m)) return '数据表不存在，请先在「设置」中执行建表 SQL';
+    if (/Could not find the '.*' column/i.test(m)) return '云端数据表缺少字段，请到「设置」页重新执行建表 SQL 升级表结构';
+    if (/Could not find the table/i.test(m) || (/relation/i.test(m) && /not exist/i.test(m))) return '数据表不存在，请先在「设置」中执行建表 SQL';
     if (/Failed to fetch|NetworkError/i.test(m)) return '网络不可用，保存失败';
     return m;
   },
@@ -322,13 +333,10 @@ const Store = {
     try {
       const { error } = await this.sb.from('ledgers').select('id').limit(1);
       if (error) {
-        if (/relation .* not exist/i.test(error.message) || /schema cache/i.test(error.message) || /Could not find the table/i.test(error.message)) {
+        if (this._isTableErr(error)) {
           return { ok: true, msg: '连接成功（数据表尚未创建，请在 Supabase SQL Editor 执行建表 SQL）' };
         }
         return { ok: false, msg: this._dbErr(error) };
-      }
-      if (this._noTagsCol) {
-        return { ok: true, msg: '连接成功（records 表缺 tags 列，好物标签暂不生效，请在 Supabase 执行：alter table records add column if not exists tags text[] not null default \'{}\';）' };
       }
       return { ok: true, msg: '连接成功，数据表可访问' };
     } catch (e) {

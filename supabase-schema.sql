@@ -18,6 +18,11 @@ begin
     user_id uuid not null references auth.users(id) on delete cascade,
     name text not null,
     type text not null default 'personal',
+    kind text not null default '',
+    icon text not null default '',
+    color text not null default '',
+    sort integer not null default 0,
+    archived boolean not null default false,
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -28,6 +33,8 @@ begin
     name text not null,
     kind text not null default 'expense',
     subs jsonb not null default '[]'::jsonb,
+    icon text not null default '',
+    sort integer not null default 0,
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -54,6 +61,8 @@ begin
     category text not null default '',
     sub text not null default '',
     amount numeric not null default 0,
+    month text not null default '',
+    note text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -63,6 +72,9 @@ begin
     ledger_id uuid not null references ledgers(id) on delete cascade,
     category text not null default '',
     sub text not null default '',
+    label text not null default '',
+    section text not null default '',
+    emoji text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -77,6 +89,20 @@ begin
 
   -- 账单标签列（多选标签，文本数组）
   execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
+
+  -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
+  execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists icon     text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists color    text         not null default '' $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists sort     integer      not null default 0 $ddl$;
+  execute $ddl$ alter table ledgers    add column if not exists archived boolean     not null default false $ddl$;
+  execute $ddl$ alter table categories add column if not exists icon     text         not null default '' $ddl$;
+  execute $ddl$ alter table categories add column if not exists sort     integer      not null default 0 $ddl$;
+  execute $ddl$ alter table templates  add column if not exists label    text         not null default '' $ddl$;
+  execute $ddl$ alter table templates  add column if not exists section  text         not null default '' $ddl$;
+  execute $ddl$ alter table templates  add column if not exists emoji    text         not null default '' $ddl$;
+  execute $ddl$ alter table budgets    add column if not exists month    text         not null default '' $ddl$;
+  execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;
@@ -110,6 +136,6 @@ begin
   execute $ddl$ create policy "own banners" on banners for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：6 张表已创建（含 banners），records.tags 列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  return 'done：6 张表已创建（含 banners），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;
