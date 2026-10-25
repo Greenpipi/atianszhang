@@ -3357,4 +3357,19 @@ begin
 end
 $fn$;`;
 
-window.addEventListener('DOMContentLoaded', () => App.init());
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!window.supabase) {
+    // vendor 未加载（极端情况）：从 CDN 兜底加载 supabase-js
+    try {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0';
+        s.crossOrigin = 'anonymous';
+        s.onload = res;
+        s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    } catch (e) { /* 兜底失败，App.init 会继续处理连接异常 */ }
+  }
+  App.init();
+});
