@@ -2727,6 +2727,7 @@ const App = {
     let rating = r.rating || 0;
     const edMask = this.openModal(`
       <div class="modal-title">编辑记录<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <div class="modal-body">
       <div class="field-row">
         <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
         <div class="field"><label>小类</label><select id="ed-sub"></select></div>
@@ -2756,10 +2757,13 @@ const App = {
           <button class="btn btn-ghost btn-sm" id="ed-img-link" type="button">图片链接</button>
         </div>
       </div>
-      <div class="modal-acts">
-        <button class="btn btn-danger" id="ed-del" style="margin-right:auto">删除</button>
-        <button class="btn btn-ghost" data-close>取消</button>
-        <button class="btn btn-primary" id="ed-save">保存</button>
+      </div>
+      <div class="modal-foot">
+        <div class="modal-acts">
+          <button class="btn btn-danger" id="ed-del" style="margin-right:auto">删除</button>
+          <button class="btn btn-ghost" data-close>取消</button>
+          <button class="btn btn-primary" id="ed-save">保存</button>
+        </div>
       </div>
     `, false, 'edit-modal');
 
@@ -2835,7 +2839,7 @@ const App = {
         tm = setTimeout(() => elm.classList.remove('mscrolling'), 900);
       }, { passive: true });
     };
-    bindThinScroll(edMask && edMask.firstElementChild);
+    bindThinScroll(edMask && edMask.querySelector('.modal-body'));
     bindThinScroll(document.getElementById('ed-tagpicker'));
     document.getElementById('ed-img-link').onclick = () => {
       this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });

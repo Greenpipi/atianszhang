@@ -674,17 +674,30 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   width:100%;max-width:460px;max-height:90dvh;overflow:auto;padding:26px;animation:pop .18s ease;
 }
 .modal.wide{max-width:640px}
+/* 编辑记录弹窗：左右留白用变量（PC 60px / 小屏 26px） */
+.modal.edit-modal{--ed-pad-x:26px;padding:26px var(--ed-pad-x) 22px;display:flex;flex-direction:column;overflow:hidden}
 /* 编辑记录弹窗（PC）：固定 800×750；小屏回退默认弹窗 */
 @media (min-width:900px){
-  .modal.edit-modal{width:800px;height:750px;max-width:92vw;max-height:92dvh;padding-left:60px;padding-right:60px}
+  .modal.edit-modal{--ed-pad-x:60px;width:800px;height:750px;max-width:92vw;max-height:92dvh}
 }
-/* 弹窗主滚动条隐形化：不滚动时全透明，滚动时浅灰 2px 圆角细线（无底框，不破坏圆角） */
-.modal.edit-modal{scrollbar-width:thin;scrollbar-color:transparent transparent}
-.modal.edit-modal::-webkit-scrollbar{width:2px}
-.modal.edit-modal::-webkit-scrollbar-track{background:transparent}
-.modal.edit-modal::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
-.modal.edit-modal.mscrolling{scrollbar-color:#D1D5DB transparent}
-.modal.edit-modal.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+/* 内容区独立滚动，滚动条隐形化：不滚动时全透明，滚动时浅灰 2px 圆角细线（无底框，不破坏圆角） */
+.modal.edit-modal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:transparent transparent}
+.modal.edit-modal .modal-body::-webkit-scrollbar{width:2px}
+.modal.edit-modal .modal-body::-webkit-scrollbar-track{background:transparent}
+.modal.edit-modal .modal-body::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
+.modal.edit-modal .modal-body.mscrolling{scrollbar-color:#D1D5DB transparent}
+.modal.edit-modal .modal-body.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+/* 底部按钮区固定，上方 25px 白色渐变遮罩，滚动内容平滑淡出 */
+.modal.edit-modal .modal-foot{
+  position:relative;flex:none;background:#fff;margin-top:16px;
+  margin-left:calc(var(--ed-pad-x) * -1);margin-right:calc(var(--ed-pad-x) * -1);
+  padding-left:var(--ed-pad-x);padding-right:var(--ed-pad-x);
+}
+.modal.edit-modal .modal-foot::before{
+  content:'';position:absolute;left:0;right:0;bottom:100%;height:25px;pointer-events:none;
+  background:linear-gradient(to top,#fff 0%,rgba(255,255,255,0) 100%);
+}
+.modal.edit-modal .modal-foot .modal-acts{margin-top:0}
 /* 好物标签框滚动条：同规则 */
 .tag-picker{scrollbar-width:thin;scrollbar-color:transparent transparent}
 .tag-picker::-webkit-scrollbar{width:2px}
