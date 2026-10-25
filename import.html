@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>数据导入</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .imp-wrap{max-width:560px;margin:48px auto;padding:0 16px}
+  .imp-card{background:var(--card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:14px;padding:22px;box-shadow:var(--shadow)}
+  .imp-title{font-size:19px;font-weight:800;margin-bottom:4px}
+  .imp-sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+  .imp-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .imp-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0}
+  .imp-dot.ok{background:#10b981}
+  .imp-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+  .imp-stat .cell{background:var(--bg,#f8fafc);border-radius:10px;padding:10px;text-align:center}
+  .imp-stat .n{font-size:17px;font-weight:800}
+  .imp-stat .l{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .imp-log{font-size:12.5px;color:var(--muted);white-space:pre-wrap;background:var(--bg,#f8fafc);border-radius:10px;padding:12px;margin-top:12px;max-height:220px;overflow:auto}
+  .imp-bar{height:8px;background:var(--border,#e2e8f0);border-radius:99px;overflow:hidden;margin-top:12px}
+  .imp-bar i{display:block;height:100%;width:0;background:var(--accent,#3b82f6);border-radius:99px;transition:width .2s}
+  .imp-hidden{display:none}
+  #imp-file{display:none}
+</style>
+</head>
+<body>
+<div class="imp-wrap">
+  <div class="imp-card">
+    <div class="imp-title">数据导入</div>
+    <div class="imp-sub">把 Notion 导出的账本数据写入云端账本（与 App 实时同步）</div>
+
+    <div class="imp-row">
+      <span class="imp-dot" id="imp-dot"></span>
+      <span id="imp-status">正在连接…</span>
+    </div>
+
+    <form id="imp-login" class="imp-hidden" style="margin-bottom:14px">
+      <div class="field"><label for="imp-email">邮箱</label><input type="email" id="imp-email" required></div>
+      <div class="field"><label for="imp-pwd">密码</label><input type="password" id="imp-pwd" minlength="6" required></div>
+      <button type="submit" class="btn btn-primary btn-block" id="imp-login-btn">登 录</button>
+    </form>
+
+    <div id="imp-ready" class="imp-hidden">
+      <div class="imp-row">
+        <button class="btn btn-ghost" id="imp-pick">选择数据文件（notion-records.json）</button>
+        <input type="file" id="imp-file" accept=".json,application/json">
+        <span class="imp-sub" style="margin:0" id="imp-file-name"></span>
+      </div>
+      <div id="imp-plan" class="imp-hidden">
+        <div class="imp-stat" id="imp-stats"></div>
+        <div class="imp-sub" id="imp-dedup-tip" style="margin-bottom:14px"></div>
+        <button class="btn btn-primary btn-block" id="imp-start">开始导入</button>
+        <div class="imp-bar"><i id="imp-bar-fill"></i></div>
+        <div class="imp-log" id="imp-log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/supabase.js"></script>
+<script>window.supabase || document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"><\/script>');</script>
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/import.js"></script>
+</body>
+</html>
