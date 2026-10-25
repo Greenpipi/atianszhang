@@ -538,19 +538,34 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
 .filter-bar .field{min-width:150px}
 
-/* 标签导航（仓库页） */
-.tag-nav{display:flex;flex-wrap:wrap;gap:8px 14px;margin:14px 0 4px}
-.tag-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.tag-group-name{font-size:12px;font-weight:700;color:var(--muted);margin-right:2px}
-.tag-chip{
+/* 仓库分类（可折叠层级：大类行 + 展开的小类行） */
+.wish-cats{margin:14px 0 4px;display:flex;flex-direction:column;gap:8px}
+.wc-row{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.wc-chip{
   display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);
   background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer;
   transition:border-color .15s,background .15s,color .15s;font-family:inherit;
 }
-.tag-chip b{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.tag-chip:hover{border-color:#93C5FD;background:#F8FAFF}
-.tag-chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
-.tag-chip.on b{color:rgba(255,255,255,.85)}
+.wc-chip b{font-size:11px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.wc-chip .wc-ar{font-style:normal;font-size:9px;color:var(--muted);margin-left:1px}
+.wc-chip:hover{border-color:#93C5FD;background:#F8FAFF}
+.wc-chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.wc-chip.on b{color:rgba(255,255,255,.85)}
+.wc-chip.on .wc-ar{color:rgba(255,255,255,.85)}
+.wc-subs{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 2px 4px}
+.wc-sub{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--text);
+  background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;
+  transition:border-color .15s,background .15s,color .15s;font-family:inherit;
+}
+.wc-sub b{font-size:10.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.wc-sub:hover{border-color:#93C5FD;background:#F8FAFF}
+.wc-sub.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.wc-sub.on b{color:rgba(255,255,255,.85)}
+/* 空分类置灰（仍有计数显示，避免占位抢眼） */
+.wc-sub.zero{color:#B6C2D2;background:#FAFBFC;border-style:dashed}
+.wc-sub.zero b{color:#CBD5E1}
+.wc-sub.zero:hover{border-color:#CBD5E1;background:#F5F7FA}
 /* 仓库分类图标（emoji 套装，chips/徽章/标签面板共用） */
 .tag-emo{font-size:1.1em;line-height:1;margin-right:2px;flex-shrink:0}
 

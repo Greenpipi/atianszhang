@@ -5,7 +5,7 @@ const App = {
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
-    wish: { sort: 'date-desc', tag: '' },
+    wish: { sort: 'amt-desc', tag: '', cat: '', open: [] },
     home: { view: 'week', anchor: todayStr(), sel: todayStr(), mode: 'calendar' },
     search: { q: '', cats: [], ledgers: [], from: '', to: '' },
     list: { sortKey: 'date', sortDir: 'desc', page: 1 },
@@ -1473,8 +1473,17 @@ const App = {
     // 标签导航计数（按全部好物统计，一个物品可计入多个标签）
     const tagCounts = {};
     all.forEach(r => recTags(r).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+    // 各大类物品总数
+    const catCounts = {};
+    GOODS_TAG_GROUPS.forEach(g => {
+      const tags = g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name];
+      catCounts[g.name] = tags.reduce((n, t) => n + (tagCounts[t] || 0), 0);
+    });
+    const openCats = Array.isArray(f.open) ? f.open : [];
 
-    let items = f.tag ? all.filter(r => recTags(r).includes(f.tag)) : all;
+    let items = all;
+    if (f.tag) items = all.filter(r => recTags(r).includes(f.tag));
+    else if (f.cat) items = all.filter(r => recTags(r).some(t => t === f.cat || t.indexOf(f.cat + '-') === 0));
     const sorters = {
       'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
@@ -1489,15 +1498,19 @@ const App = {
         <div class="card-head">
           <div>
             <div class="card-title">好物仓库</div>
-            <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
+            <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : f.cat ? '分类 · ' + esc(f.cat) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
           </div>
         </div>
-        <div class="tag-nav" id="w-tagnav">
-          <button class="tag-chip${f.tag ? '' : ' on'}" data-tag="">全部<b>${all.length}</b></button>
-          ${GOODS_TAG_GROUPS.map(g => {
+        <div class="wish-cats" id="w-cats">
+          <div class="wc-row">
+            <button class="wc-chip${f.cat || f.tag ? '' : ' on'}" data-cat="">全部<b>${all.length}</b></button>
+            ${GOODS_TAG_GROUPS.map(g =>
+              '<button class="wc-chip' + (f.cat === g.name && !f.tag ? ' on' : '') + '" data-cat="' + esc(g.name) + '" title="点击展开小类">' + esc(g.name) + '<b>' + (catCounts[g.name] || 0) + '</b>' + (g.subs.length ? '<i class="wc-ar">▾</i>' : '') + '</button>').join('')}
+          </div>
+          ${GOODS_TAG_GROUPS.filter(g => openCats.includes(g.name)).map(g => {
             const tags = g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name];
-            return '<div class="tag-group"><span class="tag-group-name">' + esc(g.name) + '</span>' + tags.map(t =>
-              '<button class="tag-chip' + (f.tag === t ? ' on' : '') + '" data-tag="' + esc(t) + '" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '<b>' + (tagCounts[t] || 0) + '</b></button>').join('') + '</div>';
+            return '<div class="wc-subs">' + tags.map(t =>
+              '<button class="wc-sub' + (f.tag === t ? ' on' : '') + ((tagCounts[t] || 0) ? '' : ' zero') + '" data-tag="' + esc(t) + '" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '<b>' + (tagCounts[t] || 0) + '</b></button>').join('') + '</div>';
           }).join('')}
         </div>
         <div class="filter-bar">
@@ -1515,14 +1528,31 @@ const App = {
       <div class="wish-grid" id="wish-grid"></div>`;
 
     el.querySelector('#w-sort').onchange = e => { this.state.wish.sort = e.target.value; this.renderWishlist(); };
-    el.querySelectorAll('#w-tagnav .tag-chip').forEach(ch => {
-      ch.onclick = () => { this.state.wish.tag = ch.dataset.tag; this.renderWishlist(); };
+    el.querySelectorAll('#w-cats .wc-chip[data-cat]').forEach(ch => {
+      ch.onclick = () => {
+        const cat = ch.dataset.cat;
+        const w = this.state.wish;
+        if (!cat) { w.cat = ''; w.tag = ''; w.open = []; } // 「全部」：清空分类与展开态
+        else {
+          w.cat = cat; w.tag = '';
+          const i = w.open.indexOf(cat);
+          if (i >= 0) w.open.splice(i, 1); else w.open.push(cat);
+        }
+        this.renderWishlist();
+      };
+    });
+    el.querySelectorAll('#w-cats .wc-sub[data-tag]').forEach(ch => {
+      ch.onclick = () => {
+        const t = ch.dataset.tag;
+        this.state.wish.tag = this.state.wish.tag === t ? '' : t;
+        this.renderWishlist();
+      };
     });
     this.enhanceSelects(el);
 
     const grid = el.querySelector('#wish-grid');
     if (!items.length) {
-      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>' + (f.tag ? '该标签下还没有好物' : '还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里') + '</p>';
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>' + (f.tag || f.cat ? '该分类下还没有好物' : '还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里') + '</p>';
       return;
     }
     grid.innerHTML = items.map(r => {
@@ -1695,16 +1725,22 @@ const App = {
       ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '</span>').join('')
       : '<span class="wtag none">未贴标签</span>';
   },
-  /* 标签导航计数刷新（增删标签后顶部 chip 数字同步） */
+  /* 分类导航计数刷新（增删标签后大类/小类 chip 数字同步） */
   updateWishTagCounts() {
     const all = this.recsOf(this.state.currentLedgerId).filter(r => r.favorite);
     const counts = {};
     all.forEach(r => recTags(r).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
-    document.querySelectorAll('#w-tagnav .tag-chip').forEach(ch => {
+    const catCount = name => GOODS_TAG_GROUPS.filter(g => g.name === name).reduce((n, g) =>
+      n + (g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name]).reduce((m, t) => m + (counts[t] || 0), 0), 0);
+    document.querySelectorAll('#w-cats .wc-chip[data-cat]').forEach(ch => {
       const b = ch.querySelector('b');
       if (!b) return;
-      const t = ch.dataset.tag;
-      b.textContent = t ? (counts[t] || 0) : all.length;
+      const cat = ch.dataset.cat;
+      b.textContent = cat ? (catCount(cat) || 0) : all.length;
+    });
+    document.querySelectorAll('#w-cats .wc-sub[data-tag]').forEach(ch => {
+      const b = ch.querySelector('b');
+      if (b) b.textContent = counts[ch.dataset.tag] || 0;
     });
   },
   /* 标签菜单：复用记账弹窗的标签多选面板，勾选即存 */
