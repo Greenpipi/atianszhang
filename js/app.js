@@ -2725,17 +2725,17 @@ const App = {
     if (!r) return;
     const cats = this.catsOf(ledgerId);
     let rating = r.rating || 0;
-    this.openModal(`
+    const edMask = this.openModal(`
       <div class="modal-title">编辑记录<button class="icon-btn" style="display:flex" data-close>✕</button></div>
       <div class="field-row">
         <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
         <div class="field"><label>小类</label><select id="ed-sub"></select></div>
         <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
       </div>
-      <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" min="0" step="0.01" value="${r.amount}"></div>
+      <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" min="0" step="0.01" value="${(Number(r.amount) || 0).toFixed(2)}"></div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="field"><label>描述</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
-      <div class="field"><label>备注</label><textarea id="ed-remark" rows="2" placeholder="可输入多行备注，高度随内容自适应">${esc(r.remark || '')}</textarea></div>
+      <div class="field"><label>备注</label><textarea id="ed-remark" rows="2">${esc(r.remark || '')}</textarea></div>
       <div class="field-row">
         <div class="field"><label>购买平台</label><input id="ed-platform" type="text" value="${esc(r.purchase_platform || '')}" placeholder="如 淘宝 / 京东"></div>
         <div class="field"><label>属性</label><input id="ed-attr" type="text" value="${esc(r.attribute || '')}" placeholder="如 黑色 128G"></div>
@@ -2825,6 +2825,18 @@ const App = {
     const fitRemark = () => { remarkEl.style.height = 'auto'; remarkEl.style.height = Math.max(64, remarkEl.scrollHeight) + 'px'; };
     remarkEl.addEventListener('input', fitRemark);
     fitRemark();
+    // 滚动条：滚动时显示浅灰细线，停止后隐藏（弹窗主滚动条 + 好物标签框）
+    const bindThinScroll = (elm) => {
+      if (!elm) return;
+      let tm = null;
+      elm.addEventListener('scroll', () => {
+        elm.classList.add('mscrolling');
+        clearTimeout(tm);
+        tm = setTimeout(() => elm.classList.remove('mscrolling'), 900);
+      }, { passive: true });
+    };
+    bindThinScroll(edMask && edMask.firstElementChild);
+    bindThinScroll(document.getElementById('ed-tagpicker'));
     document.getElementById('ed-img-link').onclick = () => {
       this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });
     };

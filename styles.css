@@ -676,10 +676,27 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .modal.wide{max-width:640px}
 /* 编辑记录弹窗（PC）：固定 800×750；小屏回退默认弹窗 */
 @media (min-width:900px){
-  .modal.edit-modal{width:800px;height:750px;max-width:92vw;max-height:92dvh}
+  .modal.edit-modal{width:800px;height:750px;max-width:92vw;max-height:92dvh;padding-left:60px;padding-right:60px}
 }
-/* 金额输入放大醒目 */
-.modal .amt-input{font-size:24px;font-weight:700;padding:12px 14px}
+/* 弹窗主滚动条隐形化：不滚动时全透明，滚动时浅灰 2px 圆角细线（无底框，不破坏圆角） */
+.modal.edit-modal{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.modal.edit-modal::-webkit-scrollbar{width:2px}
+.modal.edit-modal::-webkit-scrollbar-track{background:transparent}
+.modal.edit-modal::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
+.modal.edit-modal.mscrolling{scrollbar-color:#D1D5DB transparent}
+.modal.edit-modal.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+/* 好物标签框滚动条：同规则 */
+.tag-picker{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.tag-picker::-webkit-scrollbar{width:2px}
+.tag-picker::-webkit-scrollbar-track{background:transparent}
+.tag-picker::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
+.tag-picker.mscrolling{scrollbar-color:#D1D5DB transparent}
+.tag-picker.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+/* 金额输入框：加高 60px、去掉上下加减箭头 */
+.modal .amt-input{font-size:24px;font-weight:700;padding:0 14px;height:60px;appearance:textfield;-moz-appearance:textfield}
+.modal .amt-input::-webkit-outer-spin-button,.modal .amt-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* 描述输入框加粗 */
+#ed-note{font-weight:700}
 /* 备注 textarea：高度由 JS 自适应，禁用手动拖拽避免和自动高度打架 */
 #ed-remark{resize:none;overflow:hidden}
 @keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
