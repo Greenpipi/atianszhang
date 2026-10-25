@@ -2159,7 +2159,8 @@ const App = {
           ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:200';
           ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:250px;text-align:center;box-shadow:0 12px 40px rgba(15,23,42,.18)">' +
             '<div style="font-weight:800;margin-bottom:8px">正在导入 Notion 数据</div>' +
-            '<div class="imp-pct" style="font-size:13px;color:var(--muted)">准备中…</div></div>';
+            '<div class="imp-pct" style="font-size:13px;color:var(--muted)">准备中…</div>' +
+            '<div style="font-size:11.5px;color:#F97316;margin-top:10px">导入期间请勿关闭或刷新页面</div></div>';
           document.getElementById('modal-root').appendChild(ov);
           const pct = ov.querySelector('.imp-pct');
           try {

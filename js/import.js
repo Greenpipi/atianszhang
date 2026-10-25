@@ -93,7 +93,7 @@
 
   /* ---------- 执行导入 ---------- */
   async function runImport(payload, plan) {
-    if (!window.confirm('确认导入 ' + plan.toInsert.length + ' 条记录到「' + plan.ledger.name + '」？\n重复记录会自动跳过，可反复运行。')) return;
+    if (!window.confirm('确认导入 ' + plan.toInsert.length + ' 条记录到「' + plan.ledger.name + '」？\n重复记录会自动跳过，可反复运行。\n\n导入期间请勿关闭或刷新页面，否则会中途断开（重新导入会自动续上）。')) return;
     $('imp-start').disabled = true;
     $('imp-pick').disabled = true;
     log('开始导入…');
