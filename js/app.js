@@ -1789,11 +1789,38 @@ const App = {
     fileInp.onchange = async () => {
       try {
         const data = await readJSONFile(fileInp);
-        const ok = await this.confirmDialog('导入数据', '导入将追加数据到当前模式（可能产生重复记录），确定继续吗？');
-        if (!ok) return;
-        await Store.importAll(data, false);
-        this.toast('导入完成', 'ok');
-        await this.loadData();
+        const kind = (typeof NotionImport !== 'undefined' && NotionImport.detect(data)) || null;
+        if (kind === 'notion') {
+          // Notion 账本导出：去重 + 补齐分类 + 分批写入（与导入页同一套逻辑）
+          const plan = await NotionImport.plan(data);
+          const ok = await this.confirmDialog('导入 Notion 数据',
+            '将与云端现有记录比对去重：预计新增 ' + plan.toInsert.length + ' 条' +
+            (plan.dupCount ? '（跳过重复 ' + plan.dupCount + ' 条）' : '') +
+            (plan.catPlan.length ? '，补齐 ' + plan.catPlan.length + ' 个分类的小类' : '') + '。确定导入吗？');
+          if (!ok) return;
+          const ov = document.createElement('div');
+          ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:200';
+          ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:250px;text-align:center;box-shadow:0 12px 40px rgba(15,23,42,.18)">' +
+            '<div style="font-weight:800;margin-bottom:8px">正在导入 Notion 数据</div>' +
+            '<div class="imp-pct" style="font-size:13px;color:var(--muted)">准备中…</div></div>';
+          document.getElementById('modal-root').appendChild(ov);
+          const pct = ov.querySelector('.imp-pct');
+          try {
+            const r = await NotionImport.run(data, plan, (done, total) => { pct.textContent = done + ' / ' + total; });
+            this.toast('导入完成：新增 ' + r.added + ' 条' + (r.failed ? '，失败 ' + r.failed + ' 条' : ''), r.failed ? 'err' : 'ok');
+          } finally { ov.remove(); }
+          await this.loadData();
+          return;
+        }
+        if (kind === 'backup') {
+          const ok = await this.confirmDialog('导入数据', '导入将追加数据到当前模式（可能产生重复记录），确定继续吗？');
+          if (!ok) return;
+          await Store.importAll(data, false);
+          this.toast('导入完成', 'ok');
+          await this.loadData();
+          return;
+        }
+        this.toast('文件格式无法识别（支持 Notion 导出 JSON 或本 App 的数据备份）', 'err');
       } catch (e) { this.toast(e.message, 'err'); }
       fileInp.value = '';
     };
