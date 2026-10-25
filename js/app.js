@@ -821,6 +821,16 @@ const App = {
   },
 
   /* ---------- 记账本主页（顶部快捷横排 + 日历/列表视图） ---------- */
+  // 快捷按钮使用记录（localStorage，按设备）：最近使用的小类排最前
+  quickMru() {
+    try { return JSON.parse(localStorage.getItem('fin_quick_mru') || '[]'); } catch (_) { return []; }
+  },
+  touchQuickMru(cat, sub) {
+    const key = (cat || '') + '||' + (sub || '');
+    const arr = this.quickMru().filter(k => k !== key);
+    arr.unshift(key);
+    try { localStorage.setItem('fin_quick_mru', JSON.stringify(arr.slice(0, 32))); } catch (_) {}
+  },
   renderLedgerHome() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
@@ -831,14 +841,17 @@ const App = {
     const searchFocused = document.activeElement && document.activeElement.id === 'search-input';
     const s = this.monthSummary(lid, thisMonth());
 
-    // 快捷记账：日历上方横排一行（日常 → 爱好 → 旅游）
-    const quickHTML = QUICK_SECTIONS.map(sec => (DEFAULT_TEMPLATES || [])
-      .filter(t => t.section === sec)
-      .map(t => `
+    // 快捷记账：日历上方横排一行（最近使用的排最前，其余保持默认板块顺序）
+    const mru = this.quickMru();
+    const qTpls = [...(DEFAULT_TEMPLATES || [])].sort((a, b) => {
+      const ia = mru.indexOf(a.category + '||' + a.sub), ib = mru.indexOf(b.category + '||' + b.sub);
+      return (ia >= 0 ? ia : 9999) - (ib >= 0 ? ib : 9999);
+    });
+    const quickHTML = qTpls.map(t => `
           <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
             <span class="qemoji">${t.emoji || '•'}</span>
             <span class="qlabel">${esc(quickShort(t.label))}</span>
-          </button>`).join('')).join('');
+          </button>`).join('');
 
     const listRecs = showList ? this.filteredRecs() : [];
     el.innerHTML = `
@@ -847,7 +860,11 @@ const App = {
         <div class="hs-item"><span>本月收入</span><b class="income">${fmtMoney(s.income)}</b></div>
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
-      <div class="qbar">${quickHTML}</div>
+      <div class="qwrap" id="qwrap">
+        <button type="button" class="qnav qnav-l" id="qnav-l" aria-label="上一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+        <div class="qbar" id="qbar">${quickHTML}</div>
+        <button type="button" class="qnav qnav-r" id="qnav-r" aria-label="下一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
       <div class="home-view-bar">
         <div class="seg">
           <button data-lm="calendar" class="${showList ? '' : 'on'}">日历</button>
@@ -891,6 +908,28 @@ const App = {
     el.querySelectorAll('.qbtn').forEach(b => {
       b.onclick = () => this.addRecordModal(lid, todayStr(), b.dataset.cat, b.dataset.sub);
     });
+    // 快捷条翻页：溢出时悬停/滑动出现模糊+左右箭头，点击滑动一页（PC 悬停、移动端滑动均可见）
+    const qwrapEl = document.getElementById('qwrap');
+    const qbarEl = document.getElementById('qbar');
+    if (qwrapEl && qbarEl) {
+      const qL = document.getElementById('qnav-l'), qR = document.getElementById('qnav-r');
+      const qUpd = () => {
+        const max = qbarEl.scrollWidth - qbarEl.clientWidth;
+        qwrapEl.classList.toggle('qhas', max > 2);
+        qL.classList.toggle('on', qbarEl.scrollLeft > 2);
+        qR.classList.toggle('on', qbarEl.scrollLeft < max - 2);
+      };
+      qL.onclick = () => qbarEl.scrollBy({ left: -qbarEl.clientWidth, behavior: 'smooth' });
+      qR.onclick = () => qbarEl.scrollBy({ left: qbarEl.clientWidth, behavior: 'smooth' });
+      let qTimer = null;
+      qbarEl.addEventListener('scroll', () => {
+        qwrapEl.classList.add('qtouch');
+        clearTimeout(qTimer);
+        qTimer = setTimeout(() => { qUpd(); qwrapEl.classList.remove('qtouch'); }, 1200);
+        qUpd();
+      }, { passive: true });
+      qUpd();
+    }
     // 日历 / 列表视图切换（搜索中点任一视图 = 退出搜索并切到该视图）
     el.querySelectorAll('[data-lm]').forEach(b => {
       b.onclick = () => {
@@ -2093,6 +2132,7 @@ const App = {
         });
         // 即存即显：把新记录乐观加入内存并局部刷新日历/列表，避免全量重载的秒级延迟
         if (row && row.id) this.state.records.push(row);
+        this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
         this.refreshLedgerPane();
         if (continuous) {
           // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
@@ -2824,6 +2864,7 @@ const App = {
       };
       try {
         await Store.update('records', rid, patch);
+        this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
         const rec = this.state.records.find(x => x.id === rid);
         if (rec) Object.assign(rec, patch);
         this.refreshLedgerPane(); // 即时刷新日历/列表
