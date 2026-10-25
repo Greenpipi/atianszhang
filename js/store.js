@@ -170,12 +170,24 @@ const Store = {
   },
 
   /* ---------- 通用 CRUD（按用户隔离） ---------- */
+  /* list：分页拉全。PostgREST 有单次返回行数上限（Supabase 项目默认 1000），
+     一次 select('*') 只会拿到前 N 行——云端 2701 条时永远只显示最早的 1000 条，
+     且导入去重比对也看不到全部，导致重复导入。按 500/页循环拉全。 */
   async list(table) {
     if (this.mode === 'supabase') {
       try {
-        const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true });
-        if (error) throw error;
-        return data || [];
+        const all = [];
+        const PAGE = 500;
+        let from = 0;
+        for (;;) {
+          const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+          if (error) throw error;
+          const rows = data || [];
+          for (const r of rows) all.push(r);
+          if (rows.length < PAGE) break;
+          from += PAGE;
+        }
+        return all;
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
         else throw new Error(this._dbErr(e));
@@ -183,6 +195,22 @@ const Store = {
     }
     const db = this._localRead();
     return db ? (db[table] || []) : [];
+  },
+
+  /* 批量删除（去重用）：一次删多个 id，100 个一批由调用方控制 */
+  async removeMany(table, ids) {
+    if (!ids || !ids.length) return 0;
+    if (this.mode === 'supabase') {
+      const { error } = await this.sb.from(table).delete().in('id', ids);
+      if (error) throw new Error(this._dbErr(error));
+      return ids.length;
+    }
+    const db = this._localRead();
+    if (!db || !db[table]) return 0;
+    const dead = new Set(ids);
+    db[table] = db[table].filter(x => !dead.has(x.id));
+    this._localWrite(db);
+    return ids.length;
   },
 
   async insert(table, row) {

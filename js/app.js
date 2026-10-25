@@ -2126,6 +2126,7 @@ const App = {
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
           <button class="btn btn-ghost" id="data-export">导出数据（JSON）</button>
           <button class="btn btn-ghost" id="data-import">导入数据</button>
+          <button class="btn btn-ghost" id="data-dedup">数据去重</button>
           <input type="file" id="import-file" accept=".json" hidden>
           ${mode === 'supabase' ? '<button class="btn btn-purple" id="data-migrate">迁移本地数据到云端</button>' : ''}
         </div>
@@ -2253,6 +2254,43 @@ const App = {
           }
         }
         this.toast('已迁移 ' + n + ' 条数据', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+
+    /* --- 数据去重：同账本下 日期+类型+大类+小类+金额+备注 全同视为重复，
+           每组保留一条（优先有收藏/评分的，其次最早写入的），其余批量删除 --- */
+    const dedupBtn = el.querySelector('#data-dedup');
+    if (dedupBtn) dedupBtn.onclick = async () => {
+      try {
+        const recs = this.state.records || [];
+        const key = r => [r.ledger_id || '', r.date, r.kind || 'expense', r.category, r.sub || '', Number(r.amount).toFixed(2), r.note || ''].join('|');
+        const groups = new Map();
+        for (const r of recs) {
+          const k = key(r);
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(r);
+        }
+        let dupGroups = 0;
+        const toDelete = [];
+        for (const [, g] of groups) {
+          if (g.length < 2) continue;
+          dupGroups++;
+          g.sort((a, b) => {
+            const fa = (a.favorite ? 2 : 0) + ((a.rating || 0) > 0 ? 1 : 0);
+            const fb = (b.favorite ? 2 : 0) + ((b.rating || 0) > 0 ? 1 : 0);
+            if (fa !== fb) return fb - fa;
+            return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+          });
+          for (let i = 1; i < g.length; i++) toDelete.push(g[i].id);
+        }
+        if (!toDelete.length) { this.toast('没有重复记录'); return; }
+        const ok = await this.confirmDialog('数据去重',
+          '发现 ' + dupGroups + ' 组完全重复的记录（日期、大类、小类、金额、备注全部相同），每组保留一条，将删除 ' + toDelete.length + ' 条。删除后无法恢复，确定吗？');
+        if (!ok) return;
+        let n = 0;
+        for (let i = 0; i < toDelete.length; i += 100) n += await Store.removeMany('records', toDelete.slice(i, i + 100));
+        this.toast('已删除 ' + n + ' 条重复记录', 'ok');
         await this.loadData();
       } catch (e) { this.toast(e.message, 'err'); }
     };
