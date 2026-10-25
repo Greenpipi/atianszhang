@@ -681,7 +681,12 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   .modal.edit-modal{--ed-pad-x:60px;width:800px;height:750px;max-width:92vw;max-height:92dvh}
 }
 /* 内容区独立滚动，滚动条隐形化：不滚动时全透明，滚动时浅灰 2px 圆角细线（无底框，不破坏圆角） */
-.modal.edit-modal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:transparent transparent}
+.modal.edit-modal .modal-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:4px;
+  /* 右缘延伸到弹窗边框内壁，滚动条紧贴右边缘；等量右内边距保持内容对齐 */
+  margin-right:calc(var(--ed-pad-x) * -1);padding-right:var(--ed-pad-x);
+  scrollbar-width:thin;scrollbar-color:transparent transparent;
+}
 .modal.edit-modal .modal-body::-webkit-scrollbar{width:2px}
 .modal.edit-modal .modal-body::-webkit-scrollbar-track{background:transparent}
 .modal.edit-modal .modal-body::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
