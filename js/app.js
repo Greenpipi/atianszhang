@@ -1842,9 +1842,6 @@ const App = {
           <div class="field">${st.period === 'month'
             ? '<label>月份</label><input type="month" id="st-month" value="' + st.month + '">'
             : '<label>年份</label><input type="number" id="st-year" min="2000" max="2100" value="' + st.year + '">'}</div>
-          <div class="field"><label>小类明细大类</label>
-            <select id="st-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (st.cat === c.name ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select>
-          </div>
         </div>
       </div>
 
@@ -1884,6 +1881,9 @@ const App = {
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">${esc(st.cat)} · 小类消费情况</div><div class="card-sub">${st.period === 'month' ? st.month : st.year}${st.scope === 'all' ? ' · 全部账本' : ''}</div></div>
+          <select id="st-cat" style="height:34px;border:1px solid var(--line);border-radius:9px;padding:0 10px;background:#fff">
+            ${cats.map(c => '<option value="' + esc(c.name) + '" ' + (st.cat === c.name ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}
+          </select>
         </div>
         <div class="mini-bars">
           ${subRows.map(r => `

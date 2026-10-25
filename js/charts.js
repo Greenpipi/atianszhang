@@ -110,20 +110,23 @@ const Charts = {
     const cw = w - padL - padR, chh = h - padT - padB;
     const all = series.flatMap(s => s.data);
     let max = Math.max(...all, 0);
-    if (max <= 0) max = 100;
-    max = max * 1.12;
+    let min = Math.min(...all, 0);
+    if (max === min) { max = 100; min = 0; }
+    const range = max - min;
+    max += range * 0.08;
+    min -= range * 0.08;
     const n = labels.length;
 
-    // 网格与 Y 轴
+    // 网格与 Y 轴（含负值区间：min ~ max 四等分）
     ctx.strokeStyle = '#F3F4F6';
     ctx.fillStyle = '#9CA3AF';
     ctx.textAlign = 'right';
     ctx.lineWidth = 1;
+    const fmtV = v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : Math.round(v);
     for (let i = 0; i <= 4; i++) {
       const y = padT + chh - (chh * i / 4);
       ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-      const v = max * i / 4;
-      ctx.fillText(v >= 10000 ? (v / 10000).toFixed(1) + '万' : Math.round(v), padL - 8, y + 4);
+      ctx.fillText(fmtV(min + (max - min) * i / 4), padL - 8, y + 4);
     }
 
     // X 轴标签（自动抽稀）
@@ -136,18 +139,27 @@ const Charts = {
     });
 
     const px = i => padL + (n === 1 ? cw / 2 : cw * i / (n - 1));
-    const py = v => padT + chh - (v / max) * chh;
+    const py = v => padT + chh - ((v - min) / (max - min)) * chh;
+
+    // 0 基准线（有负值时加粗一点，便于区分收入/支出正负）
+    if (min < 0) {
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(padL, py(0)); ctx.lineTo(w - padR, py(0)); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
 
     series.forEach(s => {
       if (s.data.length < 1) return;
-      // 面积
+      // 面积（以 0 线为基线，负值区域自然向下填充）
       const grad = ctx.createLinearGradient(0, padT, 0, padT + chh);
       grad.addColorStop(0, s.color + '2E');
       grad.addColorStop(1, s.color + '00');
+      const zero = py(0);
       ctx.beginPath();
       s.data.forEach((v, i) => { i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
-      ctx.lineTo(px(s.data.length - 1), padT + chh);
-      ctx.lineTo(px(0), padT + chh);
+      ctx.lineTo(px(s.data.length - 1), zero);
+      ctx.lineTo(px(0), zero);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
