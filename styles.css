@@ -478,9 +478,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wish-amount{font-size:13px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums}
 .wish-attr{font-size:13px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .field-row{display:flex;gap:10px}.field-row .field{flex:1;min-width:0}
-/* 右上角方形图片框：与标题+价格区高度齐平 */
+/* 右上角图片框：固定正方形，不随图片比例/内容拉伸卡片 */
 .wish-imgbox{
-  position:relative;flex:none;width:88px;border-radius:10px;overflow:hidden;cursor:pointer;
+  position:relative;flex:none;width:88px;height:88px;align-self:flex-start;border-radius:10px;overflow:hidden;cursor:pointer;
   border:1px dashed var(--line);background:#F8FAFC;
 }
 .wish-imgbox img{width:100%;height:100%;object-fit:cover;display:block}
@@ -733,7 +733,7 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   .wish-grid{grid-template-columns:1fr 1fr;gap:12px}
   .wish-top{padding:12px 12px 0}
   .wish-name{font-size:13px}
-  .wish-imgbox{width:72px}
+  .wish-imgbox{width:72px;height:72px}
   .wish-status{padding:10px 12px 0}
   .wish-meta{padding:12px 12px 0}
   .wish-tags{padding:10px 12px 14px}

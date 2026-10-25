@@ -5,7 +5,7 @@ const App = {
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
-    wish: { sort: 'amt-desc', tag: '', cat: '', open: [] },
+    wish: { sort: 'amt-desc', tag: '', cats: [], open: [] },
     home: { view: 'week', anchor: todayStr(), sel: todayStr(), mode: 'calendar' },
     search: { q: '', cats: [], ledgers: [], from: '', to: '' },
     list: { sortKey: 'date', sortDir: 'desc', page: 1 },
@@ -1482,8 +1482,9 @@ const App = {
     const openCats = Array.isArray(f.open) ? f.open : [];
 
     let items = all;
+    const cats = Array.isArray(f.cats) ? f.cats : [];
     if (f.tag) items = all.filter(r => recTags(r).includes(f.tag));
-    else if (f.cat) items = all.filter(r => recTags(r).some(t => t === f.cat || t.indexOf(f.cat + '-') === 0));
+    else if (cats.length) items = all.filter(r => { const ts = recTags(r); return cats.some(c => ts.includes(c) || ts.some(t => t.indexOf(c + '-') === 0)); });
     const sorters = {
       'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
@@ -1498,14 +1499,14 @@ const App = {
         <div class="card-head">
           <div>
             <div class="card-title">好物仓库</div>
-            <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : f.cat ? '分类 · ' + esc(f.cat) + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
+            <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : cats.length ? '分类 · ' + cats.map(esc).join('、') + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
           </div>
         </div>
         <div class="wish-cats" id="w-cats">
           <div class="wc-row">
-            <button class="wc-chip${f.cat || f.tag ? '' : ' on'}" data-cat="">全部<b>${all.length}</b></button>
+            <button class="wc-chip${(!f.tag && !cats.length) ? ' on' : ''}" data-cat="">全部<b>${all.length}</b></button>
             ${GOODS_TAG_GROUPS.map(g =>
-              '<button class="wc-chip' + (f.cat === g.name && !f.tag ? ' on' : '') + '" data-cat="' + esc(g.name) + '" title="点击展开小类">' + esc(g.name) + '<b>' + (catCounts[g.name] || 0) + '</b>' + (g.subs.length ? '<i class="wc-ar">▾</i>' : '') + '</button>').join('')}
+              '<button class="wc-chip' + (cats.includes(g.name) ? ' on' : '') + '" data-cat="' + esc(g.name) + '" title="点击选中/取消，再点展开小类">' + esc(g.name) + '<b>' + (catCounts[g.name] || 0) + '</b>' + (g.subs.length ? '<i class="wc-ar">▾</i>' : '') + '</button>').join('')}
           </div>
           ${GOODS_TAG_GROUPS.filter(g => openCats.includes(g.name)).map(g => {
             const tags = g.subs.length ? g.subs.map(s => g.name + '-' + s) : [g.name];
@@ -1532,11 +1533,17 @@ const App = {
       ch.onclick = () => {
         const cat = ch.dataset.cat;
         const w = this.state.wish;
-        if (!cat) { w.cat = ''; w.tag = ''; w.open = []; } // 「全部」：清空分类与展开态
+        if (!cat) { w.cats = []; w.tag = ''; w.open = []; } // 「全部」：清空分类与展开态
         else {
-          w.cat = cat; w.tag = '';
-          const i = w.open.indexOf(cat);
-          if (i >= 0) w.open.splice(i, 1); else w.open.push(cat);
+          const i = w.cats.indexOf(cat);
+          if (i >= 0) { // 再点：取消勾选并收起
+            w.cats.splice(i, 1);
+            const j = w.open.indexOf(cat);
+            if (j >= 0) w.open.splice(j, 1);
+          } else { // 首点：勾选高亮并展开小类
+            w.cats.push(cat); w.tag = '';
+            if (!w.open.includes(cat)) w.open.push(cat);
+          }
         }
         this.renderWishlist();
       };
@@ -1552,7 +1559,7 @@ const App = {
 
     const grid = el.querySelector('#wish-grid');
     if (!items.length) {
-      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>' + (f.tag || f.cat ? '该分类下还没有好物' : '还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里') + '</p>';
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><p>' + (f.tag || cats.length ? '该分类下还没有好物' : '还没有心仪物品<br>在记账时勾选「心仪物品」就会自动出现在这里') + '</p>';
       return;
     }
     grid.innerHTML = items.map(r => {
