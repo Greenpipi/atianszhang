@@ -1630,8 +1630,8 @@ const App = {
         <div class="wish-meta">
           <div class="wm-row">购入日期<b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></div>
           <div class="wm-row wm-duo">
-            <span>已陪伴<b class="wm-badge wm-purple">${days}</b> 天</span>
-            <span>每日<b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b> 元</span>
+            <span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">${days}</b><span class="wm-unit">天</span></span></span>
+            <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b><span class="wm-unit">元</span></span></span>
           </div>
         </div>
         <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>

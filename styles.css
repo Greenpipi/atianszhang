@@ -500,6 +500,14 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wish-meta .wm-row{display:flex;align-items:baseline;gap:6px}
 .wish-meta .wm-duo>span{display:inline-flex;align-items:baseline;gap:6px} /* 文字与数字底框间距 = 购入日期行的 6px */
 .wish-meta .wm-duo{justify-content:space-between}
+.wish-meta .wm-lab{white-space:nowrap}
+.wish-meta .wm-val{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+.wish-meta .wm-unit{font-style:normal}
+/* 窄屏（手机双列卡片）：标签一行、数值换到第二行，各自不折行 */
+@media (max-width:560px){
+  .wish-meta .wm-duo>span{display:grid;justify-items:start;row-gap:2px}
+  .wish-meta .wm-duo .wm-val{gap:4px}
+}
 .wish-meta .wm-dim{color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
 /* 数字描边底框：天数=紫、每日成本=蓝 */
 .wm-badge{display:inline-block;padding:3px 9px;border-radius:7px;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;border:1px solid;line-height:1.45}
