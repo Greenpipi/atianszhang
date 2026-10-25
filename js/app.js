@@ -137,8 +137,8 @@ const App = {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
     this.initNavToggle();
-    await this.initHero();
-    await this.migrateLocalIfNeeded();
+    // banner 配置与本地迁移检查互相独立，并行发起省一个来回（弱网下登录后内容出现更快）
+    await Promise.all([this.initHero(), this.migrateLocalIfNeeded()]);
     await this.loadData();
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
@@ -321,12 +321,14 @@ const App = {
       // 旧版数据清理：出租屋曾是独立账本，现改为主账本的记录标记
       const staleRental = ledgers.filter(l => l.type === 'rental');
       if (staleRental.length) {
+        const ops = [];
         for (const l of staleRental) {
-          for (const r of records.filter(x => x.ledger_id === l.id)) await Store.remove('records', r.id);
-          for (const c of categories.filter(x => x.ledger_id === l.id)) await Store.remove('categories', c.id);
-          for (const b of budgets.filter(x => x.ledger_id === l.id)) await Store.remove('budgets', b.id);
-          await Store.remove('ledgers', l.id);
+          for (const r of records.filter(x => x.ledger_id === l.id)) ops.push(Store.remove('records', r.id));
+          for (const c of categories.filter(x => x.ledger_id === l.id)) ops.push(Store.remove('categories', c.id));
+          for (const b of budgets.filter(x => x.ledger_id === l.id)) ops.push(Store.remove('budgets', b.id));
+          ops.push(Store.remove('ledgers', l.id));
         }
+        await Promise.all(ops); // 并行清理，避免串行多个来回（弱网下登录要等很久）
         changed = true;
       }
       // 同名同类型账本合并（历史迁移 bug 曾造成云端重复账本：保留最早的一个，
@@ -342,28 +344,30 @@ const App = {
         const movedCats = [], movedTpls = []; // 已改挂到保留账本的（内存数组不随 update 更新，靠它们防同批重复）
         for (const d of dupLedgers) {
           const keep = keepMap[dupKey(d)];
+          const ops = []; // 同一账本的子数据并行改挂/删除，最后并行提交
           for (const c of categories.filter(x => x.ledger_id === d.id)) {
             const dupInKeep = categories.some(x => x.ledger_id === keep.id && x.name === c.name) || movedCats.some(x => x.name === c.name);
             if (dupInKeep) {
-              await Store.remove('categories', c.id); // 保留侧已有同名分类
+              ops.push(Store.remove('categories', c.id)); // 保留侧已有同名分类
             } else {
-              await Store.update('categories', c.id, { ledger_id: keep.id });
+              ops.push(Store.update('categories', c.id, { ledger_id: keep.id }));
               movedCats.push(c);
             }
           }
-          for (const r of records.filter(x => x.ledger_id === d.id)) await Store.update('records', r.id, { ledger_id: keep.id });
-          for (const b of budgets.filter(x => x.ledger_id === d.id)) await Store.update('budgets', b.id, { ledger_id: keep.id });
+          for (const r of records.filter(x => x.ledger_id === d.id)) ops.push(Store.update('records', r.id, { ledger_id: keep.id }));
+          for (const b of budgets.filter(x => x.ledger_id === d.id)) ops.push(Store.update('budgets', b.id, { ledger_id: keep.id }));
           for (const t of templates.filter(x => x.ledger_id === d.id)) {
             const sameTpl = x => x.category === t.category && (x.sub || '') === (t.sub || '');
             const dupInKeep = templates.some(x => x.ledger_id === keep.id && sameTpl(x)) || movedTpls.some(sameTpl);
             if (dupInKeep) {
-              await Store.remove('templates', t.id); // 保留侧已有同模板（category+sub 相同）
+              ops.push(Store.remove('templates', t.id)); // 保留侧已有同模板（category+sub 相同）
             } else {
-              await Store.update('templates', t.id, { ledger_id: keep.id });
+              ops.push(Store.update('templates', t.id, { ledger_id: keep.id }));
               movedTpls.push(t);
             }
           }
-          await Store.remove('ledgers', d.id);
+          ops.push(Store.remove('ledgers', d.id));
+          await Promise.all(ops);
         }
         changed = true;
       }
@@ -381,8 +385,11 @@ const App = {
           else dupTpls.push(t);
         }
         if (dupTpls.length) {
-          for (const t of dupTpls) await Store.remove('templates', t.id);
-          changed = true;
+          const dead = new Set(dupTpls.map(t => t.id));
+          // 并行删除 + 同步裁剪内存数组：n 条重复只花一个来回，且不再触发整体重载
+          //（串行删除时弱网下登录光等删除就要几十秒——用户实测「加载那么慢」的直接原因）
+          await Promise.all(dupTpls.map(t => Store.remove('templates', t.id)));
+          templates.splice(0, templates.length, ...templates.filter(t => !dead.has(t.id)));
         }
       }
       if (!categories.length) {

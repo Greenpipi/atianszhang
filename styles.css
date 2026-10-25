@@ -31,7 +31,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{
-  font-family:"Inter","PingFang SC","Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
   background:var(--bg);color:var(--text);
   font-size:14px;line-height:1.55;
   -webkit-font-smoothing:antialiased;
