@@ -2070,7 +2070,7 @@ const App = {
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
       const fav = document.getElementById('ad-fav').checked;
       try {
-        await Store.insert('records', {
+        const row = await Store.insert('records', {
           ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
           note: document.getElementById('ad-note').value.trim(),
           favorite: fav,
@@ -2078,6 +2078,9 @@ const App = {
           rental: document.getElementById('ad-rental').checked,
           rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
+        // 即存即显：把新记录乐观加入内存并局部刷新日历/列表，避免全量重载的秒级延迟
+        if (row && row.id) this.state.records.push(row);
+        this.refreshLedgerPane();
         if (continuous) {
           // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
           document.getElementById('ad-amt').value = '';
@@ -2090,12 +2093,12 @@ const App = {
           document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
           document.getElementById('ad-amt').focus();
           this.toast('已保存，可继续记下一笔', 'ok');
-          await this.loadData();
+          this.loadData(true); // 后台静默同步，不阻塞
           return;
         }
         this.closeModal();
         this.toast('已记账 ' + fmtMoney(amount), 'ok');
-        await this.loadData();
+        this.loadData(true); // 后台静默同步，不阻塞
       } catch (e) { this.toast(e.message, 'err'); }
     };
   },
@@ -2781,20 +2784,24 @@ const App = {
       const amount = parseFloat(document.getElementById('ed-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
       const fav = document.getElementById('ed-fav').checked;
+      const patch = {
+        category: catSel.value, sub: subSel.value, amount,
+        date: document.getElementById('ed-date').dataset.date || r.date,
+        note: document.getElementById('ed-note').value.trim(),
+        favorite: fav,
+        tags: fav ? this.pickedTags('#ed-tagpicker') : [],
+        rental: document.getElementById('ed-rental').checked,
+        images: edImgs,
+        rating, kind: this.kindOf(ledgerId, catSel.value)
+      };
       try {
-        await Store.update('records', rid, {
-          category: catSel.value, sub: subSel.value, amount,
-          date: document.getElementById('ed-date').dataset.date || r.date,
-          note: document.getElementById('ed-note').value.trim(),
-          favorite: fav,
-          tags: fav ? this.pickedTags('#ed-tagpicker') : [],
-          rental: document.getElementById('ed-rental').checked,
-          images: edImgs,
-          rating, kind: this.kindOf(ledgerId, catSel.value)
-        });
+        await Store.update('records', rid, patch);
+        const rec = this.state.records.find(x => x.id === rid);
+        if (rec) Object.assign(rec, patch);
+        this.refreshLedgerPane(); // 即时刷新日历/列表
         this.closeModal();
         this.toast('已保存修改', 'ok');
-        await this.loadData();
+        this.loadData(true); // 后台静默同步，不阻塞
       } catch (e) { this.toast(e.message, 'err'); }
     };
   },
