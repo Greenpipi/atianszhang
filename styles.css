@@ -842,13 +842,15 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .qbtn:active{background:var(--primary-soft)}
 .qemoji{font-size:30px;line-height:1;flex-shrink:0;filter:saturate(1.1)}
 .qlabel{font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;text-align:center}
-/* 两侧模糊渐隐 + 圆形箭头（PC 悬停 / 触屏滑动时出现） */
+/* 两侧白色渐隐（无灰雾、无圆角轮廓，向四周自然淡出融入白底） */
 .qwrap::before,.qwrap::after{
-  content:'';position:absolute;top:0;bottom:0;width:46px;z-index:2;pointer-events:none;
+  content:'';position:absolute;top:-8px;bottom:-8px;width:64px;z-index:2;pointer-events:none;
   opacity:0;transition:opacity .2s;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18%,#000 82%,transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 18%,#000 82%,transparent 100%);
 }
-.qwrap::before{left:0;border-radius:14px 0 0 14px;background:linear-gradient(90deg,#F1F5F9 30%,rgba(241,245,249,0));backdrop-filter:blur(2px)}
-.qwrap::after{right:0;border-radius:0 14px 14px 0;background:linear-gradient(270deg,#F1F5F9 30%,rgba(241,245,249,0));backdrop-filter:blur(2px)}
+.qwrap::before{left:0;background:linear-gradient(90deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.9) 30%,rgba(255,255,255,.55) 62%,rgba(255,255,255,0) 100%)}
+.qwrap::after{right:0;background:linear-gradient(270deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.9) 30%,rgba(255,255,255,.55) 62%,rgba(255,255,255,0) 100%)}
 .qnav{
   position:absolute;top:50%;transform:translateY(-50%);z-index:3;
   width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
