@@ -116,6 +116,15 @@ function recTags(r) {
   return [];
 }
 
+/* ---------- 好物仓库：使用状态四态 ----------
+ * 存 records.status（text）；老数据无 status 时按 favorite 推导显示 */
+const WISH_STATUS_LIST = [
+  { key: '使用中', cls: 'using' },
+  { key: '闲置中', cls: 'idle' },
+  { key: '未使用', cls: 'unused' },
+  { key: '已弃用', cls: 'dropped' }
+];
+
 const DEFAULT_TEMPLATES = [
   // 日常支出板块
   { ledger: 'personal', section: '日常支出板块', label: '早餐', emoji: '🥪', category: '饮食支出', sub: '早餐' },

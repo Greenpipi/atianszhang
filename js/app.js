@@ -1529,47 +1529,231 @@ const App = {
       const days = daysBetween(r.date);
       const cost = (Number(r.amount) || 0) / days;
       const name = r.note || (r.category + ' · ' + r.sub);
-      const tags = recTags(r);
+      const st = this.wishStatusOf(r);
+      const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
-        <div class="wish-body">
-          <div class="wish-name"><span>${esc(name)}</span><span class="badge ${r.favorite ? 'badge-green' : 'badge-gray'}">${r.favorite ? '使用中' : '已闲置'}</span></div>
-          <div class="wish-amount">${fmtMoney(r.amount)}</div>
-          <div class="wish-tags">${tags.length
-            ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '</span>').join('')
-            : '<span class="wtag none">未贴标签</span>'}</div>
-          <div class="wish-meta">
-            <div>购入日期<b>${r.date}</b></div>
-            <div>已陪伴<b>${days} 天</b></div>
-            <div>每日成本<b>${fmtMoney(cost)}</b></div>
+        <div class="wish-top">
+          <div class="wish-info">
+            <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
+            <div class="wish-amount">${fmtMoney(r.amount)}</div>
+          </div>
+          <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
+            ${imgs.length
+              ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+              : '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'}
           </div>
         </div>
-        <div class="wish-acts">
-          <button class="btn btn-ghost btn-sm" data-act="edit">编辑</button>
-          <button class="btn btn-danger btn-sm" data-act="del">删除</button>
+        <div class="wish-status">
+          <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
         </div>
+        <div class="wish-meta">
+          <div>购入日期<b class="wm-dim">${r.date}</b></div>
+          <div>已陪伴<b class="wm-hl">${days} 天</b></div>
+          <div>每日成本<b class="wm-hl">${fmtMoney(cost)}</b></div>
+        </div>
+        <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
       </div>`;
     }).join('');
 
     grid.querySelectorAll('.wish-card').forEach(card => {
       const rid = card.dataset.wid;
-      card.querySelectorAll('[data-act]').forEach(btn => {
-        btn.onclick = async () => {
-          const act = btn.dataset.act;
+      card.onclick = () => {
+        const rec = this.state.records.find(r => r.id === rid);
+        if (rec) this.editRecord(rid, rec.ledger_id);
+      };
+      card.querySelectorAll('[data-act]').forEach(el => {
+        el.onclick = async (e) => {
+          e.stopPropagation(); // 图片框/状态/标签不触发整卡编辑
+          const act = el.dataset.act;
           const rec = this.state.records.find(r => r.id === rid);
           if (!rec) return;
-          if (act === 'edit') {
-            this.editRecord(rid, rec.ledger_id);
-          } else if (act === 'del') {
-            const ok = await this.confirmDialog('删除好物', '删除后无法恢复，确定删除吗？');
-            if (!ok) return;
-            await Store.remove('records', rid);
-            this.toast('已删除');
-            await this.loadData();
+          if (act === 'img') {
+            const imgs = this.recImages(rec);
+            if (imgs.length) this.openWishLight(imgs, 0);
+            else await this.addWishImages(rid);
+          } else if (act === 'status') {
+            this.openWishStatusPop(rid, el);
+          } else if (act === 'tags') {
+            this.openWishTagPop(rid, el);
           }
         };
       });
     });
+  },
+
+  /* ---------- 好物卡片：图片/状态/标签辅助与浮层 ---------- */
+  /* 有效图片列表（images 多图列权威；缺列时回退老数据单图 image） */
+  recImages(r) {
+    if (Array.isArray(r && r.images)) return r.images.filter(x => typeof x === 'string' && x);
+    return r && r.image ? [r.image] : [];
+  },
+  /* 选本地图片（可多选）并压缩，返回 dataURL 数组 */
+  pickImages() {
+    return new Promise(resolve => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+      inp.onchange = async () => {
+        const files = Array.from(inp.files || []);
+        const out = [];
+        for (const f of files) {
+          try { out.push(await compressImage(f)); }
+          catch (e) { this.toast(e.message || '图片处理失败', 'err'); }
+        }
+        resolve(out);
+      };
+      inp.click();
+    });
+  },
+  /* 卡片占位图点击：直接选图上传（多张） */
+  async addWishImages(rid) {
+    if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+    this.toast('图片处理中…');
+    const added = await this.pickImages();
+    if (!added.length) return;
+    const rec = this.state.records.find(r => r.id === rid);
+    if (!rec) return;
+    const next = [...this.recImages(rec), ...added];
+    const ok = await Store.update('records', rid, { images: next });
+    if (ok === false) { this.toast('图片保存失败，请重试'); return; }
+    rec.images = next;
+    const box = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="img"]');
+    if (box) {
+      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
+      box.title = '点击查看大图';
+    }
+    this.toast('已添加 ' + added.length + ' 张图片', 'ok');
+  },
+  /* 大图查看：左右箭头切换 + 计数 + 点背景/Esc 关闭 */
+  openWishLight(imgs, idx) {
+    this.closeWishLight();
+    let i = idx;
+    const wrap = document.createElement('div');
+    wrap.className = 'wish-light';
+    wrap.id = 'wish-light';
+    wrap.innerHTML =
+      '<button type="button" class="wl-btn wl-prev" title="上一张" style="display:' + (imgs.length > 1 ? '' : 'none') + '">‹</button>' +
+      '<img id="wl-img" src="' + esc(imgs[i]) + '" alt="">' +
+      '<button type="button" class="wl-btn wl-next" title="下一张" style="display:' + (imgs.length > 1 ? '' : 'none') + '">›</button>' +
+      '<div class="wl-cnt">' + (i + 1) + ' / ' + imgs.length + '</div>' +
+      '<button type="button" class="wl-close" title="关闭">✕</button>';
+    document.body.appendChild(wrap);
+    const img = wrap.querySelector('#wl-img'), cnt = wrap.querySelector('.wl-cnt');
+    const show = () => { img.src = imgs[i]; cnt.textContent = (i + 1) + ' / ' + imgs.length; };
+    wrap.querySelector('.wl-prev').onclick = e => { e.stopPropagation(); i = (i - 1 + imgs.length) % imgs.length; show(); };
+    wrap.querySelector('.wl-next').onclick = e => { e.stopPropagation(); i = (i + 1) % imgs.length; show(); };
+    wrap.querySelector('.wl-close').onclick = e => { e.stopPropagation(); this.closeWishLight(); };
+    wrap.onclick = () => this.closeWishLight();
+    this._wlKey = e => {
+      if (e.key === 'Escape') this.closeWishLight();
+      if (e.key === 'ArrowLeft' && imgs.length > 1) { i = (i - 1 + imgs.length) % imgs.length; show(); }
+      if (e.key === 'ArrowRight' && imgs.length > 1) { i = (i + 1) % imgs.length; show(); }
+    };
+    document.addEventListener('keydown', this._wlKey, true);
+  },
+  closeWishLight() {
+    const p = document.getElementById('wish-light');
+    if (p) p.remove();
+    if (this._wlKey) { document.removeEventListener('keydown', this._wlKey, true); this._wlKey = null; }
+  },
+  /* 当前状态（老数据无 status：心标 → 使用中，否则闲置中） */
+  wishStatusOf(r) {
+    const s = String((r && r.status) || '').trim();
+    return WISH_STATUS_LIST.find(x => x.key === s) || (r && r.favorite ? WISH_STATUS_LIST[0] : WISH_STATUS_LIST[1]);
+  },
+  /* 卡片标签区 HTML（与 wish-tags 局部刷新共用） */
+  wishTagsHTML(tags) {
+    return tags && tags.length
+      ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '</span>').join('')
+      : '<span class="wtag none">未贴标签</span>';
+  },
+  /* 标签导航计数刷新（增删标签后顶部 chip 数字同步） */
+  updateWishTagCounts() {
+    const all = this.recsOf(this.state.currentLedgerId).filter(r => r.favorite);
+    const counts = {};
+    all.forEach(r => recTags(r).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    document.querySelectorAll('#w-tagnav .tag-chip').forEach(ch => {
+      const b = ch.querySelector('b');
+      if (!b) return;
+      const t = ch.dataset.tag;
+      b.textContent = t ? (counts[t] || 0) : all.length;
+    });
+  },
+  /* 标签菜单：复用记账弹窗的标签多选面板，勾选即存 */
+  openWishTagPop(rid, anchor) {
+    this.closeWishPop();
+    const rec = this.state.records.find(r => r.id === rid);
+    if (!rec) return;
+    const cur = recTags(rec);
+    const pop = document.createElement('div');
+    pop.className = 'wish-pop';
+    pop.id = 'wish-pop';
+    pop.innerHTML = '<div class="wp-title">标签（可多选）</div><div class="tag-picker">' + this.goodsTagPickerHTML() + '</div>';
+    document.body.appendChild(pop);
+    this._placeWishPop(pop, anchor);
+    pop.querySelectorAll('.tag-opt input').forEach(i => { i.checked = cur.includes(i.value); });
+    pop.addEventListener('change', async e => {
+      const t = e.target.value;
+      if (!t) return;
+      const next = e.target.checked ? normGoodsTags([...cur, t]) : cur.filter(x => x !== t);
+      if (Store.missingCol('records', 'tags')) { this.toast('标签列缺失：请先到设置页补一次建表 SQL'); return; }
+      const ok = await Store.update('records', rid, { tags: next });
+      if (ok === false) { this.toast('标签保存失败，请重试'); return; }
+      rec.tags = next;
+      cur.length = 0; cur.push(...next);
+      const card = document.querySelector('.wish-card[data-wid="' + rid + '"]');
+      if (card) card.querySelector('.wish-tags').innerHTML = this.wishTagsHTML(next);
+      this.updateWishTagCounts();
+    });
+    this._bindWishPopOut(pop, anchor);
+  },
+  /* 状态菜单：四选一，选中即存并更新卡片 */
+  openWishStatusPop(rid, anchor) {
+    this.closeWishPop();
+    const rec = this.state.records.find(r => r.id === rid);
+    if (!rec) return;
+    const cur = this.wishStatusOf(rec);
+    const pop = document.createElement('div');
+    pop.className = 'wish-pop';
+    pop.id = 'wish-pop';
+    pop.innerHTML = '<div class="wp-title">状态</div><div class="wp-opts">' + WISH_STATUS_LIST.map(x =>
+      '<button type="button" class="wp-st st-' + x.cls + (x.key === cur.key ? ' on' : '') + '" data-st="' + esc(x.key) + '"><i></i>' + esc(x.key) + '</button>').join('') + '</div>';
+    document.body.appendChild(pop);
+    this._placeWishPop(pop, anchor);
+    pop.querySelectorAll('[data-st]').forEach(b => {
+      b.onclick = async () => {
+        const label = b.dataset.st;
+        if (Store.missingCol('records', 'status')) { this.toast('请先到设置页补一次建表 SQL（补 status 列）'); return; }
+        const ok = await Store.update('records', rid, { status: label });
+        if (ok === false) { this.toast('状态保存失败，请重试'); return; }
+        rec.status = label;
+        const st = this.wishStatusOf(rec);
+        const btn = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="status"]');
+        if (btn) { btn.textContent = st.key; btn.className = 'wst st-' + st.cls; }
+        this.closeWishPop();
+      };
+    });
+    this._bindWishPopOut(pop, anchor);
+  },
+  _placeWishPop(pop, anchor) {
+    const r = anchor.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
+    pop.style.top = Math.min(r.bottom + 6, Math.max(8, window.innerHeight - ph - 10)) + 'px';
+  },
+  _bindWishPopOut(pop, anchor) {
+    this._wpOut = e => { if (!pop.contains(e.target) && !anchor.contains(e.target)) this.closeWishPop(); };
+    this._wpKey = e => { if (e.key === 'Escape') this.closeWishPop(); };
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._wpOut, true);
+      document.addEventListener('keydown', this._wpKey, true);
+    }, 0);
+  },
+  closeWishPop() {
+    const p = document.getElementById('wish-pop');
+    if (p) p.remove();
+    if (this._wpOut) { document.removeEventListener('mousedown', this._wpOut, true); this._wpOut = null; }
+    if (this._wpKey) { document.removeEventListener('keydown', this._wpKey, true); this._wpKey = null; }
   },
 
   /* ---------- 视图：统计 ---------- */
@@ -2437,14 +2621,9 @@ const App = {
       <div class="field" id="ed-tags-field" style="display:none"><label>好物标签（可多选）</label>
         <div class="tag-picker" id="ed-tagpicker">${this.goodsTagPickerHTML()}</div>
       </div>
-      <div class="field" id="ed-img-field" style="display:none"><label>图片</label>
-        <div class="rec-img-row">
-          <div class="rec-img-prev" id="ed-img-prev">${r.image ? '<img src="' + r.image + '" alt="">' : '<span class="ph">暂无图片</span>'}</div>
-          <div class="rec-img-btns">
-            <button class="btn btn-ghost btn-sm" id="ed-img-up" type="button">${r.image ? '更换图片' : '上传图片'}</button>
-            <button class="btn btn-ghost btn-sm" id="ed-img-del" type="button" style="display:${r.image ? '' : 'none'}">移除图片</button>
-          </div>
-        </div>
+      <div class="field" id="ed-img-field" style="display:none"><label>图片（可多张）</label>
+        <div class="rec-img-grid" id="ed-img-grid"></div>
+        <button class="btn btn-ghost btn-sm" id="ed-img-up" type="button" style="margin-top:8px">添加图片</button>
       </div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
@@ -2471,40 +2650,43 @@ const App = {
     });
     this.bindFavTags(favEl, document.getElementById('ed-tags-field'), '#ed-tagpicker');
     const imgField = document.getElementById('ed-img-field');
-    const imgPrev = document.getElementById('ed-img-prev');
+    const imgGrid = document.getElementById('ed-img-grid');
     const imgUp = document.getElementById('ed-img-up');
-    const imgDel = document.getElementById('ed-img-del');
+    let edImgs = this.recImages(r);
+    const renderImgGrid = () => {
+      imgGrid.innerHTML = edImgs.length
+        ? edImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(src) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
+        : '<span class="ph">暂无图片</span>';
+      imgGrid.querySelectorAll('.ri-del').forEach(b => {
+        b.onclick = async () => {
+          if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+          const i = Number(b.dataset.i);
+          const next = edImgs.filter((_, k) => k !== i);
+          const ok = await Store.update('records', rid, { images: next });
+          if (ok === false) { this.toast('删除失败，请重试'); return; }
+          edImgs = next;
+          r.images = next;
+          renderImgGrid();
+          this.toast('图片已删除', 'ok');
+        };
+      });
+    };
     const syncImgField = () => { if (imgField) imgField.style.display = favEl.checked ? '' : 'none'; };
     favEl.addEventListener('change', syncImgField);
     syncImgField();
-    imgUp.onclick = () => {
-      const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'image/*';
-      inp.onchange = async () => {
-        const f = inp.files && inp.files[0];
-        if (!f) return;
-        try {
-          this.toast('图片处理中…');
-          const data = await compressImage(f);
-          await Store.update('records', rid, { image: data });
-          imgPrev.innerHTML = '<img src="' + data + '" alt="">';
-          imgDel.style.display = '';
-          imgUp.textContent = '更换图片';
-          this.toast('图片已保存', 'ok');
-          await this.loadData(true);
-        } catch (e) { this.toast(e.message || '图片处理失败', 'err'); }
-      };
-      inp.click();
-    };
-    imgDel.onclick = async () => {
-      try {
-        await Store.update('records', rid, { image: null });
-        imgPrev.innerHTML = '<span class="ph">暂无图片</span>';
-        imgDel.style.display = 'none';
-        imgUp.textContent = '上传图片';
-        this.toast('图片已移除', 'ok');
-        await this.loadData(true);
-      } catch (e) { this.toast(e.message, 'err'); }
+    renderImgGrid();
+    imgUp.onclick = async () => {
+      if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+      this.toast('图片处理中…');
+      const added = await this.pickImages();
+      if (!added.length) return;
+      const next = [...edImgs, ...added];
+      const ok = await Store.update('records', rid, { images: next });
+      if (ok === false) { this.toast('图片保存失败，请重试'); return; }
+      edImgs = next;
+      r.images = next;
+      renderImgGrid();
+      this.toast('已添加 ' + added.length + ' 张图片', 'ok');
     };
     const edDate = document.getElementById('ed-date');
     edDate.onclick = () => this.openCalendar(edDate);
@@ -2537,6 +2719,7 @@ const App = {
           favorite: fav,
           tags: fav ? this.pickedTags('#ed-tagpicker') : [],
           rental: document.getElementById('ed-rental').checked,
+          images: edImgs,
           rating, kind: this.kindOf(ledgerId, catSel.value)
         });
         this.closeModal();
@@ -2996,6 +3179,8 @@ begin
     date text not null default '',
     image text,
     kind text not null default 'expense',
+    status text not null default '',
+    images text[] not null default '{}'::text[],
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -3034,6 +3219,12 @@ begin
 
   -- 账单标签列（多选标签，文本数组）
   execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
+
+  -- 好物使用状态（使用中/闲置中/未使用/已弃用，存中文 label）
+  execute $ddl$ alter table records add column if not exists status text not null default '' $ddl$;
+
+  -- 好物多图（images 优先，兼容老数据单图 image 列）
+  execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;

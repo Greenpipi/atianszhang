@@ -51,6 +51,8 @@ begin
     date text not null default '',
     image text,
     kind text not null default 'expense',
+    status text not null default '',
+    images text[] not null default '{}'::text[],
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -89,6 +91,12 @@ begin
 
   -- 账单标签列（多选标签，文本数组）
   execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
+
+  -- 好物使用状态（使用中/闲置中/未使用/已弃用，存中文 label）
+  execute $ddl$ alter table records add column if not exists status text not null default '' $ddl$;
+
+  -- 好物多图（images 优先，兼容老数据单图 image 列）
+  execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
