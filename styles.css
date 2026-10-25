@@ -875,8 +875,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .qnav-l{left:8px}
 .qnav-r{right:8px}
 .qwrap:hover .qnav.on,.qwrap.qtouch .qnav.on{opacity:1;pointer-events:auto}
-.qwrap:hover.qhas::before,.qwrap:hover.qhas::after,
-.qwrap.qtouch.qhas::before,.qwrap.qtouch.qhas::after{opacity:1}
+/* 渐隐只在该方向还有内容可滚时出现（到边界的一侧隐藏） */
+.qwrap:hover.can-l::before,.qwrap.qtouch.can-l::before{opacity:1}
+.qwrap:hover.can-r::after,.qwrap.qtouch.can-r::after{opacity:1}
 /* 移动端：同样一行横滑（原生触摸滚动），按钮略缩 */
 @media (max-width:920px){
   .qbtn{width:84px;height:78px}

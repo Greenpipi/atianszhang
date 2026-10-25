@@ -915,9 +915,12 @@ const App = {
       const qL = document.getElementById('qnav-l'), qR = document.getElementById('qnav-r');
       const qUpd = () => {
         const max = qbarEl.scrollWidth - qbarEl.clientWidth;
-        qwrapEl.classList.toggle('qhas', max > 2);
-        qL.classList.toggle('on', qbarEl.scrollLeft > 2);
-        qR.classList.toggle('on', qbarEl.scrollLeft < max - 2);
+        // 两侧渐隐/箭头只在「该方向还有内容可滚」时出现；到边界的一侧必须隐藏
+        const canL = qbarEl.scrollLeft > 2, canR = qbarEl.scrollLeft < max - 2;
+        qwrapEl.classList.toggle('can-l', canL);
+        qwrapEl.classList.toggle('can-r', canR);
+        qL.classList.toggle('on', canL);
+        qR.classList.toggle('on', canR);
       };
       qL.onclick = () => qbarEl.scrollBy({ left: -qbarEl.clientWidth, behavior: 'smooth' });
       qR.onclick = () => qbarEl.scrollBy({ left: qbarEl.clientWidth, behavior: 'smooth' });
