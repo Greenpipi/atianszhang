@@ -674,6 +674,14 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   width:100%;max-width:460px;max-height:90dvh;overflow:auto;padding:26px;animation:pop .18s ease;
 }
 .modal.wide{max-width:640px}
+/* 编辑记录弹窗（PC）：固定 800×750；小屏回退默认弹窗 */
+@media (min-width:900px){
+  .modal.edit-modal{width:800px;height:750px;max-width:92vw;max-height:92dvh}
+}
+/* 金额输入放大醒目 */
+.modal .amt-input{font-size:24px;font-weight:700;padding:12px 14px}
+/* 备注 textarea：高度由 JS 自适应，禁用手动拖拽避免和自动高度打架 */
+#ed-remark{resize:none;overflow:hidden}
 @keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
 .modal-title{font-size:17px;font-weight:800;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
 .modal-acts{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}

@@ -2687,11 +2687,15 @@ const App = {
     let rating = r.rating || 0;
     this.openModal(`
       <div class="modal-title">编辑记录<button class="icon-btn" style="display:flex" data-close>✕</button></div>
-      <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
-      <div class="field"><label>小类</label><select id="ed-sub"></select></div>
-      <div class="field"><label>金额（元）</label><input id="ed-amt" type="number" min="0" step="0.01" value="${r.amount}"></div>
-      <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
-      <div class="field"><label>备注</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
+      <div class="field-row">
+        <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
+        <div class="field"><label>小类</label><select id="ed-sub"></select></div>
+        <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
+      </div>
+      <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" min="0" step="0.01" value="${r.amount}"></div>
+      <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
+      <div class="field"><label>描述</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
+      <div class="field"><label>备注</label><textarea id="ed-remark" rows="2" placeholder="可输入多行备注，高度随内容自适应">${esc(r.remark || '')}</textarea></div>
       <div class="field-row">
         <div class="field"><label>购买平台</label><input id="ed-platform" type="text" value="${esc(r.purchase_platform || '')}" placeholder="如 淘宝 / 京东"></div>
         <div class="field"><label>属性</label><input id="ed-attr" type="text" value="${esc(r.attribute || '')}" placeholder="如 黑色 128G"></div>
@@ -2712,13 +2716,12 @@ const App = {
           <button class="btn btn-ghost btn-sm" id="ed-img-link" type="button">图片链接</button>
         </div>
       </div>
-      <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
         <button class="btn btn-danger" id="ed-del" style="margin-right:auto">删除</button>
         <button class="btn btn-ghost" data-close>取消</button>
         <button class="btn btn-primary" id="ed-save">保存</button>
       </div>
-    `);
+    `, false, 'edit-modal');
 
     const catSel = document.getElementById('ed-cat'), subSel = document.getElementById('ed-sub');
     const fillSubs = (keep) => {
@@ -2777,6 +2780,11 @@ const App = {
     };
     const edDate = document.getElementById('ed-date');
     edDate.onclick = () => this.openCalendar(edDate);
+    // 备注 textarea：高度随内容自适应
+    const remarkEl = document.getElementById('ed-remark');
+    const fitRemark = () => { remarkEl.style.height = 'auto'; remarkEl.style.height = Math.max(64, remarkEl.scrollHeight) + 'px'; };
+    remarkEl.addEventListener('input', fitRemark);
+    fitRemark();
     document.getElementById('ed-img-link').onclick = () => {
       this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });
     };
@@ -2805,6 +2813,7 @@ const App = {
         category: catSel.value, sub: subSel.value, amount,
         date: document.getElementById('ed-date').dataset.date || r.date,
         note: document.getElementById('ed-note').value.trim(),
+        remark: document.getElementById('ed-remark').value.trim(),
         favorite: fav,
         tags: fav ? this.pickedTags('#ed-tagpicker') : [],
         rental: document.getElementById('ed-rental').checked,
@@ -3165,12 +3174,12 @@ const App = {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.closeAllCsel(); });
   },
 
-  openModal(html, wide) {
+  openModal(html, wide, cls) {
     // 栈式弹窗：不再预清空，支持嵌套（如在编辑弹窗内再弹输入框）；后开的叠在上层
     const root = document.getElementById('modal-root');
     const mask = document.createElement('div');
     mask.className = 'modal-mask';
-    mask.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + '">' + html + '</div>';
+    mask.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + (cls ? ' ' + cls : '') + '">' + html + '</div>';
     mask.onclick = e => { if (e.target === mask) this.closeModal(); };
     mask.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.closeModal());
     root.appendChild(mask);
@@ -3284,6 +3293,7 @@ begin
     purchase_platform text not null default '',
     attribute text not null default '',
     status_since text not null default '',
+    remark text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -3333,6 +3343,9 @@ begin
   execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
+
+  -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
+  execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;

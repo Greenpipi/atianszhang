@@ -56,6 +56,7 @@ begin
     purchase_platform text not null default '',
     attribute text not null default '',
     status_since text not null default '',
+    remark text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -105,6 +106,9 @@ begin
   execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
+
+  -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
+  execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
