@@ -1548,9 +1548,11 @@ const App = {
           <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
         </div>
         <div class="wish-meta">
-          <div>购入日期<b class="wm-dim">${r.date}</b></div>
-          <div>已陪伴<b class="wm-hl">${days} 天</b></div>
-          <div>每日成本<b class="wm-hl">${fmtMoney(cost)}</b></div>
+          <div class="wm-row">购入日期<b class="wm-dim">${r.date}</b></div>
+          <div class="wm-row wm-duo">
+            <span>已陪伴<b class="wm-badge wm-purple">${days}</b> 天</span>
+            <span>每日<b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b> 元</span>
+          </div>
         </div>
         <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
       </div>`;
