@@ -1712,13 +1712,18 @@ const App = {
     catch (e) { return false; }
   },
   /* 粘贴图片链接加入 images：只存 URL 字符串，不下载不转存，零存储占用 */
+  /* 图片链接输入（校验+去重），返回新的图片数组；取消/非法返回 null（不入库） */
+  async promptImageLink(curImgs) {
+    const url = await this.promptDialog('图片链接', '粘贴图片网址（http:// 或 https:// 开头）');
+    if (!url) return null;
+    if (!this.isImgUrl(url)) { this.toast('链接格式不正确，需以 http:// 或 https:// 开头', 'err'); return null; }
+    if (curImgs.includes(url)) { this.toast('该链接已经添加过了', 'err'); return null; }
+    return [...curImgs, url];
+  },
   async addImageLink(rid, curImgs, onAdded) {
     if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
-    const url = await this.promptDialog('图片链接', '粘贴图片网址（http:// 或 https:// 开头）');
-    if (!url) return;
-    if (!this.isImgUrl(url)) { this.toast('链接格式不正确，需以 http:// 或 https:// 开头', 'err'); return; }
-    if (curImgs.includes(url)) { this.toast('该链接已经添加过了', 'err'); return; }
-    const next = [...curImgs, url];
+    const next = await this.promptImageLink(curImgs);
+    if (!next) return;
     const ok = await Store.update('records', rid, { images: next });
     if (ok === false) { this.toast('保存失败，请重试', 'err'); return; }
     onAdded(next);
@@ -2068,29 +2073,48 @@ const App = {
   addRecordModal(ledgerId, date, preCat, preSub, rental, continuous) {
     const cats = this.catsOf(ledgerId);
     let rating = 0;
+    let adImgs = [];
     if (rental && !preCat) preCat = RENTAL_CAT;
-    this.openModal(`
+    const adMask = this.openModal(`
       <div class="modal-title"><span id="ad-title">新增记账 · ${esc(date)}</span><button class="icon-btn" style="display:flex" data-close>✕</button></div>
-      <div class="field"><label>日期</label><input id="ad-date" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
-      <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
-      <div class="field"><label>小类</label><select id="ad-sub"></select></div>
-      <div class="field"><label>金额（元）</label><input id="ad-amt" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="field"><label>备注</label><input id="ad-note" type="text" placeholder="选填"></div>
-      <div class="field"><label>标记</label>
-        <label class="fav-check"><input type="checkbox" id="ad-rental" ${rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
+      <div class="modal-body">
+        <div class="field-row">
+          <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
+          <div class="field"><label>小类</label><select id="ad-sub"></select></div>
+          <div class="field"><label>日期</label><input id="ad-date" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
+        </div>
+        <div class="field"><label>金额（元）</label><input id="ad-amt" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
+        <div class="field"><label>描述</label><input id="ad-note" type="text" placeholder="选填"></div>
+        <div class="field"><label>备注</label><textarea id="ad-remark" rows="2"></textarea></div>
+        <div class="field-row">
+          <div class="field"><label>购买平台</label><input id="ad-platform" type="text" placeholder="如 淘宝 / 京东"></div>
+          <div class="field"><label>属性</label><input id="ad-attr" type="text" placeholder="如 黑色 128G"></div>
+        </div>
+        <div class="field"><label>标记</label>
+          <label class="fav-check"><input type="checkbox" id="ad-rental" ${rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
+        </div>
+        <div class="field"><label>心仪物品</label>
+          <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
+        </div>
+        <div class="field" id="ad-tags-field" style="display:none"><label>好物标签（可多选）</label>
+          <div class="tag-picker" id="ad-tagpicker">${this.goodsTagPickerHTML()}</div>
+        </div>
+        <div class="field" id="ad-img-field" style="display:none"><label>图片（可多张）</label>
+          <div class="rec-img-grid" id="ad-img-grid"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-ghost btn-sm" id="ad-img-up" type="button">上传图片</button>
+            <button class="btn btn-ghost btn-sm" id="ad-img-link" type="button">图片链接</button>
+          </div>
+        </div>
       </div>
-      <div class="field"><label>心仪物品</label>
-        <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
+      <div class="modal-foot">
+        <div class="modal-acts">
+          <button class="btn btn-ghost" data-close>${continuous ? '完成' : '取消'}</button>
+          <button class="btn btn-primary" id="ad-save">${continuous ? '保存并继续' : '保存'}</button>
+        </div>
       </div>
-      <div class="field" id="ad-tags-field" style="display:none"><label>好物标签（可多选）</label>
-        <div class="tag-picker" id="ad-tagpicker">${this.goodsTagPickerHTML()}</div>
-      </div>
-      <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
-      <div class="modal-acts">
-        <button class="btn btn-ghost" data-close>${continuous ? '完成' : '取消'}</button>
-        <button class="btn btn-primary" id="ad-save">${continuous ? '保存并继续' : '保存'}</button>
-      </div>
-    `);
+    `, false, 'edit-modal', 'form-mask');
     const catSel = document.getElementById('ad-cat'), subSel = document.getElementById('ad-sub');
     const fillSubs = () => {
       const cc = this.catByName(ledgerId, catSel.value);
@@ -2120,6 +2144,55 @@ const App = {
         document.querySelectorAll('#ad-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
       };
     });
+    // 图片区（与编辑弹窗一致：勾选「心仪物品」后出现，图片随记录一起入库）
+    const favEl = document.getElementById('ad-fav');
+    const imgField = document.getElementById('ad-img-field');
+    const imgGrid = document.getElementById('ad-img-grid');
+    const renderImgGrid = () => {
+      imgGrid.innerHTML = adImgs.length
+        ? adImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(src) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
+        : '<span class="ph">暂无图片</span>';
+      imgGrid.querySelectorAll('.ri-del').forEach(b => {
+        b.onclick = () => { adImgs.splice(Number(b.dataset.i), 1); renderImgGrid(); };
+      });
+    };
+    const syncImgField = () => { if (imgField) imgField.style.display = favEl.checked ? '' : 'none'; };
+    favEl.addEventListener('change', syncImgField);
+    syncImgField();
+    renderImgGrid();
+    document.getElementById('ad-img-up').onclick = async () => {
+      if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+      this.toast('图片处理中…');
+      const added = await this.pickImages();
+      if (!added.length) return;
+      adImgs = [...adImgs, ...added];
+      renderImgGrid();
+      this.toast('已添加 ' + added.length + ' 张图片', 'ok');
+    };
+    document.getElementById('ad-img-link').onclick = async () => {
+      const next = await this.promptImageLink(adImgs);
+      if (!next) return;
+      adImgs = next;
+      renderImgGrid();
+      this.toast('已添加图片链接', 'ok');
+    };
+    // 备注 textarea：高度随内容自适应
+    const remarkEl = document.getElementById('ad-remark');
+    const fitRemark = () => { remarkEl.style.height = 'auto'; remarkEl.style.height = Math.max(64, remarkEl.scrollHeight) + 'px'; };
+    remarkEl.addEventListener('input', fitRemark);
+    fitRemark();
+    // 滚动条：滚动时显示浅灰细线，停止后隐藏
+    const bindThinScroll = (elm) => {
+      if (!elm) return;
+      let tm = null;
+      elm.addEventListener('scroll', () => {
+        elm.classList.add('mscrolling');
+        clearTimeout(tm);
+        tm = setTimeout(() => elm.classList.remove('mscrolling'), 900);
+      }, { passive: true });
+    };
+    bindThinScroll(adMask && adMask.querySelector('.modal-body'));
+    bindThinScroll(document.getElementById('ad-tagpicker'));
     document.getElementById('ad-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ad-amt').value);
       if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
@@ -2128,9 +2201,13 @@ const App = {
         const row = await Store.insert('records', {
           ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
           note: document.getElementById('ad-note').value.trim(),
+          remark: document.getElementById('ad-remark').value.trim(),
           favorite: fav,
           tags: fav ? this.pickedTags('#ad-tagpicker') : [],
           rental: document.getElementById('ad-rental').checked,
+          images: adImgs,
+          purchase_platform: document.getElementById('ad-platform').value.trim(),
+          attribute: document.getElementById('ad-attr').value.trim(),
           rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
         // 即存即显：把新记录乐观加入内存并局部刷新日历/列表，避免全量重载的秒级延迟
@@ -2141,6 +2218,12 @@ const App = {
           // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
           document.getElementById('ad-amt').value = '';
           document.getElementById('ad-note').value = '';
+          document.getElementById('ad-remark').value = '';
+          fitRemark();
+          document.getElementById('ad-platform').value = '';
+          document.getElementById('ad-attr').value = '';
+          adImgs = [];
+          renderImgGrid();
           document.getElementById('ad-fav').checked = false;
           document.getElementById('ad-tags-field').style.display = 'none';
           document.querySelectorAll('#ad-tagpicker input').forEach(i => { i.checked = false; });
@@ -2768,7 +2851,7 @@ const App = {
           <button class="btn btn-primary" id="ed-save">保存</button>
         </div>
       </div>
-    `, false, 'edit-modal');
+    `, false, 'edit-modal', 'form-mask');
 
     const catSel = document.getElementById('ed-cat'), subSel = document.getElementById('ed-sub');
     const fillSubs = (keep) => {
@@ -3234,11 +3317,11 @@ const App = {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.closeAllCsel(); });
   },
 
-  openModal(html, wide, cls) {
+  openModal(html, wide, cls, maskCls) {
     // 栈式弹窗：不再预清空，支持嵌套（如在编辑弹窗内再弹输入框）；后开的叠在上层
     const root = document.getElementById('modal-root');
     const mask = document.createElement('div');
-    mask.className = 'modal-mask';
+    mask.className = 'modal-mask' + (maskCls ? ' ' + maskCls : '');
     mask.innerHTML = '<div class="modal' + (wide ? ' wide' : '') + (cls ? ' ' + cls : '') + '">' + html + '</div>';
     mask.onclick = e => { if (e.target === mask) this.closeModal(); };
     mask.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.closeModal());

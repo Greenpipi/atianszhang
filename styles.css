@@ -674,6 +674,12 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   width:100%;max-width:460px;max-height:90dvh;overflow:auto;padding:26px;animation:pop .18s ease;
 }
 .modal.wide{max-width:640px}
+/* 表单弹窗（新增/编辑）周围：白色渐变弥散，径向柔和过渡，无硬边缘、无圆角弥散 */
+.modal-mask.form-mask{
+  background:radial-gradient(135% 100% at 50% 42%, rgba(255,255,255,.94) 0%, rgba(255,255,255,.8) 36%, rgba(226,232,240,.7) 100%);
+  backdrop-filter:blur(7px) saturate(1.05);
+}
+.modal-mask.form-mask .modal{box-shadow:0 30px 80px rgba(15,23,42,.20)}
 /* 编辑记录弹窗：左右留白用变量（PC 60px / 小屏 26px） */
 .modal.edit-modal{--ed-pad-x:26px;padding:26px var(--ed-pad-x) 22px;display:flex;flex-direction:column;overflow:hidden}
 /* 编辑记录弹窗（PC）：固定 800×750；小屏回退默认弹窗 */
