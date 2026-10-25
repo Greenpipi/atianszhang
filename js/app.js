@@ -914,7 +914,30 @@ const App = {
     el.querySelector('[data-htoday]').onclick = () => { home.anchor = todayStr(); this.renderLedgerHome(); };
 
     // 搜索横幅：筛选条件 chip 移除 / 一键清除
-    el.querySelectorAll('[data-rm]').forEach(b => {
+    this.bindSearchBanner(el);
+
+    // 搜索框 / 筛选按钮（元素随视图重渲染，每次重新绑定）
+    this.bindSearchBox();
+
+    if (showList) this.renderRecTable(el.querySelector('#home-list'), listRecs, { kw: this.state.search.q });
+    else this.renderHomeCalendar();
+    this.enhanceSelects(el);
+
+    // 恢复搜索框焦点与光标（意外重渲染不该打断输入）
+    if (searchFocused) {
+      const si = el.querySelector('#search-input');
+      if (si) {
+        si.focus();
+        const n = si.value.length;
+        try { si.setSelectionRange(n, n); } catch (e) { /* ignore */ }
+      }
+    }
+  },
+
+  /* 搜索横幅事件绑定（chip 移除 / 清除）；root 为视图或横幅 slot */
+  bindSearchBanner(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-rm]').forEach(b => {
       b.onclick = () => {
         const s = this.state.search, v = b.dataset.v;
         if (b.dataset.rm === 'cat') s.cats = s.cats.filter(x => x !== v);
@@ -924,25 +947,50 @@ const App = {
         this.refreshResults();
       };
     });
-    const sbClear = el.querySelector('[data-sbclear]');
-    if (sbClear) sbClear.onclick = () => this.clearSearch();
+    const sc = root.querySelector('[data-sbclear]');
+    if (sc) sc.onclick = () => this.clearSearch();
+  },
 
-    // 搜索框 / 筛选按钮（元素随视图重渲染，每次重新绑定）
-    this.bindSearchBox();
+  /* ---------- 局部刷新记账本面板（搜索输入时用）----------
+   * 只更新 视图切换条/横幅/日历与列表显隐，不重建搜索框等框架元素——
+   * 重建会取消中文输入法（IME）的拼音组合，导致永远输不完中文 */
+  refreshLedgerPane() {
+    if (this.state.route !== 'ledger') return;
+    const el = document.getElementById('view-ledger');
+    if (!el) return;
+    const searching = this.searchActive();
+    const showList = searching || this.state.home.mode === 'list';
 
-    if (showList) this.renderRecTable(el.querySelector('#home-list'), listRecs, { kw: this.state.search.q });
-    else this.renderHomeCalendar();
-    this.enhanceSelects(el);
-
-    // 恢复搜索框焦点与光标（防抖触发的重渲染不该打断输入）
-    if (searchFocused) {
-      const si = el.querySelector('#search-input');
-      if (si) {
-        si.focus();
-        const n = si.value.length;
-        try { si.setSelectionRange(n, n); } catch (e) { /* ignore */ }
-      }
+    // 视图切换条：高亮 + 计数
+    const bar = el.querySelector('.home-view-bar');
+    if (bar) {
+      bar.querySelectorAll('[data-lm]').forEach(b => b.classList.toggle('on', (b.dataset.lm === 'list') === showList));
+      let cnt = bar.querySelector('.hvb-count');
+      if (showList) {
+        const n = this.filteredRecs().length;
+        if (!cnt) { cnt = document.createElement('span'); cnt.className = 'hvb-count'; bar.appendChild(cnt); }
+        cnt.textContent = '共 ' + n + ' 条' + (searching ? '（搜索结果）' : '');
+      } else if (cnt) cnt.remove();
     }
+
+    // 搜索横幅
+    const slot = el.querySelector('#search-banner-slot');
+    if (slot) {
+      slot.innerHTML = this.searchBannerHTML();
+      this.bindSearchBanner(slot);
+    }
+
+    // 日历 / 列表显隐与内容
+    const calBar = el.querySelector('.cal-pane-bar');
+    const cal = el.querySelector('#home-calendar');
+    const list = el.querySelector('#home-list');
+    if (calBar) calBar.hidden = showList;
+    if (cal) cal.hidden = showList;
+    if (list) list.hidden = !showList;
+    if (showList) this.renderRecTable(list, this.filteredRecs(), { kw: this.state.search.q });
+    else this.renderHomeCalendar();
+
+    this.renderSearchUI();
   },
 
   /* ---------- 搜索 / 筛选 ---------- */
@@ -1094,9 +1142,13 @@ const App = {
     const inp = $('search-input');
     if (!inp) return;
     let timer = null;
-    inp.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => this.applySearch(inp.value), 140);
+    let composing = false; // 中文输入法拼音组合中：不搜索、不重渲染（否则组合被取消，永远输不完中文）
+    const schedule = (ms) => { clearTimeout(timer); timer = setTimeout(() => this.applySearch(inp.value), ms); };
+    inp.addEventListener('compositionstart', () => { composing = true; clearTimeout(timer); });
+    inp.addEventListener('compositionend', () => { composing = false; schedule(140); }); // 选词落字后才搜索
+    inp.addEventListener('input', e => {
+      if (composing || (e && e.isComposing)) return; // 拼音字母逐个落入框里，忽略
+      schedule(140);
     });
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); this.applySearch(inp.value); }
@@ -1123,7 +1175,7 @@ const App = {
       this.renderSearchUI();
       return;
     }
-    if (changed || nowActive) this.renderView();
+    if (changed || nowActive) this.refreshLedgerPane(); // 局部刷新：不重建搜索框（IME 组合不被打断）
     this.renderSearchUI();
   },
   clearSearch() {
@@ -1135,14 +1187,14 @@ const App = {
     if (inp) inp.value = '';
     this.closeFilterPop();
     this.renderSearchUI();
-    if (this.state.route === 'ledger') this.renderView();
+    if (this.state.route === 'ledger') this.refreshLedgerPane();
   },
   refreshResults() {
     if (this.searchActive()) {
       if (this.state.route !== 'ledger') { this.state.home.mode = 'list'; location.hash = '#/ledger'; }
-      else this.renderView();
+      else this.refreshLedgerPane();
     } else if (this.state.route === 'ledger') {
-      this.renderView();
+      this.refreshLedgerPane();
     }
     this.renderSearchUI();
     const cnt = document.getElementById('fp-count');
