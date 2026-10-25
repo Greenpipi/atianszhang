@@ -6,7 +6,9 @@ const App = {
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
     wish: { sort: 'date-desc', tag: '' },
-    home: { view: 'week', anchor: todayStr(), sel: todayStr() },
+    home: { view: 'week', anchor: todayStr(), sel: todayStr(), mode: 'calendar' },
+    search: { q: '', cats: [], ledgers: [], from: '', to: '' },
+    list: { sortKey: 'date', sortDir: 'desc', page: 1 },
     rentalMonth: thisMonth(),
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
     settingsLedgerType: 'personal',
@@ -51,6 +53,7 @@ const App = {
     });
     $('toggle-signup').onclick = () => this.toggleSignup();
     $('login-form').onsubmit = e => { e.preventDefault(); this.doLogin(); };
+    this.bindSearch();
   },
 
   /* ---------- 在线状态 ---------- */
@@ -478,6 +481,7 @@ const App = {
     });
     this.renderChrome();
     this.renderView();
+    this.renderSearchUI();
     window.scrollTo({ top: 0 });
   },
 
@@ -816,11 +820,13 @@ const App = {
     return this.renderLedgerHome();
   },
 
-  /* ---------- 记账本主页（顶部快捷横排 + 日历） ---------- */
+  /* ---------- 记账本主页（顶部快捷横排 + 日历/列表视图） ---------- */
   renderLedgerHome() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
     const home = this.state.home;
+    const searching = this.searchActive();
+    const showList = searching || home.mode === 'list';
     const s = this.monthSummary(lid, thisMonth());
 
     // 快捷记账：日历上方横排一行（日常 → 爱好 → 旅游）
@@ -832,6 +838,7 @@ const App = {
             <span class="qlabel">${esc(quickShort(t.label))}</span>
           </button>`).join('')).join('');
 
+    const listRecs = showList ? this.filteredRecs() : [];
     el.innerHTML = `
       <div class="home-summary">
         <div class="hs-item"><span>本月支出</span><b class="expense">${fmtMoney(s.expense)}</b></div>
@@ -839,8 +846,16 @@ const App = {
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
       <div class="qbar">${quickHTML}</div>
+      ${this.searchBannerHTML()}
+      <div class="home-view-bar">
+        <div class="seg">
+          <button data-lm="calendar" class="${showList ? '' : 'on'}">日历</button>
+          <button data-lm="list" class="${showList ? 'on' : ''}">列表</button>
+        </div>
+        ${showList ? '<span class="hvb-count">共 ' + listRecs.length + ' 条' + (searching ? '（搜索结果）' : '') + '</span>' : ''}
+      </div>
       <section class="cal-pane">
-        <div class="cal-pane-bar">
+        <div class="cal-pane-bar"${showList ? ' hidden' : ''}>
           <div class="seg">
             <button data-hv="week" class="${home.view === 'week' ? 'on' : ''}">周</button>
             <button data-hv="month" class="${home.view === 'month' ? 'on' : ''}">月</button>
@@ -853,14 +868,28 @@ const App = {
             <button class="btn btn-ghost btn-sm" data-htoday>今天</button>
           </div>
         </div>
-        <div id="home-calendar"></div>
+        <div id="home-calendar"${showList ? ' hidden' : ''}></div>
+        <div id="home-list"${showList ? '' : ' hidden'}></div>
       </section>`;
 
     // 快捷按钮 → 带出分类记账
     el.querySelectorAll('.qbtn').forEach(b => {
       b.onclick = () => this.addRecordModal(lid, todayStr(), b.dataset.cat, b.dataset.sub);
     });
-    // 视图切换 / 翻页
+    // 日历 / 列表视图切换（搜索中点任一视图 = 退出搜索并切到该视图）
+    el.querySelectorAll('[data-lm]').forEach(b => {
+      b.onclick = () => {
+        const m = b.dataset.lm;
+        if (this.searchActive()) {
+          this.clearSearch();
+          this.state.home.mode = m;
+          this.renderLedgerHome();
+          return;
+        }
+        home.mode = m; this.renderLedgerHome();
+      };
+    });
+    // 周/月/年切换 / 翻页
     el.querySelectorAll('[data-hv]').forEach(b => {
       b.onclick = () => { home.view = b.dataset.hv; this.renderLedgerHome(); };
     });
@@ -869,8 +898,299 @@ const App = {
     });
     el.querySelector('[data-htoday]').onclick = () => { home.anchor = todayStr(); this.renderLedgerHome(); };
 
-    this.renderHomeCalendar();
+    // 搜索横幅：筛选条件 chip 移除 / 一键清除
+    el.querySelectorAll('[data-rm]').forEach(b => {
+      b.onclick = () => {
+        const s = this.state.search, v = b.dataset.v;
+        if (b.dataset.rm === 'cat') s.cats = s.cats.filter(x => x !== v);
+        else if (b.dataset.rm === 'ledger') s.ledgers = s.ledgers.filter(x => x !== v);
+        else { s.from = ''; s.to = ''; }
+        this.state.list.page = 1;
+        this.refreshResults();
+      };
+    });
+    const sbClear = el.querySelector('[data-sbclear]');
+    if (sbClear) sbClear.onclick = () => this.clearSearch();
+
+    if (showList) this.renderRecTable(el.querySelector('#home-list'), listRecs, { kw: this.state.search.q });
+    else this.renderHomeCalendar();
     this.enhanceSelects(el);
+  },
+
+  /* ---------- 搜索 / 筛选 ---------- */
+  searchActive() {
+    const s = this.state.search;
+    return !!(s.q || s.cats.length || s.ledgers.length || s.from || s.to);
+  },
+  hasFilters() {
+    const s = this.state.search;
+    return !!(s.cats.length || s.ledgers.length || s.from || s.to);
+  },
+  /* 关键词命中：大类 / 小类 / 备注 / 金额 / 日期（日期支持 2025-12-15、12-15、12/15、20251215、12月15日） */
+  matchQuery(r, kw) {
+    if (!kw) return true;
+    const k = String(kw).toLowerCase();
+    const amt = Number(r.amount) || 0;
+    const fields = [
+      r.category, r.sub, r.note, r.date,
+      r.date.slice(5), r.date.slice(5).replace('-', '/'), r.date.replace(/-/g, ''),
+      r.date.slice(0, 4) + '年' + r.date.slice(5, 7) + '月' + r.date.slice(8, 10) + '日',
+      String(amt), String(Math.abs(amt)), amt.toFixed(2), Math.abs(amt).toFixed(2), fmtMoney(amt)
+    ];
+    return fields.some(f => f != null && String(f).toLowerCase().indexOf(k) >= 0);
+  },
+  /* 全量筛选 + 排序（搜索与账单列表共用） */
+  filteredRecs() {
+    const st = this.state;
+    const recs = st.records.filter(r => {
+      if (!this.matchQuery(r, st.search.q)) return false;
+      if (st.search.cats.length && st.search.cats.indexOf(r.category) < 0) return false;
+      if (st.search.ledgers.length && st.search.ledgers.indexOf(r.ledger_id) < 0) return false;
+      if (st.search.from && r.date < st.search.from) return false;
+      if (st.search.to && r.date > st.search.to) return false;
+      return true;
+    });
+    const dir = st.list.sortDir === 'asc' ? 1 : -1;
+    recs.sort((a, b) => {
+      let c = 0;
+      if (st.list.sortKey === 'amount') c = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+      else if (st.list.sortKey === 'category') c = String(a.category || '').localeCompare(String(b.category || ''), 'zh-Hans-CN');
+      else c = a.date < b.date ? -1 : a.date > b.date ? 1 : (String(a.created_at || '') < String(b.created_at || '') ? -1 : 1);
+      return c * dir;
+    });
+    return recs;
+  },
+  searchBannerHTML() {
+    const s = this.state.search;
+    if (!this.searchActive()) return '';
+    const n = this.filteredRecs().length;
+    const chips = [];
+    if (s.q) chips.push('<span class="sf-chip">「' + esc(s.q) + '」</span>');
+    s.cats.forEach(c => chips.push('<span class="sf-chip">大类：' + esc(c) + '<button type="button" data-rm="cat" data-v="' + esc(c) + '" title="移除该筛选">✕</button></span>'));
+    s.ledgers.forEach(id => {
+      const l = this.state.ledgers.find(x => x.id === id);
+      chips.push('<span class="sf-chip">账本：' + esc(l ? l.name : '') + '<button type="button" data-rm="ledger" data-v="' + id + '" title="移除该筛选">✕</button></span>');
+    });
+    if (s.from || s.to) chips.push('<span class="sf-chip">' + (s.from || '最早') + ' 至 ' + (s.to || '最近') + '<button type="button" data-rm="date" title="移除该筛选">✕</button></span>');
+    return '<div class="search-banner">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>'
+      + '<span class="sb-count">命中 <b>' + n + '</b> 条</span>'
+      + '<div class="sb-chips">' + chips.join('') + '</div>'
+      + '<button type="button" class="sb-clear" data-sbclear>清除</button>'
+      + '</div>';
+  },
+
+  /* ---------- 账单列表（表格：表头排序 + 每页 50 条 + 关键词高亮） ---------- */
+  renderRecTable(host, recs, opts) {
+    if (!host) return;
+    const kw = (opts && opts.kw) || '';
+    const st = this.state.list;
+    const total = recs.length;
+    const shown = Math.min(total, st.page * LIST_PAGE_SIZE);
+    const multiLedger = this.state.ledgers.length > 1;
+    const colspan = multiLedger ? 6 : 5;
+    const arrow = k => '<span class="sort-arrow' + (st.sortKey === k ? ' on' : '') + '">' + (st.sortKey === k ? (st.sortDir === 'asc' ? '▲' : '▼') : '⇅') + '</span>';
+    host.innerHTML = `
+      <div class="rt-scroll">
+        <table class="rec-table">
+          <thead><tr>
+            <th data-sort="date" class="c-date">日期${arrow('date')}</th>
+            <th data-sort="category">大类${arrow('category')}</th>
+            <th>小类</th>
+            <th data-sort="amount" class="c-amt">金额${arrow('amount')}</th>
+            <th class="c-note">备注</th>
+            ${multiLedger ? '<th>账本</th>' : ''}
+          </tr></thead>
+          <tbody>
+            ${recs.slice(0, shown).map(r => {
+      const inc = (r.kind || this.kindOf(r.ledger_id, r.category)) === 'income';
+      const amt = Number(r.amount) || 0;
+      const sign = amt < 0 ? '-' : (inc ? '+' : '-');
+      const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
+      return '<tr data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
+        + '<td class="c-date">' + hlKw(r.date, kw) + '</td>'
+        + '<td><span class="rt-cat">' + catEmoji(r.category) + ' ' + hlKw(r.category, kw) + '</span></td>'
+        + '<td class="c-sub">' + (r.sub ? hlKw(r.sub, kw) : '<span class="rt-dim">—</span>') + '</td>'
+        + '<td class="c-amt' + (inc ? ' income' : '') + '">' + sign + hlKw(fmtMoney(Math.abs(amt)), kw) + '</td>'
+        + '<td class="c-note" title="' + esc(r.note || '') + '">' + (r.note ? hlKw(r.note, kw) : '<span class="rt-dim">—</span>') + '</td>'
+        + (multiLedger ? '<td class="c-ledger">' + esc(lg ? lg.name : '') + '</td>' : '')
+        + '</tr>';
+    }).join('') || '<tr><td colspan="' + colspan + '" class="rt-empty">' + (this.searchActive() ? '没有匹配的账单，换个关键词或放宽筛选试试' : '还没有账单记录，记一笔吧') + '</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      ${total > shown
+        ? '<div class="rt-foot"><button class="btn btn-ghost" data-more>加载更多（还有 ' + (total - shown) + ' 条）</button></div>'
+        : '<div class="rt-foot rt-count">共 ' + total + ' 条' + (total > LIST_PAGE_SIZE ? ' · 已全部加载' : '') + '</div>'}`;
+
+    // 表头点击排序（再点反向）
+    host.querySelectorAll('th[data-sort]').forEach(th => {
+      th.onclick = () => {
+        const k = th.dataset.sort;
+        if (st.sortKey === k) st.sortDir = st.sortDir === 'asc' ? 'desc' : 'asc';
+        else { st.sortKey = k; st.sortDir = 'desc'; }
+        st.page = 1;
+        this.renderRecTable(host, this.filteredRecs(), { kw: this.state.search.q });
+        const cnt = document.querySelector('#view-ledger .hvb-count');
+        if (cnt) cnt.textContent = '共 ' + this.filteredRecs().length + ' 条' + (this.searchActive() ? '（搜索结果）' : '');
+      };
+    });
+    // 行点击 → 编辑弹窗
+    host.querySelectorAll('tbody tr[data-rid]').forEach(tr => {
+      tr.onclick = () => this.editRecord(tr.dataset.rid, tr.dataset.lid);
+    });
+    // 加载更多
+    const more = host.querySelector('[data-more]');
+    if (more) more.onclick = () => { st.page++; this.renderRecTable(host, this.filteredRecs(), { kw: this.state.search.q }); };
+  },
+
+  /* ---------- 顶部搜索框 / 筛选浮层 ---------- */
+  bindSearch() {
+    if (this._searchBound) return;
+    this._searchBound = true;
+    const $ = id => document.getElementById(id);
+    const inp = $('search-input');
+    let timer = null;
+    inp.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => this.applySearch(inp.value), 140);
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); this.applySearch(inp.value); }
+      if (e.key === 'Escape') { clearTimeout(timer); inp.value = ''; this.applySearch(''); inp.blur(); }
+    });
+    $('search-clear').onclick = () => { inp.value = ''; this.applySearch(''); inp.focus(); };
+    $('filter-btn').onclick = e => { e.stopPropagation(); this.toggleFilterPop(); };
+    // 「/」快捷聚焦搜索框
+    document.addEventListener('keydown', e => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const ae = document.activeElement;
+      if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+      if (document.getElementById('app-view').hidden) return;
+      e.preventDefault();
+      inp.focus();
+    });
+  },
+  applySearch(q) {
+    const v = (q || '').trim();
+    const wasActive = this.searchActive();
+    const changed = v !== this.state.search.q;
+    this.state.search.q = v;
+    this.state.list.page = 1;
+    const nowActive = this.searchActive();
+    if (nowActive && !wasActive) this._modeBeforeSearch = this.state.home.mode; // 记住进入搜索前的视图
+    if (!nowActive && wasActive && this._modeBeforeSearch) this.state.home.mode = this._modeBeforeSearch;
+    if (nowActive && this.state.route !== 'ledger') {
+      this.state.home.mode = 'list';
+      location.hash = '#/ledger'; // hashchange → route() → 列表结果
+      this.renderSearchUI();
+      return;
+    }
+    if (changed || nowActive) this.renderView();
+    this.renderSearchUI();
+  },
+  clearSearch() {
+    const s = this.state.search;
+    s.q = ''; s.cats = []; s.ledgers = []; s.from = ''; s.to = '';
+    this.state.list.page = 1;
+    if (this._modeBeforeSearch) { this.state.home.mode = this._modeBeforeSearch; this._modeBeforeSearch = null; }
+    const inp = document.getElementById('search-input');
+    if (inp) inp.value = '';
+    this.closeFilterPop();
+    this.renderSearchUI();
+    if (this.state.route === 'ledger') this.renderView();
+  },
+  refreshResults() {
+    if (this.searchActive()) {
+      if (this.state.route !== 'ledger') { this.state.home.mode = 'list'; location.hash = '#/ledger'; }
+      else this.renderView();
+    } else if (this.state.route === 'ledger') {
+      this.renderView();
+    }
+    this.renderSearchUI();
+    const cnt = document.getElementById('fp-count');
+    if (cnt) cnt.textContent = '命中 ' + this.filteredRecs().length + ' 条';
+  },
+  renderSearchUI() {
+    const clr = document.getElementById('search-clear');
+    if (clr) clr.hidden = !this.state.search.q;
+    const fb = document.getElementById('filter-btn');
+    if (fb) fb.classList.toggle('on', this.hasFilters());
+  },
+  toggleFilterPop() {
+    if (document.getElementById('filter-pop')) this.closeFilterPop();
+    else this.openFilterPop();
+  },
+  openFilterPop() {
+    this.closeFilterPop();
+    const s = this.state.search;
+    const catNames = [];
+    this.state.categories.forEach(c => { if (c.name && catNames.indexOf(c.name) < 0) catNames.push(c.name); });
+    const pop = document.createElement('div');
+    pop.className = 'filter-pop';
+    pop.id = 'filter-pop';
+    pop.innerHTML = `
+      <div class="fp-sec">
+        <div class="fp-title">账本</div>
+        <div class="fp-opts">${this.state.ledgers.map(l =>
+      '<label class="fp-opt"><input type="checkbox" data-f="ledger" value="' + l.id + '"' + (s.ledgers.indexOf(l.id) >= 0 ? ' checked' : '') + '><span>' + esc(l.name) + '</span></label>').join('') || '<div class="fp-empty">暂无账本</div>'}</div>
+      </div>
+      <div class="fp-sec">
+        <div class="fp-title">大类</div>
+        <div class="fp-cats">${catNames.map(c =>
+      '<label class="fp-opt"><input type="checkbox" data-f="cat" value="' + esc(c) + '"' + (s.cats.indexOf(c) >= 0 ? ' checked' : '') + '><span>' + esc(c) + '</span></label>').join('')}</div>
+      </div>
+      <div class="fp-sec">
+        <div class="fp-title">日期范围</div>
+        <div class="fp-dates">
+          <input type="date" data-f="from" value="${esc(s.from)}">
+          <span>至</span>
+          <input type="date" data-f="to" value="${esc(s.to)}">
+        </div>
+      </div>
+      <div class="fp-foot">
+        <button type="button" class="btn btn-ghost btn-sm" data-freset>重置</button>
+        <span class="fp-count" id="fp-count"></span>
+      </div>`;
+    document.body.appendChild(pop);
+    // 定位到筛选按钮下方居中
+    const btn = document.getElementById('filter-btn');
+    const r = btn.getBoundingClientRect();
+    const pw = pop.offsetWidth;
+    pop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 8)) + 'px';
+    pop.style.top = (r.bottom + 8) + 'px';
+    // 勾选/改期即时生效
+    pop.addEventListener('change', e => {
+      const t = e.target, f = t.dataset.f;
+      if (f === 'ledger') s.ledgers = Array.from(pop.querySelectorAll('[data-f="ledger"]:checked')).map(i => i.value);
+      else if (f === 'cat') s.cats = Array.from(pop.querySelectorAll('[data-f="cat"]:checked')).map(i => i.value);
+      else if (f === 'from' || f === 'to') s[f] = t.value;
+      else return;
+      this.state.list.page = 1;
+      this.refreshResults();
+    });
+    pop.querySelector('[data-freset]').onclick = () => {
+      s.cats = []; s.ledgers = []; s.from = ''; s.to = '';
+      this.state.list.page = 1;
+      this.closeFilterPop();
+      this.refreshResults();
+    };
+    const cnt = document.getElementById('fp-count');
+    if (cnt) cnt.textContent = '命中 ' + this.filteredRecs().length + ' 条';
+    this._fpOut = e => {
+      if (!pop.contains(e.target) && e.target !== btn && !btn.contains(e.target)) this.closeFilterPop();
+    };
+    this._fpKey = e => { if (e.key === 'Escape') this.closeFilterPop(); };
+    setTimeout(() => {
+      document.addEventListener('mousedown', this._fpOut, true);
+      document.addEventListener('keydown', this._fpKey, true);
+    }, 0);
+  },
+  closeFilterPop() {
+    const p = document.getElementById('filter-pop');
+    if (p) p.remove();
+    if (this._fpOut) { document.removeEventListener('mousedown', this._fpOut, true); this._fpOut = null; }
+    if (this._fpKey) { document.removeEventListener('keydown', this._fpKey, true); this._fpKey = null; }
   },
 
   homeNav(step) {

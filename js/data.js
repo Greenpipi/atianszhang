@@ -167,6 +167,17 @@ function thisMonth() { return monthOf(todayStr()); }
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+/* 账单列表每页条数 */
+const LIST_PAGE_SIZE = 50;
+/* 关键词高亮：先转义 HTML，再大小写不敏感地把命中词包进 <mark>（保留原文大小写） */
+function hlKw(text, kw) {
+  const s = esc(text);
+  const k = (kw == null ? '' : String(kw)).trim();
+  if (!k) return s;
+  const kEsc = esc(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return s.replace(new RegExp(kEsc, 'gi'), m => '<mark>' + m + '</mark>'); }
+  catch (e) { return s; }
+}
 function fmtMoney(n, opts) {
   const v = Number(n) || 0;
   const s = v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
