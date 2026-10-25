@@ -53,6 +53,9 @@ begin
     kind text not null default 'expense',
     status text not null default '',
     images text[] not null default '{}'::text[],
+    purchase_platform text not null default '',
+    attribute text not null default '',
+    status_since text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -97,6 +100,11 @@ begin
 
   -- 好物多图（images 优先，兼容老数据单图 image 列）
   execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
+
+  -- 好物购买平台 / 属性 / 弃用冻结日（弃用后陪伴天数冻结在弃用当日）
+  execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
+  execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
+  execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;

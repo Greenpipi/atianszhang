@@ -241,9 +241,9 @@ function subEmoji(sub) {
   if (t) return t.emoji || '💸';
   return emojiByKeyword(sub);
 }
-function daysBetween(dateStr) {
+function daysBetween(dateStr, ref) {
   const a = new Date(dateStr + 'T00:00:00');
-  const b = new Date(todayStr() + 'T00:00:00');
+  const b = new Date((ref || todayStr()) + 'T00:00:00');
   return Math.max(1, Math.round((b - a) / 86400000));
 }
 function starsStr(n) {

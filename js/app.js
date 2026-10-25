@@ -1488,8 +1488,8 @@ const App = {
       'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
       'amt-desc': (a, b) => b.amount - a.amount,
-      'days-desc': (a, b) => daysBetween(b.date) - daysBetween(a.date),
-      'cost-asc': (a, b) => (a.amount / daysBetween(a.date)) - (b.amount / daysBetween(b.date))
+      'days-desc': (a, b) => daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null) - daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null),
+      'cost-asc': (a, b) => (a.amount / daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null)) - (b.amount / daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null))
     };
     items = [...items].sort(sorters[f.sort] || sorters['date-desc']);
 
@@ -1556,16 +1556,17 @@ const App = {
       return;
     }
     grid.innerHTML = items.map(r => {
-      const days = daysBetween(r.date);
-      const cost = (Number(r.amount) || 0) / days;
       const name = r.note || (r.category + ' · ' + r.sub);
       const st = this.wishStatusOf(r);
+      const days = daysBetween(r.date, (st.key === '已弃用' && r.status_since) ? r.status_since : null);
+      const cost = (Number(r.amount) || 0) / days;
       const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
         <div class="wish-top">
           <div class="wish-info">
             <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
+            ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
             <div class="wish-amount">${fmtMoney(r.amount)}</div>
           </div>
           <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
@@ -1578,7 +1579,7 @@ const App = {
           <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
         </div>
         <div class="wish-meta">
-          <div class="wm-row">购入日期<b class="wm-dim">${r.date}</b></div>
+          <div class="wm-row">购入日期<b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></div>
           <div class="wm-row wm-duo">
             <span>已陪伴<b class="wm-badge wm-purple">${days}</b> 天</span>
             <span>每日<b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b> 元</span>
@@ -1788,9 +1789,14 @@ const App = {
       b.onclick = async () => {
         const label = b.dataset.st;
         if (Store.missingCol('records', 'status')) { this.toast('请先到设置页补一次建表 SQL（补 status 列）'); return; }
-        const ok = await Store.update('records', rid, { status: label });
+        const wasDiscarded = rec.status === '已弃用';
+        const status_since = (label === '已弃用')
+          ? (wasDiscarded ? (rec.status_since || todayStr()) : todayStr())
+          : '';
+        const ok = await Store.update('records', rid, { status: label, status_since });
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
         rec.status = label;
+        rec.status_since = status_since;
         const st = this.wishStatusOf(rec);
         const btn = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="status"]');
         if (btn) { btn.textContent = st.key; btn.className = 'wst st-' + st.cls; }
@@ -2679,6 +2685,10 @@ const App = {
       <div class="field"><label>金额（元）</label><input id="ed-amt" type="number" min="0" step="0.01" value="${r.amount}"></div>
       <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
       <div class="field"><label>备注</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
+      <div class="field-row">
+        <div class="field"><label>购买平台</label><input id="ed-platform" type="text" value="${esc(r.purchase_platform || '')}" placeholder="如 淘宝 / 京东"></div>
+        <div class="field"><label>属性</label><input id="ed-attr" type="text" value="${esc(r.attribute || '')}" placeholder="如 黑色 128G"></div>
+      </div>
       <div class="field"><label>标记</label>
         <label class="fav-check"><input type="checkbox" id="ed-rental" ${r.rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
       </div>
@@ -2792,7 +2802,9 @@ const App = {
         tags: fav ? this.pickedTags('#ed-tagpicker') : [],
         rental: document.getElementById('ed-rental').checked,
         images: edImgs,
-        rating, kind: this.kindOf(ledgerId, catSel.value)
+        rating, kind: this.kindOf(ledgerId, catSel.value),
+        purchase_platform: document.getElementById('ed-platform').value.trim(),
+        attribute: document.getElementById('ed-attr').value.trim()
       };
       try {
         await Store.update('records', rid, patch);
@@ -3262,6 +3274,9 @@ begin
     kind text not null default 'expense',
     status text not null default '',
     images text[] not null default '{}'::text[],
+    purchase_platform text not null default '',
+    attribute text not null default '',
+    status_since text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -3306,6 +3321,11 @@ begin
 
   -- 好物多图（images 优先，兼容老数据单图 image 列）
   execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
+
+  -- 好物购买平台 / 属性 / 弃用冻结日（弃用后陪伴天数冻结在弃用当日）
+  execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
+  execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
+  execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
