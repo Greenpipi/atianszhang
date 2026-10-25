@@ -53,7 +53,7 @@ const App = {
     });
     $('toggle-signup').onclick = () => this.toggleSignup();
     $('login-form').onsubmit = e => { e.preventDefault(); this.doLogin(); };
-    this.bindSearch();
+    this.bindSearchShortcut();
   },
 
   /* ---------- 在线状态 ---------- */
@@ -827,6 +827,8 @@ const App = {
     const home = this.state.home;
     const searching = this.searchActive();
     const showList = searching || home.mode === 'list';
+    // 搜索框在列表区、随视图重渲染，先记住焦点，渲染后恢复（防抖触发重渲染时不丢焦点）
+    const searchFocused = document.activeElement && document.activeElement.id === 'search-input';
     const s = this.monthSummary(lid, thisMonth());
 
     // 快捷记账：日历上方横排一行（日常 → 爱好 → 旅游）
@@ -846,7 +848,6 @@ const App = {
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
       <div class="qbar">${quickHTML}</div>
-      ${this.searchBannerHTML()}
       <div class="home-view-bar">
         <div class="seg">
           <button data-lm="calendar" class="${showList ? '' : 'on'}">日历</button>
@@ -855,6 +856,20 @@ const App = {
         ${showList ? '<span class="hvb-count">共 ' + listRecs.length + ' 条' + (searching ? '（搜索结果）' : '') + '</span>' : ''}
       </div>
       <section class="cal-pane">
+        <div class="pane-search-row">
+          <div class="search-box" id="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+            <input id="search-input" type="text" placeholder="搜索账单（备注 / 大类 / 小类 / 金额 / 日期）" autocomplete="off" value="${esc(this.state.search.q)}">
+            <button type="button" class="ts-clear" id="search-clear"${this.state.search.q ? '' : ' hidden'} title="清空">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+            <span class="ts-div"></span>
+            <button type="button" class="ts-filter${this.hasFilters() ? ' on' : ''}" id="filter-btn" title="筛选（大类 / 账本 / 日期范围）">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="search-banner-slot">${this.searchBannerHTML()}</div>
         <div class="cal-pane-bar"${showList ? ' hidden' : ''}>
           <div class="seg">
             <button data-hv="week" class="${home.view === 'week' ? 'on' : ''}">周</button>
@@ -912,9 +927,22 @@ const App = {
     const sbClear = el.querySelector('[data-sbclear]');
     if (sbClear) sbClear.onclick = () => this.clearSearch();
 
+    // 搜索框 / 筛选按钮（元素随视图重渲染，每次重新绑定）
+    this.bindSearchBox();
+
     if (showList) this.renderRecTable(el.querySelector('#home-list'), listRecs, { kw: this.state.search.q });
     else this.renderHomeCalendar();
     this.enhanceSelects(el);
+
+    // 恢复搜索框焦点与光标（防抖触发的重渲染不该打断输入）
+    if (searchFocused) {
+      const si = el.querySelector('#search-input');
+      if (si) {
+        si.focus();
+        const n = si.value.length;
+        try { si.setSelectionRange(n, n); } catch (e) { /* ignore */ }
+      }
+    }
   },
 
   /* ---------- 搜索 / 筛选 ---------- */
@@ -1045,11 +1073,26 @@ const App = {
   },
 
   /* ---------- 顶部搜索框 / 筛选浮层 ---------- */
-  bindSearch() {
-    if (this._searchBound) return;
-    this._searchBound = true;
+  /* 「/」快捷聚焦搜索框（document 级只绑一次；非记账本页先跳过去） */
+  bindSearchShortcut() {
+    if (this._searchCutBound) return;
+    this._searchCutBound = true;
+    document.addEventListener('keydown', e => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const ae = document.activeElement;
+      if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+      if (document.getElementById('app-view').hidden) return;
+      e.preventDefault();
+      const focusIt = () => { const si = document.getElementById('search-input'); if (si) si.focus(); };
+      if (this.state.route !== 'ledger') { location.hash = '#/ledger'; setTimeout(focusIt, 80); }
+      else focusIt();
+    });
+  },
+  /* 搜索框 / 清空 / 筛选按钮：元素在列表区内、随 renderLedgerHome 重建，每次渲染后重新绑定 */
+  bindSearchBox() {
     const $ = id => document.getElementById(id);
     const inp = $('search-input');
+    if (!inp) return;
     let timer = null;
     inp.addEventListener('input', () => {
       clearTimeout(timer);
@@ -1059,17 +1102,11 @@ const App = {
       if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); this.applySearch(inp.value); }
       if (e.key === 'Escape') { clearTimeout(timer); inp.value = ''; this.applySearch(''); inp.blur(); }
     });
-    $('search-clear').onclick = () => { inp.value = ''; this.applySearch(''); inp.focus(); };
-    $('filter-btn').onclick = e => { e.stopPropagation(); this.toggleFilterPop(); };
-    // 「/」快捷聚焦搜索框
-    document.addEventListener('keydown', e => {
-      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const ae = document.activeElement;
-      if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
-      if (document.getElementById('app-view').hidden) return;
-      e.preventDefault();
-      inp.focus();
-    });
+    const clr = $('search-clear');
+    if (clr) clr.onclick = () => { inp.value = ''; this.applySearch(''); inp.focus(); };
+    const fb = $('filter-btn');
+    if (fb) fb.onclick = e => { e.stopPropagation(); this.toggleFilterPop(); };
+    this.renderSearchUI();
   },
   applySearch(q) {
     const v = (q || '').trim();
