@@ -1626,7 +1626,25 @@ const App = {
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
   },
-  /* 大图查看：左右箭头切换 + 计数 + 点背景/Esc 关闭 */
+  /* 合法图片链接（http/https；拒绝 javascript: 等伪协议） */
+  isImgUrl(s) {
+    try { const u = new URL(String(s || '').trim()); return u.protocol === 'http:' || u.protocol === 'https:'; }
+    catch (e) { return false; }
+  },
+  /* 粘贴图片链接加入 images：只存 URL 字符串，不下载不转存，零存储占用 */
+  async addImageLink(rid, curImgs, onAdded) {
+    if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+    const url = await this.promptDialog('图片链接', '粘贴图片网址（http:// 或 https:// 开头）');
+    if (!url) return;
+    if (!this.isImgUrl(url)) { this.toast('链接格式不正确，需以 http:// 或 https:// 开头', 'err'); return; }
+    if (curImgs.includes(url)) { this.toast('该链接已经添加过了', 'err'); return; }
+    const next = [...curImgs, url];
+    const ok = await Store.update('records', rid, { images: next });
+    if (ok === false) { this.toast('保存失败，请重试', 'err'); return; }
+    onAdded(next);
+    this.toast('已添加图片链接', 'ok');
+  },
+  /* 大图查看：左右箭头切换 + 计数 + 点背景/Esc 关闭；网络图片显示「打开原图」 */
   openWishLight(imgs, idx) {
     this.closeWishLight();
     let i = idx;
@@ -1638,10 +1656,18 @@ const App = {
       '<img id="wl-img" src="' + esc(imgs[i]) + '" alt="">' +
       '<button type="button" class="wl-btn wl-next" title="下一张" style="display:' + (imgs.length > 1 ? '' : 'none') + '">›</button>' +
       '<div class="wl-cnt">' + (i + 1) + ' / ' + imgs.length + '</div>' +
+      '<a class="wl-open" id="wl-open" href="' + esc(imgs[i]) + '" target="_blank" rel="noopener" title="打开原图" style="display:none">↗</a>' +
       '<button type="button" class="wl-close" title="关闭">✕</button>';
     document.body.appendChild(wrap);
-    const img = wrap.querySelector('#wl-img'), cnt = wrap.querySelector('.wl-cnt');
-    const show = () => { img.src = imgs[i]; cnt.textContent = (i + 1) + ' / ' + imgs.length; };
+    const img = wrap.querySelector('#wl-img'), cnt = wrap.querySelector('.wl-cnt'), openBtn = wrap.querySelector('#wl-open');
+    const show = () => {
+      img.src = imgs[i];
+      cnt.textContent = (i + 1) + ' / ' + imgs.length;
+      const net = /^https?:\/\//i.test(imgs[i]);
+      openBtn.style.display = net ? '' : 'none';
+      if (net) openBtn.href = imgs[i];
+    };
+    img.onerror = () => { if (/^https?:\/\//i.test(imgs[i])) this.toast('图片加载失败，对方网站可能不允许外嵌，可点右上角「打开原图」', 'err'); };
     wrap.querySelector('.wl-prev').onclick = e => { e.stopPropagation(); i = (i - 1 + imgs.length) % imgs.length; show(); };
     wrap.querySelector('.wl-next').onclick = e => { e.stopPropagation(); i = (i + 1) % imgs.length; show(); };
     wrap.querySelector('.wl-close').onclick = e => { e.stopPropagation(); this.closeWishLight(); };
@@ -2625,7 +2651,10 @@ const App = {
       </div>
       <div class="field" id="ed-img-field" style="display:none"><label>图片（可多张）</label>
         <div class="rec-img-grid" id="ed-img-grid"></div>
-        <button class="btn btn-ghost btn-sm" id="ed-img-up" type="button" style="margin-top:8px">添加图片</button>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost btn-sm" id="ed-img-up" type="button">上传图片</button>
+          <button class="btn btn-ghost btn-sm" id="ed-img-link" type="button">图片链接</button>
+        </div>
       </div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="modal-acts">
@@ -2692,6 +2721,9 @@ const App = {
     };
     const edDate = document.getElementById('ed-date');
     edDate.onclick = () => this.openCalendar(edDate);
+    document.getElementById('ed-img-link').onclick = () => {
+      this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });
+    };
     document.querySelectorAll('#ed-stars button').forEach(b => {
       b.onclick = () => {
         const v = Number(b.dataset.v);
@@ -2701,10 +2733,10 @@ const App = {
     });
     document.getElementById('ed-del').onclick = async () => {
       const ok = await this.confirmDialog('删除记录', '确定删除这笔账单吗？删除后不可恢复。');
-      if (!ok) { this.editRecord(rid, ledgerId); return; } // 确认框会清空弹窗栈，取消后重开编辑窗
+      if (!ok) return; // 取消：底层编辑窗原样保持（栈式弹窗，无需重开）
       try {
         await Store.remove('records', rid);
-        this.closeModal();
+        this.closeModal(); // 关掉底层编辑窗（确认框已被 confirmDialog 关闭）
         this.toast('已删除', 'ok');
         await this.loadData();
       } catch (e) { this.toast(e.message, 'err'); }
@@ -3072,7 +3104,7 @@ const App = {
   },
 
   openModal(html, wide) {
-    this.closeModal();
+    // 栈式弹窗：不再预清空，支持嵌套（如在编辑弹窗内再弹输入框）；后开的叠在上层
     const root = document.getElementById('modal-root');
     const mask = document.createElement('div');
     mask.className = 'modal-mask';
@@ -3082,7 +3114,11 @@ const App = {
     root.appendChild(mask);
     return mask;
   },
-  closeModal() { document.getElementById('modal-root').innerHTML = ''; },
+  closeModal() {
+    // 只关最顶层弹窗（嵌套时底层编辑弹窗保持打开）
+    const root = document.getElementById('modal-root');
+    if (root.lastElementChild) root.lastElementChild.remove();
+  },
 
   confirmDialog(title, msg) {
     return new Promise(resolve => {

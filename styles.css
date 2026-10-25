@@ -519,6 +519,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wl-cnt{position:absolute;bottom:26px;color:#fff;font-size:12.5px;font-weight:600;letter-spacing:.5px}
 .wl-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;border:none;font-size:14px;cursor:pointer}
 .wl-close:hover{background:rgba(255,255,255,.24)}
+/* 大图：打开原图（仅网络图片显示） */
+.wl-open{position:absolute;top:16px;right:62px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:16px;text-decoration:none;display:flex;align-items:center;justify-content:center;line-height:1}
+.wl-open:hover{background:rgba(255,255,255,.24)}
 /* 标签/状态菜单浮层 */
 .wish-pop{position:fixed;z-index:150;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14);padding:12px 14px;min-width:220px;max-width:300px;max-height:70vh;overflow:auto}
 .wish-pop .wp-title{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px}
