@@ -930,19 +930,14 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wk-col.today{border-color:var(--primary);background:var(--primary-soft)}
 .wk-col.today .wk-col-head{background:var(--primary);border-bottom-color:transparent}
 .wk-col.today .wk-col-head span{color:#fff}
-/* 头部三槽：左=笔数角标（有账才显示）｜中=日期｜右=加号（常驻） */
+/* 头部两槽：左=日期｜右=加号（常驻） */
 .wk-col-head{
-  display:grid;grid-template-columns:26px 1fr 26px;align-items:center;
+  display:grid;grid-template-columns:1fr 26px;align-items:center;
   padding:7px 6px;border-bottom:1px solid var(--line);background:#fff;
 }
-.wk-head-ph{display:block}
 .wk-head-mid{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
 .wk-wd{font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap}
 .wk-date{font-size:11px;color:var(--muted);white-space:nowrap}
-.wk-badge{
-  min-width:20px;height:20px;padding:0 6px;border-radius:11px;background:var(--danger);color:#fff;
-  font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
-}
 .wk-plus{
   width:24px;height:24px;border-radius:50%;background:#fff;border:1px solid var(--line);
   color:var(--primary);font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;
@@ -1046,9 +1041,6 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   .wk-rec-sub{font-size:12px}
   .wk-rec-note{font-size:12px}
   .wk-rec-amt{font-size:14px}
-  /* 笔数角标弱化：白底 75% 透明，形状/数字缩小 1.5 倍 */
-  .wk-badge{min-width:12px;height:12px;padding:0 4px;border-radius:6px;background:rgba(255,255,255,.75);color:#64748B;font-size:7px;font-weight:600}
-  .wk-col.today .wk-col-head .wk-badge{color:#64748B} /* 抵消 today 头部 span 白字规则 */
   .m2-grid{grid-template-columns:repeat(4,1fr)}
   .y2-grid{grid-template-columns:repeat(2,1fr)}
 }

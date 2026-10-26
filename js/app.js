@@ -1375,7 +1375,6 @@ const App = {
         return `
         <div class="wk-col${tdy ? ' today' : ''}" data-date="${d}">
           <div class="wk-col-head">
-            ${recs.length ? '<span class="wk-badge">' + recs.length + '</span>' : '<span class="wk-head-ph"></span>'}
             <span class="wk-head-mid"><span class="wk-wd">周${wd[(new Date(d + 'T00:00:00').getDay() + 6) % 7]}</span><span class="wk-date">${d.slice(5).replace('-', '/')}</span></span>
             <button type="button" class="wk-plus" data-add="${d}" title="记一笔">+</button>
           </div>
