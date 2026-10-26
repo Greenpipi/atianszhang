@@ -1671,8 +1671,7 @@ const App = {
     grid.innerHTML = items.map(r => {
       const name = r.note || (r.category + ' · ' + r.sub);
       const st = this.wishStatusOf(r);
-      const days = daysBetween(r.date, (st.key === '已弃用' && r.status_since) ? r.status_since : null);
-      const cost = (Number(r.amount) || 0) / days;
+      const dc = this.wishDaysCost(r);
       const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
@@ -1694,8 +1693,8 @@ const App = {
         <div class="wish-meta">
           <div class="wm-row wm-date"><span class="wm-item"><span class="wm-lab">购买日期</span><span class="wm-val"><b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></span></span></div>
           <div class="wm-row wm-duo">
-            <span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">${days}</b><span class="wm-unit">天</span></span></span>
-            <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b><span class="wm-unit">元</span></span></span>
+            ${dc.showDays ? '<span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">' + dc.days + '</b><span class="wm-unit">天</span></span></span>' : ''}
+            <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${dc.costText}</b>${dc.costText === '-' ? '' : '<span class="wm-unit">元</span>'}</span></span>
           </div>
         </div>
         <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
@@ -1873,11 +1872,25 @@ const App = {
       updates.push({ r, target });
     }
     for (const { r, target } of updates) {
-      const ok = await Store.update('records', r.id, { status: target, status_since: '' });
-      if (ok !== false) { r.status = target; r.status_since = ''; }
+      const ok = await Store.update('records', r.id, { status: target, status_since: todayStr() });
+      if (ok !== false) { r.status = target; r.status_since = todayStr(); }
     }
     if (updates.length && this.state.route === 'wishlist') this.renderWishlist();
     return updates.length;
+  },
+  /* 已陪伴天数 + 每日成本（按当前状态计算）：
+   *  使用中/闲置中：从状态改变日(status_since)起算，每日成本 = 金额/天数
+   *  未使用：不显示已陪伴，每日成本占位「-」
+   *  已弃用：保留已陪伴（从弃用日），每日成本占位「-」 */
+  wishDaysCost(r) {
+    const key = this.wishStatusOf(r).key;
+    const amount = Number(r.amount) || 0;
+    if (key === '未使用') return { days: 0, showDays: false, costText: '-' };
+    const since = r.status_since || r.date;
+    const days = daysBetween(since, null);
+    if (key === '已弃用') return { days, showDays: true, costText: '-' };
+    const cost = days > 0 ? amount / days : NaN; // 使用中 / 闲置中
+    return { days, showDays: true, costText: isFinite(cost) ? cost.toFixed(2) : '-' };
   },
   /* 卡片标签区 HTML（与 wish-tags 局部刷新共用） */
   wishTagsHTML(tags) {
@@ -1949,9 +1962,10 @@ const App = {
         const label = b.dataset.st;
         if (Store.missingCol('records', 'status')) { this.toast('请先到设置页补一次建表 SQL（补 status 列）'); return; }
         const wasDiscarded = rec.status === '已弃用';
+        // 每次状态变更都记录变更日：使用中/闲置中/未使用 → 今天；已弃用 → 首次弃用记今天，之后沿用原弃用日
         const status_since = (label === '已弃用')
           ? (wasDiscarded ? (rec.status_since || todayStr()) : todayStr())
-          : '';
+          : todayStr();
         const ok = await Store.update('records', rid, { status: label, status_since });
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
         rec.status = label;
