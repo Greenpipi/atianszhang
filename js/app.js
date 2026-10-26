@@ -1,11 +1,13 @@
 /* ============ 应用主逻辑 ============ */
+/* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用（已弃用始终最后） */
+const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3 };
 const App = {
   state: {
     route: 'ledger',
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
-    wish: { sort: 'amt-desc', tag: '', cats: [], open: [] },
+    wish: { sort: 'status', tag: '', cats: [], open: [] },
     home: { view: 'week', anchor: todayStr(), sel: todayStr(), mode: 'calendar' },
     search: { q: '', cats: [], ledgers: [], from: '', to: '' },
     list: { sortKey: 'date', sortDir: 'desc', page: 1 },
@@ -28,6 +30,12 @@ const App = {
     catch (e) { console.warn(e); }
 
     window.addEventListener('hashchange', () => this.route());
+    // 标签页重新可见时检测是否跨入新月份，触发季节自动切换（非实时轮询）
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.state.records.length) {
+        this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
+      }
+    });
     this.updateOnline();
     window.addEventListener('online', () => this.updateOnline());
     window.addEventListener('offline', () => this.updateOnline());
@@ -145,6 +153,8 @@ const App = {
     // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
     this.paintFromCache();
     await this.loadData();
+    // 季节自动切换：打开应用时执行一次（不阻塞渲染，后台完成）
+    this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
   },
@@ -1577,9 +1587,17 @@ const App = {
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
       'amt-desc': (a, b) => b.amount - a.amount,
       'days-desc': (a, b) => daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null) - daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null),
-      'cost-asc': (a, b) => (a.amount / daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null)) - (b.amount / daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null))
+      'cost-asc': (a, b) => (a.amount / daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null)) - (b.amount / daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null)),
+      'status': (a, b) => {
+        const ra = STATUS_RANK[this.wishStatusOf(a).key], rb = STATUS_RANK[this.wishStatusOf(b).key];
+        if (ra !== rb) return ra - rb;
+        return (a.date < b.date ? 1 : -1);
+      }
     };
-    items = [...items].sort(sorters[f.sort] || sorters['date-desc']);
+    items = [...items].sort(sorters[f.sort] || sorters['status']);
+    // 已弃用始终排在每个分类末尾（任何排序模式下）
+    const dropped = items.filter(r => this.wishStatusOf(r).key === '已弃用');
+    if (dropped.length) items = items.filter(r => this.wishStatusOf(r).key !== '已弃用').concat(dropped);
 
     el.innerHTML = `
       <div class="card">
@@ -1604,6 +1622,7 @@ const App = {
         <div class="filter-bar">
           <div class="field" style="min-width:190px"><label>排序</label>
             <select id="w-sort">
+              <option value="status" ${f.sort === 'status' ? 'selected' : ''}>状态 · 使用中→已弃用</option>
               <option value="date-desc" ${f.sort === 'date-desc' ? 'selected' : ''}>日期 · 最新</option>
               <option value="date-asc" ${f.sort === 'date-asc' ? 'selected' : ''}>日期 · 最早</option>
               <option value="amt-desc" ${f.sort === 'amt-desc' ? 'selected' : ''}>金额 · 从高到低</option>
@@ -1819,6 +1838,47 @@ const App = {
     const s = String((r && r.status) || '').trim();
     return WISH_STATUS_LIST.find(x => x.key === s) || (r && r.favorite ? WISH_STATUS_LIST[0] : WISH_STATUS_LIST[1]);
   },
+
+  /* ---------- 季节自动切换（好物仓库） ---------- */
+  seasonCfgKey() { try { return 'fin_season_' + (Store.user ? (Store.user.email || 'local') : 'local'); } catch (e) { return 'fin_season_local'; } },
+  seasonLockKey() { try { return 'fin_season_lock_' + (Store.user ? (Store.user.email || 'local') : 'local'); } catch (e) { return 'fin_season_lock_local'; } },
+  loadSeasonConfig() {
+    try {
+      const raw = localStorage.getItem(this.seasonCfgKey());
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p && typeof p === 'object') { const d = defaultSeasonMonths(); for (let i = 1; i <= 12; i++) if (!p[i]) p[i] = d[i]; return p; }
+      }
+    } catch (e) { /* ignore */ }
+    return defaultSeasonMonths();
+  },
+  saveSeasonConfig(cfg) { try { localStorage.setItem(this.seasonCfgKey(), JSON.stringify(cfg)); } catch (e) { /* ignore */ } },
+  loadSeasonLocks() { try { const raw = localStorage.getItem(this.seasonLockKey()); return new Set(raw ? JSON.parse(raw) : []); } catch (e) { return new Set(); } },
+  /* 手动改过状态的好物，加入锁定集合，自动季节逻辑不再触碰它 */
+  addSeasonLock(id) { try { const s = this.loadSeasonLocks(); s.add(id); localStorage.setItem(this.seasonLockKey(), JSON.stringify([...s])); } catch (e) { /* ignore */ } },
+  currentSeason() { return seasonOfMonth(this.loadSeasonConfig(), new Date().getMonth() + 1); },
+  /* 执行一次季节自动切换：仅切换「衣裤鞋袜」类、有季节标签、且当前为 使用中/闲置中 的好物；跳过 未使用/已弃用 与手动锁定项 */
+  async applySeasonStatus() {
+    const season = this.currentSeason();
+    const locks = this.loadSeasonLocks();
+    const updates = [];
+    for (const r of this.state.records) {
+      if (!r.favorite) continue;
+      const target = seasonTargetStatus(r, season);
+      if (!target) continue;
+      const cur = this.wishStatusOf(r).key;
+      if (cur !== '使用中' && cur !== '闲置中') continue; // 未使用/已弃用 不受自动切换影响
+      if (locks.has(r.id)) continue; // 手动覆盖优先
+      if (target === cur) continue;
+      updates.push({ r, target });
+    }
+    for (const { r, target } of updates) {
+      const ok = await Store.update('records', r.id, { status: target, status_since: '' });
+      if (ok !== false) { r.status = target; r.status_since = ''; }
+    }
+    if (updates.length && this.state.route === 'wishlist') this.renderWishlist();
+    return updates.length;
+  },
   /* 卡片标签区 HTML（与 wish-tags 局部刷新共用） */
   wishTagsHTML(tags) {
     return tags && tags.length
@@ -1896,6 +1956,7 @@ const App = {
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
         rec.status = label;
         rec.status_since = status_since;
+        this.addSeasonLock(rid); // 手动改状态 → 永久锁定，季节自动切换不再动它
         const st = this.wishStatusOf(rec);
         const btn = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="status"]');
         if (btn) { btn.textContent = st.key; btn.className = 'wst st-' + st.cls; }
@@ -2592,6 +2653,18 @@ const App = {
           <select id="tpl-sub" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
           <button class="btn btn-primary" id="add-tpl">添加模板</button>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">季节自动切换</div><div class="card-sub">衣裤鞋袜类好物按季节自动切换使用状态</div></div>
+          <span class="badge badge-green" id="season-now">当前：夏季</span>
+        </div>
+        <p class="season-note">系统按当前月份判断季节，自动把「衣裤鞋袜」类、且打了对应季节标签（夏季 / 冬季 / 春秋季）的好物设为<b class="u-using">使用中</b>，其余季节的设为<b class="u-idle">闲置中</b>。仅在「使用中 ↔ 闲置中」之间切换；<b class="u-unused">未使用</b> 与 <b class="u-dropped">已弃用</b> 不受影响。手动改过状态的单件好物，自动切换不再动它。</p>
+        <div class="season-grid" id="season-grid"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-primary" id="season-save">保存季节配置</button>
+          <button class="btn btn-ghost" id="season-apply">立即应用切换</button>
+        </div>
       </div>`;
 
     /* --- 云端配置 --- */
@@ -2729,6 +2802,36 @@ const App = {
         await this.loadData();
       } catch (e) { this.toast(e.message, 'err'); }
     };
+
+    /* --- 季节自动切换配置 --- */
+    {
+      const grid = el.querySelector('#season-grid');
+      const nowEl = el.querySelector('#season-now');
+      const refreshNow = () => { if (nowEl) nowEl.textContent = '当前：' + this.currentSeason(); };
+      if (grid) {
+        const cfg = this.loadSeasonConfig();
+        refreshNow();
+        grid.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m =>
+          '<div class="season-cell"><span class="sc-m">' + m + '月</span>' +
+          '<select class="sc-sel" data-m="' + m + '">' +
+          SEASON_TAGS.map(s => '<option value="' + s + '"' + (cfg[m] === s ? ' selected' : '') + '>' + s + '</option>').join('') +
+          '</select></div>').join('');
+        this.enhanceSelects(grid);
+        const saveBtn = el.querySelector('#season-save');
+        if (saveBtn) saveBtn.onclick = () => {
+          const cfg2 = {};
+          grid.querySelectorAll('.sc-sel').forEach(s => { cfg2[Number(s.dataset.m)] = s.value; });
+          this.saveSeasonConfig(cfg2);
+          refreshNow();
+          this.toast('季节配置已保存（' + this.currentSeason() + '）', 'ok');
+        };
+        const applyBtn = el.querySelector('#season-apply');
+        if (applyBtn) applyBtn.onclick = async () => {
+          const n = await this.applySeasonStatus();
+          this.toast(n ? ('已切换 ' + n + ' 件好物状态') : '没有需要切换的好物', n ? 'ok' : '');
+        };
+      }
+    }
 
     /* --- 分类管理 --- */
     const ledgerSel = el.querySelector('#cfg-ledger');

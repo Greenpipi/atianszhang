@@ -125,6 +125,40 @@ const WISH_STATUS_LIST = [
   { key: '已弃用', cls: 'dropped' }
 ];
 
+/* ---------- 好物仓库：季节自动切换 ----------
+ * 依据：好物的「通用」季节标签（夏季/冬季/春秋季）+ 当前月份所属季节，
+ * 自动把「衣裤鞋袜」类好物在「使用中 ↔ 闲置中」之间切换。 */
+const SEASON_TAGS = ['夏季', '冬季', '春秋季'];
+const CLOTHES_TAG_PREFIX = '衣裤鞋袜-';
+/* 好物是否打了「通用」组季节标签，返回该标签或 null */
+function recSeasonTag(r) {
+  const tags = recTags(r);
+  for (const t of tags) { const s = goodsTagShort(t); if (SEASON_TAGS.includes(s)) return t; }
+  return null;
+}
+/* 好物是否属于衣裤鞋袜大类 */
+function isClothesGood(r) { return recTags(r).some(t => t.indexOf(CLOTHES_TAG_PREFIX) === 0); }
+/* 每月 → 季节 默认配置（南宁模式：4-11 夏、3&12 春秋、1-2 冬） */
+function defaultSeasonMonths() {
+  const m = {};
+  for (let i = 1; i <= 12; i++) m[i] = '夏季';
+  [3, 12].forEach(i => m[i] = '春秋季');
+  [1, 2].forEach(i => m[i] = '冬季');
+  return m;
+}
+/* 给定月 → 季节（缺配置回退默认） */
+function seasonOfMonth(cfg, month) {
+  const c = cfg && typeof cfg === 'object' ? cfg : defaultSeasonMonths();
+  return c[month] || '夏季';
+}
+/* 给定好物与当前季节 → 应切到的状态（仅 使用中/闲置中 二选一）；不属季节切换范围返回 null */
+function seasonTargetStatus(rec, season) {
+  if (!isClothesGood(rec)) return null;
+  const st = recSeasonTag(rec);
+  if (!st) return null; // 无季节标签不参与
+  return (goodsTagShort(st) === season) ? '使用中' : '闲置中';
+}
+
 const DEFAULT_TEMPLATES = [
   // 日常支出板块
   { ledger: 'personal', section: '日常支出板块', label: '早餐', emoji: '🥪', category: '饮食支出', sub: '早餐' },
