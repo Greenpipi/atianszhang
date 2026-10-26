@@ -107,6 +107,10 @@ begin
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
 
+  -- 好物已弃用定格快照（弃用当天把已陪伴天数/每日成本冻结存档，此后不再实时计算）
+  execute $ddl$ alter table records add column if not exists discarded_days numeric not null default 0 $ddl$;
+  execute $ddl$ alter table records add column if not exists discarded_cost numeric $ddl$;
+
   -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
   execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
 

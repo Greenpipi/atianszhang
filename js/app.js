@@ -7,7 +7,7 @@ const App = {
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
-    wish: { sort: 'status', tag: '', cats: [], open: [] },
+    wish: { sort: 'date-desc', tag: '', cats: [], open: [] },
     home: { view: 'week', anchor: todayStr(), sel: todayStr(), mode: 'calendar' },
     search: { q: '', cats: [], ledgers: [], from: '', to: '' },
     list: { sortKey: 'date', sortDir: 'desc', page: 1 },
@@ -1586,18 +1586,21 @@ const App = {
       'date-desc': (a, b) => (a.date < b.date ? 1 : -1),
       'date-asc': (a, b) => (a.date > b.date ? 1 : -1),
       'amt-desc': (a, b) => b.amount - a.amount,
-      'days-desc': (a, b) => daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null) - daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null),
-      'cost-asc': (a, b) => (a.amount / daysBetween(a.date, a.status === '已弃用' && a.status_since ? a.status_since : null)) - (b.amount / daysBetween(b.date, b.status === '已弃用' && b.status_since ? b.status_since : null)),
-      'status': (a, b) => {
-        const ra = STATUS_RANK[this.wishStatusOf(a).key], rb = STATUS_RANK[this.wishStatusOf(b).key];
-        if (ra !== rb) return ra - rb;
-        return (a.date < b.date ? 1 : -1);
+      'days-desc': (a, b) => this.wishDaysCost(b).days - this.wishDaysCost(a).days,
+      'cost-asc': (a, b) => {
+        const v = r => { const p = parseFloat(this.wishDaysCost(r).costText); return isFinite(p) ? p : Infinity; };
+        const va = v(a), vb = v(b);
+        return va === vb ? 0 : (va < vb ? -1 : 1);
       }
     };
-    items = [...items].sort(sorters[f.sort] || sorters['status']);
-    // 已弃用始终排在每个分类末尾（任何排序模式下）
-    const dropped = items.filter(r => this.wishStatusOf(r).key === '已弃用');
-    if (dropped.length) items = items.filter(r => this.wishStatusOf(r).key !== '已弃用').concat(dropped);
+    if (f.sort === 'status' || !sorters[f.sort]) f.sort = 'date-desc'; // 旧配置归一
+    // 排序固定按状态分组（使用中→未使用→闲置中→已弃用），组内按所选维度次级排序；已弃用始终最后
+    const sec = sorters[f.sort];
+    items = [...items].sort((a, b) => {
+      const ra = STATUS_RANK[this.wishStatusOf(a).key], rb = STATUS_RANK[this.wishStatusOf(b).key];
+      if (ra !== rb) return ra - rb;
+      return sec(a, b);
+    });
 
     el.innerHTML = `
       <div class="card">
@@ -1622,7 +1625,6 @@ const App = {
         <div class="filter-bar">
           <div class="field" style="min-width:190px"><label>排序</label>
             <select id="w-sort">
-              <option value="status" ${f.sort === 'status' ? 'selected' : ''}>状态 · 使用中→已弃用</option>
               <option value="date-desc" ${f.sort === 'date-desc' ? 'selected' : ''}>日期 · 最新</option>
               <option value="date-asc" ${f.sort === 'date-asc' ? 'selected' : ''}>日期 · 最早</option>
               <option value="amt-desc" ${f.sort === 'amt-desc' ? 'selected' : ''}>金额 · 从高到低</option>
@@ -1671,7 +1673,6 @@ const App = {
     grid.innerHTML = items.map(r => {
       const name = r.note || (r.category + ' · ' + r.sub);
       const st = this.wishStatusOf(r);
-      const dc = this.wishDaysCost(r);
       const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
@@ -1690,13 +1691,7 @@ const App = {
         <div class="wish-status">
           <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
         </div>
-        <div class="wish-meta">
-          <div class="wm-row wm-date"><span class="wm-item"><span class="wm-lab">购买日期</span><span class="wm-val"><b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></span></span></div>
-          <div class="wm-row wm-duo">
-            ${dc.showDays ? '<span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">' + dc.days + '</b><span class="wm-unit">天</span></span></span>' : ''}
-            <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${dc.costText}</b>${dc.costText === '-' ? '' : '<span class="wm-unit">元</span>'}</span></span>
-          </div>
-        </div>
+        <div class="wish-meta">${this.wishMetaHTML(r)}</div>
         <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
       </div>`;
     }).join('');
@@ -1879,16 +1874,23 @@ const App = {
     return updates.length;
   },
   /* 已陪伴天数 + 每日成本（按当前状态计算）：
-   *  使用中/闲置中：从状态改变日(status_since)起算，每日成本 = 金额/天数
+   *  使用中/闲置中：从状态改变日(status_since)起算，每日成本 = 金额/天数，实时累计
    *  未使用：不显示已陪伴，每日成本占位「-」
-   *  已弃用：保留已陪伴（从弃用日），每日成本占位「-」 */
+   *  已弃用：显示弃用当天定格的快照（discarded_days / discarded_cost），不再随日期或金额变化 */
   wishDaysCost(r) {
     const key = this.wishStatusOf(r).key;
     const amount = Number(r.amount) || 0;
     if (key === '未使用') return { days: 0, showDays: false, costText: '-' };
+    if (key === '已弃用') {
+      const dDays = (r.discarded_days != null && r.discarded_days !== '') ? Number(r.discarded_days) : null;
+      const dCost = (r.discarded_cost != null && r.discarded_cost !== '') ? Number(r.discarded_cost) : null;
+      if (dDays != null && dDays > 0) return { days: dDays, showDays: true, costText: (dCost != null && isFinite(dCost)) ? dCost.toFixed(2) : '-' };
+      // 老数据无快照：回退按弃用日显示天数（每日成本占位「-」）
+      const since = r.status_since || r.date;
+      return { days: daysBetween(since, null), showDays: true, costText: '-' };
+    }
     const since = r.status_since || r.date;
     const days = daysBetween(since, null);
-    if (key === '已弃用') return { days, showDays: true, costText: '-' };
     const cost = days > 0 ? amount / days : NaN; // 使用中 / 闲置中
     return { days, showDays: true, costText: isFinite(cost) ? cost.toFixed(2) : '-' };
   },
@@ -1897,6 +1899,17 @@ const App = {
     return tags && tags.length
       ? tags.map(t => '<span class="wtag" title="' + esc(t) + '">' + this.tagEmoHTML(t) + esc(goodsTagShort(t)) + '</span>').join('')
       : '<span class="wtag none">未贴标签</span>';
+  },
+  /* 卡片 meta 区 HTML（购买日期 + 已陪伴 + 每日成本；状态切换后局部刷新共用） */
+  wishMetaHTML(r) {
+    const dc = this.wishDaysCost(r);
+    return `
+          <div class="wm-row wm-date"><span class="wm-item"><span class="wm-lab">购买日期</span><span class="wm-val"><b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></span></span></div>
+          <div class="wm-row wm-duo">
+            ${dc.showDays ? '<span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">' + dc.days + '</b><span class="wm-unit">天</span></span></span>' : ''}
+            <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${dc.costText}</b>${dc.costText === '-' ? '' : '<span class="wm-unit">元</span>'}</span></span>
+          </div>
+        `;
   },
   /* 分类导航计数刷新（增删标签后大类/小类 chip 数字同步） */
   updateWishTagCounts() {
@@ -1966,14 +1979,28 @@ const App = {
         const status_since = (label === '已弃用')
           ? (wasDiscarded ? (rec.status_since || todayStr()) : todayStr())
           : todayStr();
-        const ok = await Store.update('records', rid, { status: label, status_since });
+        const patch = { status: label, status_since };
+        if (label === '已弃用' && !wasDiscarded) {
+          // 定格快照：变为已弃用的当天，把当天的已陪伴天数与每日成本存为固定值，此后不再随日期/金额变化
+          const d = daysBetween(rec.status_since || rec.date, null);
+          const c = d > 0 ? (Number(rec.amount) || 0) / d : NaN;
+          patch.discarded_days = d;
+          patch.discarded_cost = isFinite(c) ? Number(c.toFixed(2)) : null;
+        }
+        const ok = await Store.update('records', rid, patch);
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
         rec.status = label;
         rec.status_since = status_since;
+        if (patch.discarded_days !== undefined) { rec.discarded_days = patch.discarded_days; rec.discarded_cost = patch.discarded_cost; }
         this.addSeasonLock(rid); // 手动改状态 → 永久锁定，季节自动切换不再动它
         const st = this.wishStatusOf(rec);
-        const btn = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="status"]');
-        if (btn) { btn.textContent = st.key; btn.className = 'wst st-' + st.cls; }
+        const card = document.querySelector('.wish-card[data-wid="' + rid + '"]');
+        if (card) {
+          const btn = card.querySelector('[data-act="status"]');
+          if (btn) { btn.textContent = st.key; btn.className = 'wst st-' + st.cls; }
+          const meta = card.querySelector('.wish-meta');
+          if (meta) meta.innerHTML = this.wishMetaHTML(rec); // 状态变更后已陪伴/每日成本立即刷新
+        }
         this.closeWishPop();
       };
     });
@@ -3680,6 +3707,10 @@ begin
   execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
+
+  -- 好物已弃用定格快照（弃用当天把已陪伴天数/每日成本冻结存档，此后不再实时计算）
+  execute $ddl$ alter table records add column if not exists discarded_days numeric not null default 0 $ddl$;
+  execute $ddl$ alter table records add column if not exists discarded_cost numeric $ddl$;
 
   -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
   execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
