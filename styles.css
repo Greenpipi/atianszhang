@@ -1037,7 +1037,20 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 
 /* 手机端：周视图横向滚动，月/年视图网格收紧 */
 @media (max-width:860px){
-  .wk-grid{grid-template-columns:repeat(7,minmax(108px,1fr));overflow-x:auto;padding-bottom:6px}
+  /* 两列多一截；滚动条贴卡片底部（去 padding-bottom，负 margin 吃掉卡片底部留白） */
+  .wk-grid{grid-template-columns:repeat(7,minmax(150px,1fr));overflow-x:auto;margin-bottom:-14px}
+  .wk-grid::-webkit-scrollbar{height:4px}
+  .wk-grid::-webkit-scrollbar-track{background:transparent}
+  .wk-grid::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:2px}
+  /* 白色账单卡片字体放大 */
+  .wk-rec{min-height:84px}
+  .wk-rec-cat{font-size:13px}
+  .wk-rec-sub{font-size:12px}
+  .wk-rec-note{font-size:12px}
+  .wk-rec-amt{font-size:14px}
+  /* 笔数角标弱化：浅灰底灰字，数字小一号 */
+  .wk-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#F1F5F9;color:#64748B;font-size:10.5px;font-weight:600}
+  .wk-col.today .wk-col-head .wk-badge{color:#64748B} /* 抵消 today 头部 span 白字规则 */
   .m2-grid{grid-template-columns:repeat(4,1fr)}
   .y2-grid{grid-template-columns:repeat(2,1fr)}
 }
