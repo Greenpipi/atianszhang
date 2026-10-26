@@ -1628,7 +1628,7 @@ const App = {
           <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
         </div>
         <div class="wish-meta">
-          <div class="wm-row">购入日期<b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></div>
+          <div class="wm-row wm-date"><span class="wm-item"><span class="wm-lab">购买日期</span><span class="wm-val"><b class="wm-dim">${r.date}${r.purchase_platform ? ' ' + esc(r.purchase_platform) : ''}</b></span></span></div>
           <div class="wm-row wm-duo">
             <span class="wm-item"><span class="wm-lab">已陪伴</span><span class="wm-val"><b class="wm-badge wm-purple">${days}</b><span class="wm-unit">天</span></span></span>
             <span class="wm-item"><span class="wm-lab">每日</span><span class="wm-val"><b class="wm-badge wm-blue">${isFinite(cost) ? cost.toFixed(2) : '—'}</b><span class="wm-unit">元</span></span></span>
