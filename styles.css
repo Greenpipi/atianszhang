@@ -930,15 +930,16 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wk-col.today{border-color:var(--primary);background:var(--primary-soft)}
 .wk-col.today .wk-col-head{background:var(--primary);border-bottom-color:transparent}
 .wk-col.today .wk-col-head span{color:#fff}
-/* 头部两槽：左=日期｜右=加号（常驻） */
+/* 头部：日期整列居中（加号右侧悬浮，不挤压日期） */
 .wk-col-head{
-  display:grid;grid-template-columns:1fr 26px;align-items:center;
+  position:relative;display:grid;grid-template-columns:1fr;align-items:center;
   padding:7px 6px;border-bottom:1px solid var(--line);background:#fff;
 }
 .wk-head-mid{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
 .wk-wd{font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap}
-.wk-date{font-size:11px;color:var(--muted);white-space:nowrap}
+.wk-date{font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}
 .wk-plus{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
   width:24px;height:24px;border-radius:50%;background:#fff;border:1px solid var(--line);
   color:var(--primary);font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;
   transition:background .12s,border-color .12s;
