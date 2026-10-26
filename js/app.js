@@ -142,6 +142,8 @@ const App = {
     this.initNavToggle();
     // banner 配置与本地迁移检查互相独立，并行发起省一个来回（弱网下登录后内容出现更快）
     await Promise.all([this.initHero(), this.migrateLocalIfNeeded()]);
+    // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
+    this.paintFromCache();
     await this.loadData();
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
@@ -445,6 +447,7 @@ const App = {
       this.state.records = records;
       this.state.budgets = budgets;
       this.state.templates = templates;
+      this._cacheSnapshot();
       if (!this.state.currentLedgerId || !ledgers.find(l => l.id === this.state.currentLedgerId)) {
         const personal = ledgers.filter(l => l.type === 'personal');
         // 优先选挂着分类的个人账本（历史重复账本遗留时，避免选到空账本导致「大类小类无选项」）
@@ -459,6 +462,48 @@ const App = {
     } finally {
       this.state.loading = false;
     }
+  },
+
+  /* ---------- 本地快照缓存（离线优先秒开） ---------- */
+  _cacheKey() {
+    try { return 'fin_cache_' + (Store.user ? (Store.user.email || '') : ''); } catch (e) { return ''; }
+  },
+  _clearCache() {
+    try { const k = this._cacheKey(); if (k) localStorage.removeItem(k); } catch (e) {}
+  },
+  _cacheSnapshot() {
+    try {
+      const key = this._cacheKey();
+      if (!key || Store.mode !== 'supabase' || !Store.user) return;
+      const snap = {
+        ts: Date.now(),
+        ledgers: this.state.ledgers, categories: this.state.categories,
+        records: this.state.records, budgets: this.state.budgets, templates: this.state.templates,
+        currentLedgerId: this.state.currentLedgerId
+      };
+      localStorage.setItem(key, JSON.stringify(snap));
+    } catch (e) { /* 隐私模式/容量超限忽略 */ }
+  },
+  // 用上次成功的快照即时渲染，避免每次刷新都等云端往返；返回是否命中缓存
+  paintFromCache() {
+    try {
+      const key = this._cacheKey();
+      if (!key) return false;
+      const raw = localStorage.getItem(key);
+      if (!raw) return false;
+      const s = JSON.parse(raw);
+      if (!s || !Array.isArray(s.records)) return false;
+      this.state.ledgers = s.ledgers || [];
+      this.state.categories = s.categories || [];
+      this.state.records = s.records || [];
+      this.state.budgets = s.budgets || [];
+      this.state.templates = s.templates || [];
+      const valid = s.currentLedgerId && this.state.ledgers.some(l => l.id === s.currentLedgerId);
+      this.state.currentLedgerId = valid ? s.currentLedgerId : (this.state.ledgers[0] && this.state.ledgers[0].id) || null;
+      this.renderChrome();
+      this.renderView();
+      return true;
+    } catch (e) { return false; }
   },
 
   onDataChange() {
@@ -505,7 +550,7 @@ const App = {
     uc.innerHTML = '<div class="avatar">' + esc(email.slice(0, 1).toUpperCase()) + '</div><span class="mail">' + esc(email) + '</span>';
     uc.title = '点击退出登录';
     uc.style.cursor = 'pointer';
-    uc.onclick = () => this.confirmDialog('退出登录', '确定要退出当前账号吗？').then(ok => { if (ok) Store.signOut(); });
+    uc.onclick = () => this.confirmDialog('退出登录', '确定要退出当前账号吗？').then(ok => { if (ok) { this._clearCache(); Store.signOut(); } });
     // 侧栏底部
     document.getElementById('sidebar-foot').innerHTML =
       (Store.mode === 'supabase' ? '☁ 云端模式 · 实时同步' : '📦 本地模式') + '<br>' + esc(email);
