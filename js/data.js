@@ -159,6 +159,28 @@ function quickShort(label) {
   return QUICK_SHORT[label] || String(label || '').slice(0, 2);
 }
 
+/* 小类名 → 2 字简称（自定义模板没有自定义 label 时用它） */
+const QUICK_SHORT_SUB = {
+  '早餐': '早餐', '外出就餐': '吃喝', '奶茶饮料': '奶茶', '咖啡': '咖啡',
+  '内容消费': '休闲', '日用品': '购物', '医疗健康': '医疗', '租房支出': '租房',
+  '车充电': '车', '猫粮': '猫', '游戏消费': '游戏', '谷子氪金': '谷子',
+  '文创文具': '文创', '数码产品': '数码', '景区景点': '门票', '交通费': '交通',
+  '酒店度假': '酒店'
+};
+
+/* 模板 → 首页快捷按钮短标签：自定义 label 优先，其次小类名映射，最后直接截 2 字 */
+function tplShort(t) {
+  const lab = t.label || '';
+  if (lab) return QUICK_SHORT[lab] || lab.slice(0, 2);
+  const sub = t.sub || '';
+  return QUICK_SHORT_SUB[sub] || QUICK_SHORT[sub] || String(sub || t.category || '').slice(0, 2);
+}
+
+/* 模板 → emoji：模板自带优先，其次按小类/大类关键词推断 */
+function tplEmoji(t) {
+  return t.emoji || subEmoji(t.sub) || catEmoji(t.category) || '💸';
+}
+
 const PALETTE = ['#3B82F6', '#34D399', '#F97316', '#0EA5E9', '#10B981', '#F59E0B', '#6366F1', '#84CC16', '#14B8A6', '#94A3B8'];
 
 /* ---------- 工具 ---------- */
@@ -206,7 +228,8 @@ function fmtShort(n) {
 const CAT_EMOJI_FALLBACK = { '出租屋': '🏠', '综合收入': '💰' };
 /* 关键词 → emoji（按顺序优先匹配，覆盖用户自定义分类/小类名） */
 const EMOJI_RULES = [
-  [/奶茶|咖啡|饮料|饮品/, '🧋'],
+  [/咖啡|拿铁|美式|摩卡|瑞幸|星巴克/, '☕'],
+  [/奶茶|饮料|饮品/, '🧋'],
   [/早餐|早点|包子|豆浆|油条/, '🥪'],
   [/外卖|午饭|晚饭|午餐|晚餐|吃饭|聚餐|餐饮|美食|小吃|吃/, '🍱'],
   [/零食|甜食|甜品|蛋糕/, '🍰'],

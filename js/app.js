@@ -645,7 +645,7 @@ const App = {
       <div class="tpl-section">
         <div class="tpl-label">${esc(g)}</div>
         <div class="tpl-chips">
-          ${groups[g].map(({ t, i }) => '<button type="button" class="chip accent" data-tpl="' + i + '">⚡ ' + esc(t.label || (t.category + ' · ' + t.sub)) + '</button>').join('')}
+          ${groups[g].map(({ t, i }) => '<button type="button" class="chip accent" data-tpl="' + i + '">' + tplEmoji(t) + ' ' + esc(t.label || (t.category + ' · ' + t.sub)) + '</button>').join('')}
         </div>
       </div>`).join('');
   },
@@ -841,16 +841,17 @@ const App = {
     const searchFocused = document.activeElement && document.activeElement.id === 'search-input';
     const s = this.monthSummary(lid, thisMonth());
 
-    // 快捷记账：日历上方横排一行（最近使用的排最前，其余保持默认板块顺序）
+    // 快捷记账：日历上方横排一行，按钮直接取自本账本的「快捷模板」（设置页增删即时生效）；
+    // 最近使用的排最前，其余保持模板顺序。该账本没有模板时整条隐藏。
     const mru = this.quickMru();
-    const qTpls = [...(DEFAULT_TEMPLATES || [])].sort((a, b) => {
+    const qTpls = this.state.templates.filter(t => t.ledger_id === lid).slice().sort((a, b) => {
       const ia = mru.indexOf(a.category + '||' + a.sub), ib = mru.indexOf(b.category + '||' + b.sub);
       return (ia >= 0 ? ia : 9999) - (ib >= 0 ? ib : 9999);
     });
     const quickHTML = qTpls.map(t => `
           <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
-            <span class="qemoji">${t.emoji || '•'}</span>
-            <span class="qlabel">${esc(quickShort(t.label))}</span>
+            <span class="qemoji">${tplEmoji(t)}</span>
+            <span class="qlabel">${esc(tplShort(t))}</span>
           </button>`).join('');
 
     const listRecs = showList ? this.filteredRecs() : [];
@@ -860,11 +861,11 @@ const App = {
         <div class="hs-item"><span>本月收入</span><b class="income">${fmtMoney(s.income)}</b></div>
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
-      <div class="qwrap" id="qwrap">
+      ${qTpls.length ? `<div class="qwrap" id="qwrap">
         <button type="button" class="qnav qnav-l" id="qnav-l" aria-label="上一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
         <div class="qbar" id="qbar">${quickHTML}</div>
         <button type="button" class="qnav qnav-r" id="qnav-r" aria-label="下一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>
+      </div>` : ''}
       <div class="home-view-bar">
         <div class="seg">
           <button data-lm="calendar" class="${showList ? '' : 'on'}">日历</button>
@@ -2540,7 +2541,7 @@ const App = {
       </div>
 
       <div class="card">
-        <div class="card-head"><div><div class="card-title">快捷模板</div><div class="card-sub">记账面板底部的一键模板</div></div></div>
+        <div class="card-head"><div><div class="card-title">快捷模板</div><div class="card-sub">首页快捷按钮</div></div></div>
         <div id="tpl-mgr"></div>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <select id="tpl-cat" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
@@ -2752,12 +2753,44 @@ const App = {
     renderCatMgr();
 
     /* --- 模板管理 --- */
+    const editTpl = t => {
+      const m = this.openModal(`
+        <div class="modal-title">编辑快捷模板<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+        <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 12px">${esc(t.category)} · ${esc(t.sub)}</p>
+        <div class="field"><label>简称（首页快捷按钮显示）</label><input id="tpl-lab" type="text" maxlength="4" value="${esc(t.label || tplShort(t))}" placeholder="如：咖啡"></div>
+        <div class="field"><label>emoji</label><input id="tpl-emo" type="text" maxlength="4" value="${esc(t.emoji || tplEmoji(t))}" placeholder="☕"></div>
+        <div class="modal-acts">
+          <button class="btn btn-ghost" data-close>取消</button>
+          <button class="btn btn-primary" data-save>保存</button>
+        </div>`);
+      const lab = m.querySelector('#tpl-lab'), emo = m.querySelector('#tpl-emo');
+      lab.focus(); lab.select();
+      m.querySelector('[data-save]').onclick = async () => {
+        const label = lab.value.trim(), emoji = emo.value.trim();
+        this.closeModal();
+        await Store.update('templates', t.id, { label, emoji });
+        this.toast('模板已更新', 'ok');
+        await this.loadData();
+        renderTplMgr();
+      };
+    };
     const renderTplMgr = () => {
       const lid = ledgerSel.value;
       const tpls = this.state.templates.filter(t => t.ledger_id === lid);
       el.querySelector('#tpl-mgr').innerHTML = tpls.length ? tpls.map(t =>
-        '<span class="chip purple" style="cursor:default">⚡ ' + esc(t.category) + ' · ' + esc(t.sub) + ' <button data-deltpl="' + t.id + '" style="color:var(--danger);font-weight:800">×</button></span>'
+        '<span class="chip purple" style="cursor:pointer" data-tplchip="' + t.id + '" title="点击改简称 / emoji">' +
+          tplEmoji(t) + ' ' + esc(t.category) + ' · ' + esc(t.sub) +
+          (t.label ? ' <span style="opacity:.7">（' + esc(t.label) + '）</span>' : '') +
+          ' <button data-deltpl="' + t.id + '" style="color:var(--danger);font-weight:800">×</button>' +
+        '</span>'
       ).join('') : '<span style="font-size:12.5px;color:var(--muted)">暂无模板</span>';
+      el.querySelectorAll('[data-tplchip]').forEach(c => {
+        c.onclick = e => {
+          if (e.target.closest('[data-deltpl]')) return;
+          const t = this.state.templates.find(x => x.id === c.dataset.tplchip);
+          if (t) editTpl(t);
+        };
+      });
       el.querySelectorAll('[data-deltpl]').forEach(b => {
         b.onclick = async () => {
           await Store.remove('templates', b.dataset.deltpl);
