@@ -666,7 +666,7 @@ const App = {
         </div>
         <div class="field f-date">
           <label>日期</label>
-          <input id="en-date" class="cal-input" readonly placeholder="选择日期" value="${todayStr()}" data-date="${todayStr()}">
+          <input id="en-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${todayStr()}" data-date="${todayStr()}">
         </div>
         <div class="field f-note">
           <label>备注</label>
@@ -1351,9 +1351,9 @@ const App = {
       <div class="fp-sec">
         <div class="fp-title">日期范围</div>
         <div class="fp-dates">
-          <input type="text" class="cal-input" readonly placeholder="开始日期" data-f="from" data-cal-mode="day" value="${esc(s.from)}">
+          <input type="text" class="cal-input" readonly placeholder="开始日期" data-f="from" data-cal-mode="day" data-date="${esc(s.from)}" value="${esc(s.from)}">
           <span>至</span>
-          <input type="text" class="cal-input" readonly placeholder="结束日期" data-f="to" data-cal-mode="day" value="${esc(s.to)}">
+          <input type="text" class="cal-input" readonly placeholder="结束日期" data-f="to" data-cal-mode="day" data-date="${esc(s.to)}" value="${esc(s.to)}">
         </div>
       </div>
       <div class="fp-foot">
@@ -1377,6 +1377,10 @@ const App = {
       this.state.list.page = 1;
       this.refreshResults();
     });
+    // 日期范围：自定义日历
+    pop.querySelectorAll('[data-cal-mode="day"]').forEach(inp => {
+      inp.onclick = () => this.openCalendar(inp, 'day');
+    });
     pop.querySelector('[data-freset]').onclick = () => {
       s.cats = []; s.ledgers = []; s.from = ''; s.to = '';
       this.state.list.page = 1;
@@ -1386,6 +1390,8 @@ const App = {
     const cnt = document.getElementById('fp-count');
     if (cnt) cnt.textContent = '命中 ' + this.filteredRecs().length + ' 条';
     this._fpOut = e => {
+      const cp = document.getElementById('cal-pop');
+      if (cp && cp.contains(e.target)) return; // 日历浮层内点击不关闭筛选
       if (!pop.contains(e.target) && e.target !== btn && !btn.contains(e.target)) this.closeFilterPop();
     };
     this._fpKey = e => { if (e.key === 'Escape') this.closeFilterPop(); };
@@ -2251,8 +2257,14 @@ const App = {
     el.querySelector('#st-scope').onchange = e => { st.scope = e.target.value; this.renderStats(); };
     el.querySelector('#st-period').onchange = e => { st.period = e.target.value; this.renderStats(); };
     const mi = el.querySelector('#st-month'), yi = el.querySelector('#st-year');
-    if (mi) mi.onchange = e => { st.month = e.target.value || st.month; this.renderStats(); };
-    if (yi) yi.onchange = e => { st.year = String(Math.max(2000, Math.min(2100, Number(e.target.value) || nowYear))); this.renderStats(); };
+    if (mi) {
+      mi.onclick = () => this.openCalendar(mi, 'month');
+      mi.onchange = e => { st.month = e.target.value || st.month; this.renderStats(); };
+    }
+    if (yi) {
+      yi.onclick = () => this.openCalendar(yi, 'year');
+      yi.onchange = e => { st.year = String(Math.max(2000, Math.min(2100, Number(e.target.value) || nowYear))); this.renderStats(); };
+    }
     el.querySelector('#st-cat').onchange = e => { st.cat = e.target.value; this.renderStats(); };
     el.querySelector('#st-pie').onchange = e => { st.pie = e.target.value; this.renderStats(); };
 
@@ -2310,7 +2322,7 @@ const App = {
         <div class="field-row">
           <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
           <div class="field"><label>小类</label><select id="ad-sub"></select></div>
-          <div class="field"><label>日期</label><input id="ad-date" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
+          <div class="field"><label>日期</label><input id="ad-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
         </div>
         <div class="field"><label>金额（元）</label><input id="ad-amt" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
@@ -3171,7 +3183,7 @@ const App = {
       <div class="field-row">
         <div class="field"><label>大类</label><select id="ed-cat">${cats.map(c => '<option value="' + esc(c.name) + '" ' + (c.name === r.category ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
         <div class="field"><label>小类</label><select id="ed-sub"></select></div>
-        <div class="field"><label>日期</label><input id="ed-date" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
+        <div class="field"><label>日期</label><input id="ed-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
       </div>
       <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" min="0" step="0.01" value="${(Number(r.amount) || 0).toFixed(2)}"></div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
