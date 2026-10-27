@@ -122,7 +122,8 @@ const WISH_STATUS_LIST = [
   { key: '使用中', cls: 'using' },
   { key: '闲置中', cls: 'idle' },
   { key: '未使用', cls: 'unused' },
-  { key: '已弃用', cls: 'dropped' }
+  { key: '已弃用', cls: 'dropped' },
+  { key: '已磬用', cls: 'depleted' }
 ];
 
 /* ---------- 好物仓库：季节自动切换 ----------

@@ -1,6 +1,6 @@
 /* ============ 应用主逻辑 ============ */
-/* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用（已弃用始终最后） */
-const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3 };
+/* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用 → 已磬用（已弃用/已磬用 始终最后） */
+const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3, '已磬用': 4 };
 const App = {
   state: {
     route: 'ledger',
@@ -1867,27 +1867,63 @@ const App = {
       updates.push({ r, target });
     }
     for (const { r, target } of updates) {
-      const ok = await Store.update('records', r.id, { status: target, status_since: todayStr() });
-      if (ok !== false) { r.status = target; r.status_since = todayStr(); }
+      // 仅在 使用中↔闲置中 间切换状态，保留原 status_since（已陪伴天数不清零、不跳变）
+      const ok = await Store.update('records', r.id, { status: target });
+      if (ok !== false) { r.status = target; }
     }
     if (updates.length && this.state.route === 'wishlist') this.renderWishlist();
     return updates.length;
   },
+  /* 一键修复好物数据：
+   *  - 在用的好物（使用中/闲置中）：清空被误写的 status_since，使其按购入日重新起算已陪伴天数（修复显示 1 天等问题）
+   *  - 已弃用/已磬用：若无定格快照则按当前天数与每日成本补一份（需已执行建表 SQL 才有 discarded 列） */
+  async repairWishData() {
+    const ACTIVE = ['使用中', '闲置中'], FROZEN = ['已弃用', '已磬用'];
+    const todo = [];
+    for (const r of this.state.records) {
+      if (!r.favorite) continue;
+      const k = this.wishStatusOf(r).key;
+      if (ACTIVE.includes(k)) {
+        if (r.status_since) todo.push({ id: r.id, patch: { status_since: '' } });
+      } else if (FROZEN.includes(k)) {
+        if (!(Number(r.discarded_days) > 0)) {
+          const d = daysBetween(r.status_since || r.date, null);
+          const c = d > 0 ? (Number(r.amount) || 0) / d : NaN;
+          todo.push({ id: r.id, patch: { discarded_days: d, discarded_cost: isFinite(c) ? Number(c.toFixed(2)) : null, status_since: r.status_since || todayStr() } });
+        }
+      }
+    }
+    let n = 0;
+    for (const u of todo) {
+      const ok = await Store.update('records', u.id, u.patch);
+      if (ok !== false) {
+        const rec = this.state.records.find(x => x.id === u.id);
+        if (rec) Object.assign(rec, u.patch);
+        n++;
+      }
+    }
+    return n;
+  },
   /* 已陪伴天数 + 每日成本（按当前状态计算）：
    *  使用中/闲置中：从状态改变日(status_since)起算，每日成本 = 金额/天数，实时累计
    *  未使用：不显示已陪伴，每日成本占位「-」
-   *  已弃用：显示弃用当天定格的快照（discarded_days / discarded_cost），不再随日期或金额变化 */
+   *  已弃用/已磬用：显示定格快照（discarded_days / discarded_cost）的 天数 + 每日成本，数字永久冻结不再变动 */
   wishDaysCost(r) {
     const key = this.wishStatusOf(r).key;
     const amount = Number(r.amount) || 0;
     if (key === '未使用') return { days: 0, showDays: false, costText: '-' };
-    if (key === '已弃用') {
-      const dDays = (r.discarded_days != null && r.discarded_days !== '') ? Number(r.discarded_days) : null;
+    if (key === '已弃用' || key === '已磬用') {
+      const dDays = (r.discarded_days != null && r.discarded_days !== '' && Number(r.discarded_days) > 0) ? Number(r.discarded_days) : null;
       const dCost = (r.discarded_cost != null && r.discarded_cost !== '') ? Number(r.discarded_cost) : null;
-      if (dDays != null && dDays > 0) return { days: dDays, showDays: true, costText: (dCost != null && isFinite(dCost)) ? dCost.toFixed(2) : '-' };
-      // 老数据无快照：回退按弃用日显示天数（每日成本占位「-」）
+      if (dDays != null) {
+        const costText = (dCost != null && isFinite(dCost)) ? dCost.toFixed(2) : (dDays > 0 ? (amount / dDays).toFixed(2) : '-');
+        return { days: dDays, showDays: true, costText };
+      }
+      // 老数据无快照：回退按冻结日显示天数 + 估算成本（补列并重新定格后才会真正冻结）
       const since = r.status_since || r.date;
-      return { days: daysBetween(since, null), showDays: true, costText: '-' };
+      const days = daysBetween(since, null);
+      const cost = days > 0 ? amount / days : NaN;
+      return { days, showDays: true, costText: isFinite(cost) ? cost.toFixed(2) : '-' };
     }
     const since = r.status_since || r.date;
     const days = daysBetween(since, null);
@@ -1974,18 +2010,30 @@ const App = {
       b.onclick = async () => {
         const label = b.dataset.st;
         if (Store.missingCol('records', 'status')) { this.toast('请先到设置页补一次建表 SQL（补 status 列）'); return; }
-        const wasDiscarded = rec.status === '已弃用';
-        // 每次状态变更都记录变更日：使用中/闲置中/未使用 → 今天；已弃用 → 首次弃用记今天，之后沿用原弃用日
-        const status_since = (label === '已弃用')
-          ? (wasDiscarded ? (rec.status_since || todayStr()) : todayStr())
-          : todayStr();
-        const patch = { status: label, status_since };
-        if (label === '已弃用' && !wasDiscarded) {
-          // 定格快照：变为已弃用的当天，把当天的已陪伴天数与每日成本存为固定值，此后不再随日期/金额变化
-          const d = daysBetween(rec.status_since || rec.date, null);
-          const c = d > 0 ? (Number(rec.amount) || 0) / d : NaN;
-          patch.discarded_days = d;
-          patch.discarded_cost = isFinite(c) ? Number(c.toFixed(2)) : null;
+        const ACTIVE = ['使用中', '闲置中'], FROZEN = ['已弃用', '已磬用'];
+        const curKey = rec.status;
+        const wasActive = ACTIVE.includes(curKey);
+        const wasFrozen = FROZEN.includes(curKey);
+        let status_since = rec.status_since;
+        const patch = { status: label };
+        if (ACTIVE.includes(label)) {
+          // 使用中↔闲置中 互切：沿用原 status_since（天数连续不清零）；从 未使用/已弃用/已磬用 转入则今天重新起算
+          if (!wasActive) status_since = todayStr();
+          patch.status_since = status_since || '';
+        } else if (label === '未使用') {
+          status_since = '';
+          patch.status_since = ''; // 未使用：清空已陪伴天数、每日成本占位「-」
+        } else if (FROZEN.includes(label)) {
+          // 已弃用 / 已磬用：定格快照，规则与已弃用完全一致（天数+每日成本冻结存档，不再变动）
+          if (!wasFrozen) {
+            const d = daysBetween(rec.status_since || rec.date, null);
+            const c = d > 0 ? (Number(rec.amount) || 0) / d : NaN;
+            patch.discarded_days = d;
+            patch.discarded_cost = isFinite(c) ? Number(c.toFixed(2)) : null;
+            if (Store.missingCol('records', 'discarded_cost')) this.toast('定格快照需补列：设置页「复制 SQL」执行一次即可', 'err');
+          }
+          status_since = wasFrozen ? (rec.status_since || todayStr()) : todayStr();
+          patch.status_since = status_since;
         }
         const ok = await Store.update('records', rid, patch);
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
@@ -2700,11 +2748,19 @@ const App = {
         <div class="card-head"><div><div class="card-title">季节自动切换</div><div class="card-sub">衣裤鞋袜类好物按季节自动切换使用状态</div></div>
           <span class="badge badge-green" id="season-now">当前：夏季</span>
         </div>
-        <p class="season-note">系统按当前月份判断季节，自动把「衣裤鞋袜」类、且打了对应季节标签（夏季 / 冬季 / 春秋季）的好物设为<b class="u-using">使用中</b>，其余季节的设为<b class="u-idle">闲置中</b>。仅在「使用中 ↔ 闲置中」之间切换；<b class="u-unused">未使用</b> 与 <b class="u-dropped">已弃用</b> 不受影响。手动改过状态的单件好物，自动切换不再动它。</p>
+        <p class="season-note">系统按当前月份判断季节，自动把「衣裤鞋袜」类、且打了对应季节标签（夏季 / 冬季 / 春秋季）的好物设为<b class="u-using">使用中</b>，其余季节的设为<b class="u-idle">闲置中</b>。仅在「使用中 ↔ 闲置中」之间切换；<b class="u-unused">未使用</b> 与 <b class="u-dropped">已弃用</b>/<b class="u-depleted">已磬用</b> 不受影响。手动改过状态的单件好物，自动切换不再动它。</p>
         <div class="season-grid" id="season-grid"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
           <button class="btn btn-primary" id="season-save">保存季节配置</button>
           <button class="btn btn-ghost" id="season-apply">立即应用切换</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">数据修复</div><div class="card-sub">修正已陪伴天数 / 补定格快照</div></div></div>
+        <p class="season-note">若好物「已陪伴天数」被误清零（如显示 1 天），点此一键把在用的好物按<b>购入日</b>重新起算天数；并把「已弃用 / 已磬用」的好物补上定格快照（需已执行建表 SQL）。</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-primary" id="repair-data">修复已陪伴天数与定格快照</button>
         </div>
       </div>`;
 
@@ -2870,6 +2926,13 @@ const App = {
         if (applyBtn) applyBtn.onclick = async () => {
           const n = await this.applySeasonStatus();
           this.toast(n ? ('已切换 ' + n + ' 件好物状态') : '没有需要切换的好物', n ? 'ok' : '');
+        };
+        const repairBtn = el.querySelector('#repair-data');
+        if (repairBtn) repairBtn.onclick = async () => {
+          const n = await this.repairWishData();
+          if (n) await this.loadData();
+          if (this.state.route === 'wishlist') this.renderWishlist();
+          this.toast(n ? ('已修复 ' + n + ' 件好物数据') : '没有需要修复的数据', n ? 'ok' : '');
         };
       }
     }

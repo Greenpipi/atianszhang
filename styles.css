@@ -522,6 +522,7 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wst.st-idle{color:#C2410C;background:#FFF7ED;border-color:#FED7AA}
 .wst.st-unused{color:#0F172A;background:#F1F5F9;border-color:#CBD5E1}
 .wst.st-dropped{color:#94A3B8;background:#F8FAFC;border-color:#E2E8F0}
+.wst.st-depleted{color:#7C3AED;background:#F5F3FF;border-color:#DDD6FE}
 /* 大图查看：左右切换 + 计数 + 点背景/Esc 关闭 */
 .wish-light{position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:300;display:flex;align-items:center;justify-content:center}
 .wish-light img{max-width:86vw;max-height:82vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.4)}
@@ -547,6 +548,7 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .wp-st.st-idle{color:#C2410C}.wp-st.st-idle i{background:#F97316}
 .wp-st.st-unused{color:#0F172A}.wp-st.st-unused i{background:#0F172A}
 .wp-st.st-dropped{color:#94A3B8}.wp-st.st-dropped i{background:#94A3B8}
+.wp-st.st-depleted{color:#7C3AED}.wp-st.st-depleted i{background:#7C3AED}
 
 /* 季节自动切换配置卡片 */
 .season-note{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.7}
@@ -555,6 +557,7 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .u-idle{color:#C2410C}
 .u-unused{color:#0F172A}
 .u-dropped{color:#94A3B8}
+.u-depleted{color:#7C3AED}
 .season-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:4px}
 .season-cell{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 4px;background:#F7F8FB;border:1px solid var(--line);border-radius:10px}
 .sc-m{font-size:12px;font-weight:700;color:var(--muted)}
