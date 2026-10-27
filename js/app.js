@@ -17,6 +17,7 @@ const App = {
     search: { q: '', cats: [], ledgers: [], from: '', to: '' },
     list: { sortKey: 'date', sortDir: 'desc', page: 1 },
     rentalMonth: thisMonth(),
+    rentalScope: 'month',   // 出租屋统计范围：month 本月 / year 本年 / all 总计
     stats: { period: 'month', month: thisMonth(), year: String(new Date().getFullYear()), scope: 'ledger', cat: '日常支出', pie: 'expense' },
     settingsLedgerType: 'personal',
     rating: 0,
@@ -795,11 +796,16 @@ const App = {
   },
 
   /* ---------- 记录列表 ---------- */
-  recordsListHTML(ledgerId, month, onlyRental) {
+  recordsListHTML(ledgerId, month, onlyRental, scope) {
+    const sc = scope || 'month';
+    const curYear = String(new Date().getFullYear());
     const recs = this.recsOf(ledgerId)
-      .filter(r => monthOf(r.date) === month && (!onlyRental || r.rental))
+      .filter(r => (onlyRental ? r.rental : true)
+        && (sc === 'all' ? true
+          : sc === 'year' ? String(r.date || '').slice(0, 4) === curYear
+          : monthOf(r.date) === month))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created_at < b.created_at ? 1 : -1)));
-    if (!recs.length) return '<div class="empty"><p>' + (onlyRental ? '本月还没有出租屋支出' : '本月还没有记录，记一笔吧') + '</p></div>';
+    if (!recs.length) return '<div class="empty"><p>' + (onlyRental ? (sc === 'month' ? '本月还没有出租屋支出' : sc === 'year' ? '本年还没有出租屋支出' : '还没有出租屋支出') : '本月还没有记录，记一笔吧') + '</p></div>';
     const days = {};
     recs.forEach(r => { (days[r.date] = days[r.date] || []).push(r); });
     return Object.keys(days).sort().reverse().map(d => {
@@ -2466,10 +2472,30 @@ const App = {
   renderRental() {
     const el = document.getElementById('view-rental');
     const lid = this.state.currentLedgerId;
+    const scope = this.state.rentalScope || 'month';   // month 本月 / year 本年 / all 总计
     const month = this.state.rentalMonth;
+    const curMonth = thisMonth();
+    const curYear = String(new Date().getFullYear());
     const rentalRecs = this.recsOf(lid).filter(r => r.rental);
+
+    // 统计范围筛选：本月（可翻月）/ 本年累计 / 全部历史累计
+    const scopeRecs = scope === 'all' ? rentalRecs
+      : scope === 'year' ? rentalRecs.filter(r => String(r.date || '').slice(0, 4) === curYear)
+      : rentalRecs.filter(r => monthOf(r.date) === month);
+    // 固定费用始终按所选月份（不随统计范围变化）
     const monthRecs = rentalRecs.filter(r => monthOf(r.date) === month);
-    const expense = monthRecs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+
+    // 收入 / 支出 / 结余（按范围）
+    let income = 0, expense = 0;
+    scopeRecs.forEach(r => {
+      const kind = r.kind || this.kindOf(lid, r.category);
+      if (kind === 'income') income += Number(r.amount) || 0; else expense += Number(r.amount) || 0;
+    });
+    const balance = income - expense;
+    const scopeName = scope === 'all' ? '总计' : scope === 'year' ? '本年' : '本月';
+    const scopeDesc = scope === 'all' ? '全部历史累计'
+      : scope === 'year' ? (curYear + ' 年累计')
+      : (month.replace('-', ' 年 ') + ' 月');
 
     // 固定费用月金额（挂在「出租屋」大类下）
     const fixedBudget = name => {
@@ -2490,9 +2516,9 @@ const App = {
       </div>`;
     }).join('');
 
-    // 分类统计（按小类）
+    // 分类统计（按小类，范围口径）
     const bySub = {};
-    monthRecs.forEach(r => {
+    scopeRecs.forEach(r => {
       const k = r.sub || '其他';
       bySub[k] = bySub[k] || { amount: 0, count: 0 };
       bySub[k].amount += Number(r.amount) || 0;
@@ -2505,25 +2531,41 @@ const App = {
       color: (RENTAL_META[k] || {}).color || PALETTE[i % PALETTE.length]
     }));
 
-    // 近 6 个月趋势
+    // 趋势：总计=历史按月（本年=12 个月，本月=近 6 个月）
     const trendLabels = [], trendData = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(month.slice(0, 4), Number(month.slice(5, 7)) - 1 - i, 1);
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      trendLabels.push((d.getMonth() + 1) + ' 月');
-      trendData.push(rentalRecs.filter(r => monthOf(r.date) === key).reduce((s, r) => s + (Number(r.amount) || 0), 0));
+    const sumMonth = key => rentalRecs.filter(r => monthOf(r.date) === key).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    if (scope === 'all') {
+      const months = [...new Set(rentalRecs.map(r => monthOf(r.date)).filter(Boolean))].sort().slice(-24);
+      months.forEach(k => { trendLabels.push(k.slice(5).replace('-', ' 月')); trendData.push(sumMonth(k)); });
+    } else if (scope === 'year') {
+      for (let m = 1; m <= 12; m++) {
+        trendLabels.push(m + ' 月');
+        trendData.push(sumMonth(curYear + '-' + String(m).padStart(2, '0')));
+      }
+    } else {
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(month.slice(0, 4), Number(month.slice(5, 7)) - 1 - i, 1);
+        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        trendLabels.push((d.getMonth() + 1) + ' 月');
+        trendData.push(sumMonth(key));
+      }
     }
+    const trendTitle = scope === 'all' ? '历史支出趋势' : scope === 'year' ? '本年支出趋势' : '近 6 个月趋势';
 
     el.innerHTML = `
       <div class="rental-head">
-        <div>
-          <div class="card-title">出租屋</div>
+        <div class="scope-seg" id="rental-scope">
+          <button type="button" data-scope="month" class="${scope === 'month' ? 'on' : ''}">本月</button>
+          <button type="button" data-scope="year" class="${scope === 'year' ? 'on' : ''}">本年</button>
+          <button type="button" data-scope="all" class="${scope === 'all' ? 'on' : ''}">总计</button>
         </div>
         <button class="btn btn-accent" id="rental-add">＋ 记一笔出租屋支出</button>
       </div>
-      <div class="grid grid-3" style="margin-bottom:20px">
-        <div class="stat-card"><div class="stat-label">本月出租屋支出</div><div class="stat-value expense">${fmtMoney(expense)}</div><div class="stat-foot">${month.replace('-', ' 年 ')} 月 · ${monthRecs.length} 笔</div></div>
-        <div class="stat-card"><div class="stat-label">记录总数</div><div class="stat-value">${rentalRecs.length}</div><div class="stat-foot">全部标记为出租屋的支出</div></div>
+      <div class="grid grid-5" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">${scopeName}收入</div><div class="stat-value income">${fmtMoney(income)}</div><div class="stat-foot">${scopeDesc}</div></div>
+        <div class="stat-card"><div class="stat-label">${scopeName}支出</div><div class="stat-value expense">${fmtMoney(expense)}</div><div class="stat-foot">${scopeDesc} · ${scopeRecs.length} 笔</div></div>
+        <div class="stat-card"><div class="stat-label">结余</div><div class="stat-value" style="color:${balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(balance)}</div><div class="stat-foot">收入 − 支出</div></div>
+        <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${scopeRecs.length}</div><div class="stat-foot">${scopeName}出租屋记录</div></div>
         <div class="stat-card"><div class="stat-label">月度固定费用合计</div><div class="stat-value" style="color:var(--accent-deep)">${fmtMoney(fixedTotal)}</div><div class="stat-foot">${RENTAL_FIXED.join(' / ')}</div></div>
       </div>
 
@@ -2537,7 +2579,7 @@ const App = {
 
       <div class="card">
         <div class="card-head">
-          <div><div class="card-title">分类统计</div><div class="card-sub">${month.replace('-', ' 年 ')} 月各分类占比</div></div>
+          <div><div class="card-title">分类统计</div><div class="card-sub">${scopeDesc}各分类占比</div></div>
         </div>
         ${subRows.length ? `
           <div class="rental-stat-grid">
@@ -2553,18 +2595,18 @@ const App = {
               }).join('')}
             </div>
           </div>
-        ` : '<div class="empty"><p>本月暂无出租屋支出</p></div>'}
+        ` : `<div class="empty"><p>${scopeName}暂无出租屋支出</p></div>`}
       </div>
 
       <div class="card">
-        <div class="card-head"><div><div class="card-title">近 6 个月趋势</div><div class="card-sub">出租屋月度支出</div></div></div>
+        <div class="card-head"><div><div class="card-title">${trendTitle}</div><div class="card-sub">出租屋月度支出</div></div></div>
         <div class="chart-box"><canvas id="rental-line" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-head">
           <div class="card-title">出租屋明细</div>
-          ${this.monthSwitcherHTML('rentalMonth', month)}
+          ${scope === 'month' ? this.monthSwitcherHTML('rentalMonth', month) : `<span style="font-size:12.5px;color:var(--muted)">${scope === 'year' ? curYear + ' 年全部记录' : '全部历史记录'}</span>`}
         </div>
         <div id="rental-recs"></div>
       </div>`;
@@ -2612,14 +2654,28 @@ const App = {
       this.addRecordModal(lid, isCur ? todayStr() : month + '-01', RENTAL_CAT, null, true);
     };
 
+    // 统计范围切换：本月 / 本年 / 总计
+    el.querySelectorAll('#rental-scope [data-scope]').forEach(b => {
+      b.onclick = () => {
+        const v = b.dataset.scope;
+        if (this.state.rentalScope === v) return;
+        this.state.rentalScope = v;
+        // 切到「本年/总计」时回到当月，保证「记一笔 / 一键生成本月记录」始终是当月语义
+        if (v !== 'month') this.state.rentalMonth = thisMonth();
+        this.renderRental();
+      };
+    });
+
     const recs = el.querySelector('#rental-recs');
-    recs.innerHTML = this.recordsListHTML(lid, month, true);
+    recs.innerHTML = this.recordsListHTML(lid, month, true, scope);
     this.bindRecordsList(recs, lid);
-    const sw = recs.closest('.card').querySelector('.card-head');
-    this.bindMonthSwitcher(sw, 'rentalMonth', () => this.renderRental());
+    if (scope === 'month') {
+      const sw = recs.closest('.card').querySelector('.card-head');
+      this.bindMonthSwitcher(sw, 'rentalMonth', () => this.renderRental());
+    }
     this.enhanceSelects(el);
 
-    if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, '本月合计');
+    if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, scopeName + '合计');
     Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#3B82F6', data: trendData }]);
   },
 
