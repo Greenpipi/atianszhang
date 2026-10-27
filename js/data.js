@@ -8,6 +8,9 @@ const DEFAULT_CFG = {
 /* 背景头图默认插画：奶油底 + 满铺柳枝浆果纹样（Morris 风格，参考 Notion 植物封面） */
 const HERO_DEFAULT_BG = 'assets/hero-default.jpg';
 
+/* 各页面路由：每页拥有各自独立的背景头图（图 + 位置分别独立保存） */
+const HERO_PAGES = ['ledger', 'wishlist', 'stats', 'rental', 'budget', 'settings'];
+
 const LEDGER_PERSONAL = '个人记账本';
 
 const DEFAULT_LEDGERS = [

@@ -257,17 +257,28 @@ const App = {
     };
   },
 
-  /* ---------- 背景头图 ---------- */
+  /* ---------- 每页独立背景头图 ---------- */
   async initHero() {
     const hero = document.getElementById('page-hero');
     if (!hero || this._heroBound) return;
     this._heroBound = true;
-    this.hero = { img: '', x: 50, y: 50 };
-    const s = await Store.getBanner();
-    if (s && typeof s === 'object') {
-      this.hero.img = typeof s.img === 'string' ? s.img : '';
-      this.hero.x = Math.max(0, Math.min(100, Number(s.x) || 50));
-      this.hero.y = Math.max(0, Math.min(100, Number(s.y) || 50));
+    this.heroAdjusting = false;
+    // 载入每页配置（map：page -> {img,x,y}），并补齐所有页面默认项
+    let map = null;
+    try { map = await Store.getHeroMap(); } catch (e) { map = null; }
+    this.heroes = {};
+    HERO_PAGES.forEach(p => { this.heroes[p] = { img: '', x: 50, y: 50 }; });
+    if (map && typeof map === 'object') {
+      HERO_PAGES.forEach(p => {
+        const h = map[p];
+        if (h && typeof h === 'object') {
+          this.heroes[p] = {
+            img: typeof h.img === 'string' ? h.img : '',
+            x: Math.max(0, Math.min(100, Number(h.x) || 50)),
+            y: Math.max(0, Math.min(100, Number(h.y) || 50))
+          };
+        }
+      });
     }
     this.applyHero();
 
@@ -276,21 +287,24 @@ const App = {
     const btnReset = document.getElementById('hero-reset');
     const btnAdjust = document.getElementById('hero-adjust');
     const hint = document.getElementById('hero-hint');
+    const pageKey = () => (this.state && this.state.route) || 'ledger';
 
     btnChange.onclick = () => file.click();
     file.onchange = async () => {
       const f = file.files && file.files[0];
       if (!f) return;
       try {
-        this.hero.img = await compressImage(f, 1600, 0.82);
-        this.hero.x = 50; this.hero.y = 50;
+        const ph = this.heroes[pageKey()];
+        ph.img = await compressImage(f, 1600, 0.82);
+        ph.x = 50; ph.y = 50;
         this.saveHero(); this.applyHero();
         this.toast('背景已更换', 'ok');
       } catch (e) { this.toast(e.message || '图片读取失败', 'err'); }
       file.value = '';
     };
     btnReset.onclick = () => {
-      this.hero.img = ''; this.hero.x = 50; this.hero.y = 50;
+      const ph = this.heroes[pageKey()];
+      ph.img = ''; ph.x = 50; ph.y = 50;
       this.saveHero(); this.applyHero();
       this.toast('已恢复默认背景', 'ok');
     };
@@ -301,20 +315,22 @@ const App = {
       btnAdjust.textContent = this.heroAdjusting ? '保存位置' : '调整位置';
       if (!this.heroAdjusting) { this.saveHero(); this.toast('位置已保存', 'ok'); }
     };
-    // 拖动调整（鼠标 + 触摸统一走 pointer 事件）
+    // 拖动调整（鼠标 + 触摸统一走 pointer 事件），仅作用于当前页
     let drag = null;
     hero.addEventListener('pointerdown', e => {
       if (!this.heroAdjusting) return;
       if (e.target.closest('.hero-tools')) return; // 工具按钮不触发拖动
-      drag = { sx: e.clientX, sy: e.clientY, x: this.hero.x, y: this.hero.y };
+      const ph = this.heroes[pageKey()];
+      drag = { sx: e.clientX, sy: e.clientY, x: ph.x, y: ph.y };
       try { hero.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       e.preventDefault();
     });
     hero.addEventListener('pointermove', e => {
       if (!drag) return;
+      const ph = this.heroes[pageKey()];
       const w = hero.clientWidth || 1, h = hero.clientHeight || 1;
-      this.hero.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.sx) / w * 100));
-      this.hero.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.sy) / h * 100));
+      ph.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.sx) / w * 100));
+      ph.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.sy) / h * 100));
       this.applyHero();
     });
     const endDrag = () => { drag = null; };
@@ -324,13 +340,20 @@ const App = {
   applyHero() {
     const hero = document.getElementById('page-hero');
     if (!hero) return;
-    hero.style.backgroundImage = 'url("' + (this.hero.img || HERO_DEFAULT_BG) + '")';
-    hero.style.backgroundPosition = this.hero.x + '% ' + this.hero.y + '%';
+    const page = (this.state && this.state.route) || 'ledger';
+    const ph = (this.heroes && this.heroes[page]) || { img: '', x: 50, y: 50 };
+    hero.style.backgroundImage = 'url("' + (ph.img || HERO_DEFAULT_BG) + '")';
+    hero.style.backgroundPosition = ph.x + '% ' + ph.y + '%';
     const r = document.getElementById('hero-reset');
-    if (r) r.hidden = !this.hero.img;
+    if (r) r.hidden = !ph.img;
+    const a = document.getElementById('hero-adjust');
+    if (a) a.textContent = this.heroAdjusting ? '保存位置' : '调整位置';
+    hero.classList.toggle('adjusting', !!this.heroAdjusting);
+    const hint = document.getElementById('hero-hint');
+    if (hint) hint.hidden = !this.heroAdjusting;
   },
   saveHero() {
-    Promise.resolve(Store.saveBanner(this.hero)).catch(() => { /* ignore */ });
+    Promise.resolve(Store.saveHeroMap(this.heroes)).catch(() => { /* ignore */ });
   },
 
   /* ---------- 数据加载 ---------- */
@@ -547,6 +570,7 @@ const App = {
     document.querySelectorAll('.nav-item').forEach(a => {
       a.classList.toggle('active', a.dataset.route === this.state.route);
     });
+    this.heroAdjusting = false; this.applyHero(); // 切换页面：加载该页自己的背景与位置
     this.renderChrome();
     this.renderView();
     this.renderSearchUI();

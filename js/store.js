@@ -335,6 +335,59 @@ const Store = {
     return false;
   },
 
+  /* ---------- 每页独立背景头图（map：page -> {img,x,y}） ----------
+     本地 localStorage(fin_hero_v1) 为权威存储，并尽力把 JSON map 镜像到云端 banners 表的 img 列（不改动表结构）。
+     兼容旧版单图：云端 banners.img 为 data URL 字符串、或本地 fin_bg 有值时，迁移到全部页面。 */
+  async getHeroMap() {
+    const readLocalMap = () => {
+      try { const m = JSON.parse(localStorage.getItem('fin_hero_v1') || 'null'); return (m && typeof m === 'object') ? m : null; } catch (e) { return null; }
+    };
+    const localMap = readLocalMap();
+    if (localMap) return localMap;
+    // 旧版单图迁移
+    let legacy = null;
+    try {
+      const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
+      if (s && typeof s === 'object' && s.img) legacy = { img: s.img, x: Number(s.x) || 50, y: Number(s.y) || 50 };
+    } catch (e) { /* ignore */ }
+    if (!legacy && this.mode === 'supabase' && this.user) {
+      try {
+        const { data, error } = await this.sb.from('banners').select('img, pos_x, pos_y').single();
+        if (!error && data && typeof data.img === 'string' && data.img) {
+          if (data.img[0] === '{') {
+            try { const m = JSON.parse(data.img); if (m && typeof m === 'object') return m; } catch (e2) { /* ignore */ }
+          } else {
+            legacy = { img: data.img, x: Number(data.pos_x) || 50, y: Number(data.pos_y) || 50 };
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+    if (legacy) {
+      const map = {};
+      HERO_PAGES.forEach(p => { map[p] = { img: legacy.img, x: legacy.x, y: legacy.y }; });
+      return map;
+    }
+    return null;
+  },
+  async saveHeroMap(map) {
+    const safe = {};
+    HERO_PAGES.forEach(p => {
+      const h = (map && map[p]) || {};
+      safe[p] = { img: typeof h.img === 'string' ? h.img : '', x: Number(h.x) || 50, y: Number(h.y) || 50 };
+    });
+    try { localStorage.setItem('fin_hero_v1', JSON.stringify(safe)); } catch (e) { /* ignore */ }
+    if (this.mode === 'supabase' && this.user) {
+      try {
+        await this.sb.from('banners').upsert({
+          user_id: this.user.id,
+          img: JSON.stringify(safe),
+          pos_x: 50, pos_y: 50,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      } catch (e) { /* 尽力而为，失败不影响本地 */ }
+    }
+  },
+
   _dbErr(e) {
     const m = (e && e.message) || '保存失败';
     if (/row-level security/i.test(m)) return '权限不足（RLS），请检查 Supabase 安全策略';
