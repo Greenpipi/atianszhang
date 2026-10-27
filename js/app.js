@@ -2561,10 +2561,8 @@ const App = {
         </div>
         <button class="btn btn-accent" id="rental-add">＋ 记一笔出租屋支出</button>
       </div>
-      <div class="grid grid-5" style="margin-bottom:20px">
-        <div class="stat-card"><div class="stat-label">${scopeName}收入</div><div class="stat-value income">${fmtMoney(income)}</div><div class="stat-foot">${scopeDesc}</div></div>
+      <div class="grid grid-3" style="margin-bottom:20px">
         <div class="stat-card"><div class="stat-label">${scopeName}支出</div><div class="stat-value expense">${fmtMoney(expense)}</div><div class="stat-foot">${scopeDesc} · ${scopeRecs.length} 笔</div></div>
-        <div class="stat-card"><div class="stat-label">结余</div><div class="stat-value" style="color:${balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(balance)}</div><div class="stat-foot">收入 − 支出</div></div>
         <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${scopeRecs.length}</div><div class="stat-foot">${scopeName}出租屋记录</div></div>
         <div class="stat-card"><div class="stat-label">月度固定费用合计</div><div class="stat-value" style="color:var(--accent-deep)">${fmtMoney(fixedTotal)}</div><div class="stat-foot">${RENTAL_FIXED.join(' / ')}</div></div>
       </div>
@@ -3328,13 +3326,28 @@ const App = {
     };
   },
 
-  /* ---------- 日历组件 ---------- */
-  openCalendar(inp) {
+  /* ---------- 自定义日历（日 / 月 / 年 三级联动，替代浏览器原生日期控件） ---------- */
+  openCalendar(inp, mode) {
+    mode = mode || inp.dataset.calMode || 'day';
     if (this._cal && this._cal.inp === inp) { this.closeCalendar(); return; }
     this.closeCalendar();
-    const sel = inp.dataset.date || todayStr();
-    const [y, m] = sel.split('-').map(Number);
-    this._cal = { inp, y, m, sel };
+    const now = new Date();
+    const c = {
+      inp: inp, mode: mode,
+      view: mode === 'day' ? 'day' : (mode === 'month' ? 'month' : 'year'),
+      y: now.getFullYear(), m: now.getMonth() + 1,
+      sel: '', yBase: 2000
+    };
+    if (mode === 'day') c.sel = String(inp.dataset.date || '').trim();
+    else if (mode === 'month') c.sel = String(inp.dataset.month || '').trim();
+    else c.sel = String(inp.dataset.year || '').trim();
+    if (!c.sel && inp.value) c.sel = String(inp.value).trim();
+    const yy = parseInt(c.sel.slice(0, 4), 10);
+    if (yy) c.y = yy;
+    const mm = parseInt(c.sel.slice(5, 7), 10);
+    if (mm) c.m = mm;
+    c.yBase = 2000 + Math.floor((c.y - 2000) / 12) * 12;
+    this._cal = c;
     const pop = document.createElement('div');
     pop.className = 'cal-pop';
     pop.id = 'cal-pop';
