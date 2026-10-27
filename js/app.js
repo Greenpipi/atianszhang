@@ -869,7 +869,7 @@ const App = {
       <button class="btn btn-ghost btn-sm" data-nav="prev">‹ 上月</button>
       <b style="font-size:13.5px;min-width:76px;text-align:center">${y} 年 ${m} 月</b>
       <button class="btn btn-ghost btn-sm" data-nav="next">下月 ›</button>
-      <input type="month" value="${month}" data-jump style="height:32px;border:1px solid var(--line);border-radius:9px;padding:0 8px;background:#fff">
+      <input type="text" class="cal-input" readonly value="${month}" data-month="${month}" data-cal-mode="month" data-jump placeholder="跳转月份" style="width:112px;height:32px;border:1px solid var(--line);border-radius:9px;padding:0 8px;background:#fff;font-size:12.5px;color:var(--text)">
     </div>`;
   },
 
@@ -885,7 +885,10 @@ const App = {
       };
     });
     const jump = root.querySelector('[data-jump]');
-    if (jump) jump.onchange = () => { this.state[key] = jump.value; rerender(); };
+    if (jump) {
+      jump.onclick = () => this.openCalendar(jump, 'month');
+      jump.onchange = () => { this.state[key] = jump.value; rerender(); };
+    }
   },
 
   /* ---------- 视图：记账本 ---------- */
@@ -1348,9 +1351,9 @@ const App = {
       <div class="fp-sec">
         <div class="fp-title">日期范围</div>
         <div class="fp-dates">
-          <input type="date" data-f="from" value="${esc(s.from)}">
+          <input type="text" class="cal-input" readonly placeholder="开始日期" data-f="from" data-cal-mode="day" value="${esc(s.from)}">
           <span>至</span>
-          <input type="date" data-f="to" value="${esc(s.to)}">
+          <input type="text" class="cal-input" readonly placeholder="结束日期" data-f="to" data-cal-mode="day" value="${esc(s.to)}">
         </div>
       </div>
       <div class="fp-foot">
@@ -2190,8 +2193,8 @@ const App = {
             </select>
           </div>
           <div class="field">${st.period === 'month'
-            ? '<label>月份</label><input type="month" id="st-month" value="' + st.month + '">'
-            : '<label>年份</label><input type="number" id="st-year" min="2000" max="2100" value="' + st.year + '">'}</div>
+            ? '<label>月份</label><input type="text" id="st-month" class="cal-input" readonly placeholder="选择月份" value="' + st.month + '" data-month="' + st.month + '" data-cal-mode="month">'
+            : '<label>年份</label><input type="text" id="st-year" class="cal-input" readonly placeholder="选择年份" value="' + st.year + '" data-year="' + st.year + '" data-cal-mode="year">'}</div>
         </div>
       </div>
 
@@ -2575,30 +2578,32 @@ const App = {
         ${fixedRows}
       </div>
 
-      <div class="card">
-        <div class="card-head">
-          <div><div class="card-title">分类统计</div><div class="card-sub">${scopeDesc}各分类占比</div></div>
-        </div>
-        ${subRows.length ? `
-          <div class="rental-stat-grid">
-            <div class="chart-box" style="max-width:280px;margin:0 auto"><canvas id="rental-donut" height="240"></canvas></div>
-            <div class="mini-bars">
-              ${subRows.map(k => {
-                const meta = RENTAL_META[k] || {};
-                return `
-                <div class="mini-bar-row">
-                  <div class="mini-bar-top"><span>${meta.emoji || '•'} ${esc(k)} <span style="color:var(--muted)">×${bySub[k].count}</span></span><b>${fmtMoney(bySub[k].amount)}</b></div>
-                  <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.max(2, bySub[k].amount / subMax * 100)}%;background:${meta.color || 'var(--accent)'}"></div></div>
-                </div>`;
-              }).join('')}
-            </div>
+      <div class="grid grid-2" style="margin-bottom:18px;align-items:stretch">
+        <div class="card">
+          <div class="card-head">
+            <div><div class="card-title">分类统计</div><div class="card-sub">${scopeDesc}各分类占比</div></div>
           </div>
-        ` : `<div class="empty"><p>${scopeName}暂无出租屋支出</p></div>`}
-      </div>
+          ${subRows.length ? `
+            <div class="rental-stat-grid">
+              <div class="chart-box" style="max-width:280px;margin:0 auto"><canvas id="rental-donut" height="240"></canvas></div>
+              <div class="mini-bars">
+                ${subRows.map(k => {
+                  const meta = RENTAL_META[k] || {};
+                  return `
+                  <div class="mini-bar-row">
+                    <div class="mini-bar-top"><span>${meta.emoji || '•'} ${esc(k)} <span style="color:var(--muted)">×${bySub[k].count}</span></span><b>${fmtMoney(bySub[k].amount)}</b></div>
+                    <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.max(2, bySub[k].amount / subMax * 100)}%;background:${meta.color || 'var(--accent)'}"></div></div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          ` : `<div class="empty"><p>${scopeName}暂无出租屋支出</p></div>`}
+        </div>
 
-      <div class="card">
-        <div class="card-head"><div><div class="card-title">${trendTitle}</div><div class="card-sub">出租屋月度支出</div></div></div>
-        <div class="chart-box"><canvas id="rental-line" height="180"></canvas></div>
+        <div class="card">
+          <div class="card-head"><div><div class="card-title">${trendTitle}</div><div class="card-sub">出租屋月度支出</div></div></div>
+          <div class="chart-box"><canvas id="rental-line" height="180"></canvas></div>
+        </div>
       </div>
 
       <div class="card">
@@ -3336,16 +3341,19 @@ const App = {
       inp: inp, mode: mode,
       view: mode === 'day' ? 'day' : (mode === 'month' ? 'month' : 'year'),
       y: now.getFullYear(), m: now.getMonth() + 1,
-      sel: '', yBase: 2000
+      selY: now.getFullYear(), selM: now.getMonth() + 1, selD: now.getDate(),
+      yBase: 2000
     };
-    if (mode === 'day') c.sel = String(inp.dataset.date || '').trim();
-    else if (mode === 'month') c.sel = String(inp.dataset.month || '').trim();
-    else c.sel = String(inp.dataset.year || '').trim();
-    if (!c.sel && inp.value) c.sel = String(inp.value).trim();
-    const yy = parseInt(c.sel.slice(0, 4), 10);
-    if (yy) c.y = yy;
-    const mm = parseInt(c.sel.slice(5, 7), 10);
-    if (mm) c.m = mm;
+    let raw = '';
+    if (mode === 'day') raw = String(inp.dataset.date || '').trim();
+    else if (mode === 'month') raw = String(inp.dataset.month || '').trim();
+    else raw = String(inp.dataset.year || '').trim();
+    if (!raw && inp.value) raw = String(inp.value).trim();
+    const p = raw.split('-');
+    const py = parseInt(p[0], 10), pm = parseInt(p[1], 10), pd = parseInt(p[2], 10);
+    if (py) { c.selY = py; c.y = py; }
+    if (pm) { c.selM = pm; c.m = pm; }
+    if (pd) c.selD = pd;
     c.yBase = 2000 + Math.floor((c.y - 2000) / 12) * 12;
     this._cal = c;
     const pop = document.createElement('div');
@@ -3389,68 +3397,154 @@ const App = {
     this._cal = null;
   },
 
+  _calCommit(kind, val) {
+    const inp = this._cal.inp;
+    if (kind === 'day') { inp.dataset.date = val; inp.value = val; }
+    else if (kind === 'month') { inp.dataset.month = val; inp.value = val; }
+    else { inp.dataset.year = val; inp.value = val; }
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    this.closeCalendar();
+  },
+
   _renderCal() {
     const pop = document.getElementById('cal-pop');
     if (!pop || !this._cal) return;
-    const { y, m, sel } = this._cal;
+    const cal = this._cal;
     const today = todayStr();
-    const mk = (yy, mm, dd) => {
+    const pad = n => String(n).padStart(2, '0');
+    const mkDate = (yy, mm, dd) => {
       const dt = new Date(yy, mm - 1, dd);
-      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
     };
-    const startDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 周一为一周开始
-    const dim = new Date(y, m, 0).getDate();
-    const prevDim = new Date(y, m - 1, 0).getDate();
-    const cells = [];
-    for (let i = 0; i < 42; i++) {
-      const d = i - startDow + 1;
-      if (d < 1) cells.push({ d: prevDim + d, out: true, key: mk(y, m - 1, prevDim + d) });
-      else if (d > dim) cells.push({ d: d - dim, out: true, key: mk(y, m + 1, d - dim) });
-      else cells.push({ d, out: false, key: mk(y, m, d) });
-    }
-    pop.innerHTML = `
-      <div class="cal-card">
-        <div class="cal-head">
-          <button type="button" class="cal-nav" data-nav="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg></button>
-          <div class="cal-title">${y} 年 ${m} 月</div>
-          <button type="button" class="cal-nav" data-nav="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
-        </div>
-        <div class="cal-grid">
-          ${['一', '二', '三', '四', '五', '六', '日'].map(w => '<div class="cal-wd">' + w + '</div>').join('')}
-          ${cells.map(c => '<button type="button" class="cal-cell' + (c.out ? ' out' : '') + (c.key === today ? ' today' : '') + (c.key === sel ? ' sel' : '') + '" data-key="' + c.key + '">' + c.d + '</button>').join('')}
-        </div>
-        <div class="cal-foot"><button type="button" class="cal-today-btn" data-quick="0">今天</button><button type="button" class="cal-today-btn" data-quick="1">昨天</button><button type="button" class="cal-today-btn" data-quick="2">前天</button></div>
-      </div>`;
+    const chev = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+      (d < 0 ? '<path d="m15 5-7 7 7 7"/>' : '<path d="m9 5 7 7-7 7"/>') + '</svg>';
 
+    let head = '', body = '';
+    if (cal.view === 'day') {
+      head = '<button type="button" class="cal-nav" data-nav="-1">' + chev(-1) + '</button>' +
+        '<button type="button" class="cal-title" data-goto="month">' + cal.y + ' 年 ' + cal.m + ' 月</button>' +
+        '<button type="button" class="cal-nav" data-nav="1">' + chev(1) + '</button>';
+      const startDow = (new Date(cal.y, cal.m - 1, 1).getDay() + 6) % 7; // 周一为一周开始
+      const dim = new Date(cal.y, cal.m, 0).getDate();
+      const prevDim = new Date(cal.y, cal.m - 1, 0).getDate();
+      const cells = [];
+      for (let i = 0; i < 42; i++) {
+        const d = i - startDow + 1;
+        if (d < 1) cells.push({ d: prevDim + d, out: true, key: mkDate(cal.y, cal.m - 1, prevDim + d) });
+        else if (d > dim) cells.push({ d: d - dim, out: true, key: mkDate(cal.y, cal.m + 1, d - dim) });
+        else cells.push({ d, out: false, key: mkDate(cal.y, cal.m, d) });
+      }
+      const selKey = mkDate(cal.selY, cal.selM, cal.selD);
+      body = '<div class="cal-grid">' +
+        ['一', '二', '三', '四', '五', '六', '日'].map(w => '<div class="cal-wd">' + w + '</div>').join('') +
+        cells.map(c => '<button type="button" class="cal-cell' + (c.out ? ' out' : '') + (c.key === today ? ' today' : '') + (c.key === selKey ? ' sel' : '') + '" data-key="' + c.key + '">' + c.d + '</button>').join('') +
+        '</div>' +
+        '<div class="cal-foot"><button type="button" class="cal-today-btn" data-quick="0">今天</button><button type="button" class="cal-today-btn" data-quick="1">昨天</button><button type="button" class="cal-today-btn" data-quick="2">前天</button></div>';
+    } else if (cal.view === 'month') {
+      head = '<button type="button" class="cal-nav" data-nav="-1">' + chev(-1) + '</button>' +
+        '<button type="button" class="cal-title" data-goto="year">' + cal.y + ' 年</button>' +
+        '<button type="button" class="cal-nav" data-nav="1">' + chev(1) + '</button>';
+      let cells = '';
+      for (let i = 1; i <= 12; i++) {
+        const on = (cal.selY === cal.y && cal.selM === i);
+        cells += '<button type="button" class="cal-cell cal-mcell' + (on ? ' sel' : '') + '" data-mon="' + i + '">' + i + ' 月</button>';
+      }
+      body = '<div class="cal-mgrid">' + cells + '</div>' +
+        '<div class="cal-foot"><button type="button" class="cal-today-btn" data-gomon="1">本月</button></div>';
+    } else {
+      head = '<button type="button" class="cal-nav" data-nav="-1">' + chev(-1) + '</button>' +
+        '<div class="cal-title cal-title-static">' + cal.yBase + ' - ' + (cal.yBase + 11) + '</div>' +
+        '<button type="button" class="cal-nav" data-nav="1">' + chev(1) + '</button>';
+      let cells = '';
+      for (let i = 0; i < 12; i++) {
+        const yy = cal.yBase + i;
+        const on = (cal.selY === yy);
+        cells += '<button type="button" class="cal-cell cal-ycell' + (on ? ' sel' : '') + '" data-year="' + yy + '">' + yy + '</button>';
+      }
+      body = '<div class="cal-ygrid">' + cells + '</div>' +
+        '<div class="cal-foot"><button type="button" class="cal-today-btn" data-goyear="1">今年</button></div>';
+    }
+
+    pop.innerHTML = '<div class="cal-card"><div class="cal-head">' + head + '</div>' + body + '</div>';
+
+    // 左右箭头：日视图切月 / 月视图切年 / 年视图切年段
     pop.querySelectorAll('[data-nav]').forEach(b => {
       b.onclick = () => {
-        const dt = new Date(this._cal.y, this._cal.m - 1 + Number(b.dataset.nav), 1);
-        this._cal.y = dt.getFullYear();
-        this._cal.m = dt.getMonth() + 1;
+        const d = Number(b.dataset.nav);
+        const c = this._cal;
+        if (c.view === 'day') {
+          const dt = new Date(c.y, c.m - 1 + d, 1);
+          c.y = dt.getFullYear();
+          c.m = dt.getMonth() + 1;
+        } else if (c.view === 'month') {
+          c.y += d;
+        } else {
+          c.yBase += d * 12;
+          c.y = c.yBase;
+        }
         this._renderCal();
       };
     });
-    pop.querySelectorAll('.cal-cell').forEach(c => {
+    // 标题联动：日 → 月 → 年
+    pop.querySelectorAll('[data-goto]').forEach(b => {
+      b.onclick = () => {
+        this._cal.view = b.dataset.goto;
+        this._renderCal();
+      };
+    });
+    // 选日
+    pop.querySelectorAll('[data-key]').forEach(c => {
+      c.onclick = () => { this._calCommit('day', c.dataset.key); };
+    });
+    // 选月
+    pop.querySelectorAll('[data-mon]').forEach(c => {
       c.onclick = () => {
-        const key = c.dataset.key;
-        const inp = this._cal.inp;
-        inp.dataset.date = key;
-        inp.value = key;
-        inp.dispatchEvent(new Event('change', { bubbles: true }));
-        this.closeCalendar();
+        const mm = Number(c.dataset.mon);
+        const cc = this._cal;
+        if (cc.mode === 'month') { this._calCommit('month', cc.y + '-' + pad(mm)); return; }
+        cc.selY = cc.y; cc.selM = mm; cc.m = mm;
+        cc.view = 'day';
+        this._renderCal();
+      };
+    });
+    // 选年
+    pop.querySelectorAll('[data-year]').forEach(c => {
+      c.onclick = () => {
+        const yy = Number(c.dataset.year);
+        const cc = this._cal;
+        if (cc.mode === 'year') { this._calCommit('year', String(yy)); return; }
+        cc.selY = yy; cc.y = yy;
+        cc.view = 'month';
+        this._renderCal();
       };
     });
     // 快捷选项：今天 / 昨天 / 前天（方便补记）
     pop.querySelectorAll('[data-quick]').forEach(b => {
       b.onclick = () => {
-        const inp = this._cal.inp;
         const d = new Date();
         d.setDate(d.getDate() - Number(b.dataset.quick));
-        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        inp.dataset.date = key;
-        inp.value = key;
-        inp.dispatchEvent(new Event('change', { bubbles: true }));
-        this.closeCalendar();
+        this._calCommit('day', d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()));
+      };
+    });
+    // 本月
+    pop.querySelectorAll('[data-gomon]').forEach(b => {
+      b.onclick = () => {
+        const cc = this._cal;
+        const now = new Date();
+        if (cc.mode === 'month') { this._calCommit('month', now.getFullYear() + '-' + pad(now.getMonth() + 1)); return; }
+        cc.selY = now.getFullYear(); cc.selM = now.getMonth() + 1;
+        cc.y = cc.selY; cc.m = cc.selM; cc.view = 'day';
+        this._renderCal();
+      };
+    });
+    // 今年
+    pop.querySelectorAll('[data-goyear]').forEach(b => {
+      b.onclick = () => {
+        const cc = this._cal;
+        const now = new Date().getFullYear();
+        if (cc.mode === 'year') { this._calCommit('year', String(now)); return; }
+        cc.selY = now; cc.y = now; cc.view = 'month';
+        this._renderCal();
       };
     });
   },
