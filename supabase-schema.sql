@@ -102,14 +102,10 @@ begin
   -- 好物多图（images 优先，兼容老数据单图 image 列）
   execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
 
-  -- 好物购买平台 / 属性 / 弃用冻结日（弃用后陪伴天数冻结在弃用当日）
+  -- 好物购买平台 / 属性 / 状态起始日（status_since 同时承载已弃用/已磬用的定格快照：弃用日|天数|每日成本）
   execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
-
-  -- 好物已弃用定格快照（弃用当天把已陪伴天数/每日成本冻结存档，此后不再实时计算）
-  execute $ddl$ alter table records add column if not exists discarded_days numeric not null default 0 $ddl$;
-  execute $ddl$ alter table records add column if not exists discarded_cost numeric $ddl$;
 
   -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
   execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;

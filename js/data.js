@@ -126,6 +126,30 @@ const WISH_STATUS_LIST = [
   { key: '已磬用', cls: 'depleted' }
 ];
 
+/* ---------- 好物状态：定格快照编码 ----------
+ * records.status_since 一个字段承载两种含义（线上表无 discarded_* 列，快照随本字段一起存）：
+ *   普通状态（使用中 / 闲置中 / 未使用）：'YYYY-MM-DD'  —— 状态起始日
+ *   定格状态（已弃用 / 已磬用）：'YYYY-MM-DD|天数|每日成本' —— 弃用日 + 当天冻结的天数与每日成本
+ * 未使用时为空字符串（清零已陪伴天数，每日成本占位「-」）。
+ * 定格值一旦写入便不再随日期 / 金额变化；已弃用与已磬用规则完全一致。 */
+function parseWishSince(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return { date: '', days: 0, cost: null, snap: false };
+  const p = s.split('|');
+  if (p.length >= 3) {
+    const d = Number(p[1]);
+    const c = (p[2] === '' ? null : Number(p[2]));
+    return { date: p[0], days: (isFinite(d) && d > 0) ? d : 0, cost: (c != null && isFinite(c)) ? c : null, snap: true };
+  }
+  return { date: s, days: 0, cost: null, snap: false };
+}
+/* 组装定格快照：'弃用日|天数|每日成本' */
+function fmtWishSince(dateStr, days, cost) {
+  const d = Math.max(1, Math.round(Number(days) || 0));
+  const c = (cost == null || !isFinite(Number(cost))) ? '' : Number(cost).toFixed(2);
+  return (dateStr || todayStr()) + '|' + d + '|' + c;
+}
+
 /* ---------- 好物仓库：季节自动切换 ----------
  * 依据：好物的「通用」季节标签（夏季/冬季/春秋季）+ 当前月份所属季节，
  * 自动把「衣裤鞋袜」类好物在「使用中 ↔ 闲置中」之间切换。 */

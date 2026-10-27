@@ -1,6 +1,11 @@
 /* ============ 应用主逻辑 ============ */
 /* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用 → 已磬用（已弃用/已磬用 始终最后） */
 const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3, '已磬用': 4 };
+
+/* 旧版季节自动切换会把好物的 status_since 重置为切换当天（已陪伴天数因此显示 1 天）。
+ * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
+ * 该窗口内被自动切换过的好物，status_since 精确等于 2026-10-26 或 2026-10-27 → 即被污染值。 */
+const WISH_STATUS_BUG_DATES = ['2026-10-26', '2026-10-27'];
 const App = {
   state: {
     route: 'ledger',
@@ -153,6 +158,13 @@ const App = {
     // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
     this.paintFromCache();
     await this.loadData();
+    // 好物数据自动自愈：补定格快照 + 恢复被误重置的已陪伴天数（无需用户任何操作）
+    this.autoRepairWishData().then(n => {
+      if (n) {
+        if (this.state.route === 'wishlist') this.renderWishlist();
+        this.toast('已自动修复 ' + n + ' 件好物数据', 'ok');
+      }
+    }).catch(e => console.warn('好物数据自愈失败', e));
     // 季节自动切换：打开应用时执行一次（不阻塞渲染，后台完成）
     this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
@@ -1874,23 +1886,37 @@ const App = {
     if (updates.length && this.state.route === 'wishlist') this.renderWishlist();
     return updates.length;
   },
-  /* 一键修复好物数据：
-   *  - 在用的好物（使用中/闲置中）：清空被误写的 status_since，使其按购入日重新起算已陪伴天数（修复显示 1 天等问题）
-   *  - 已弃用/已磬用：若无定格快照则按当前天数与每日成本补一份（需已执行建表 SQL 才有 discarded 列） */
-  async repairWishData() {
+  /* 旧版季节自动切换曾把 status_since 重置为切换当天（已陪伴天数因此变成 1 天）：
+   * 若该好物未手动锁定、且起始日落在旧版缺陷窗口内 → 判定为被误重置 */
+  isSinceClobbered(r, since) {
+    if (!since) return false;
+    if (this.loadSeasonLocks().has(r.id)) return false;
+    if (!r.date || !(r.date < since)) return false;
+    return WISH_STATUS_BUG_DATES.indexOf(since) >= 0;
+  },
+  /* 自动自愈好物数据（进入应用时静默执行，用户无需任何操作）：
+   *  1) 已弃用 / 已磬用：补写定格快照（购入日 → 弃用日 的天数 + 每日成本），写入后永久冻结
+   *  2) 使用中 / 闲置中：旧版季节自动切换把 status_since 重置成切换日（已陪伴显示 1 天）→ 恢复为按购入日起算
+   * 幂等：修完即为正确值，再次执行无任何改动 */
+  async autoRepairWishData() {
     const ACTIVE = ['使用中', '闲置中'], FROZEN = ['已弃用', '已磬用'];
+    const locks = this.loadSeasonLocks();
     const todo = [];
     for (const r of this.state.records) {
       if (!r.favorite) continue;
-      const k = this.wishStatusOf(r).key;
-      if (ACTIVE.includes(k)) {
-        if (r.status_since) todo.push({ id: r.id, patch: { status_since: '' } });
-      } else if (FROZEN.includes(k)) {
-        if (!(Number(r.discarded_days) > 0)) {
-          const d = daysBetween(r.status_since || r.date, null);
-          const c = d > 0 ? (Number(r.amount) || 0) / d : NaN;
-          todo.push({ id: r.id, patch: { discarded_days: d, discarded_cost: isFinite(c) ? Number(c.toFixed(2)) : null, status_since: r.status_since || todayStr() } });
-        }
+      const key = this.wishStatusOf(r).key;
+      const fz = parseWishSince(r.status_since);
+      if (FROZEN.includes(key)) {
+        if (fz.snap) continue; // 已有定格快照
+        const end = fz.date || todayStr();              // 弃用日
+        const days = daysBetween(r.date || end, end);   // 购入日 → 弃用日
+        const cost = days > 0 ? (Number(r.amount) || 0) / days : NaN;
+        const val = fmtWishSince(end, days, isFinite(cost) ? cost : null);
+        if (val !== (r.status_since || '')) todo.push({ id: r.id, patch: { status_since: val } });
+      } else if (ACTIVE.includes(key)) {
+        if (!fz.date || locks.has(r.id)) continue;        // 手动改过状态的以用户设置为准
+        if (!this.isSinceClobbered(r, fz.date)) continue;  // 起始日不在旧版缺陷窗口 → 非被重置
+        todo.push({ id: r.id, patch: { status_since: r.date } }); // 恢复按购入日起算
       }
     }
     let n = 0;
@@ -1905,27 +1931,25 @@ const App = {
     return n;
   },
   /* 已陪伴天数 + 每日成本（按当前状态计算）：
-   *  使用中/闲置中：从状态改变日(status_since)起算，每日成本 = 金额/天数，实时累计
+   *  使用中 / 闲置中：从状态起始日(status_since)起算，每日成本 = 金额 / 天数，实时累计（季节自动切换不重置）
    *  未使用：不显示已陪伴，每日成本占位「-」
-   *  已弃用/已磬用：显示定格快照（discarded_days / discarded_cost）的 天数 + 每日成本，数字永久冻结不再变动 */
+   *  已弃用 / 已磬用：显示定格快照（status_since 内冻结的天数 + 每日成本），数字永久不再变动、也不清零 */
   wishDaysCost(r) {
     const key = this.wishStatusOf(r).key;
     const amount = Number(r.amount) || 0;
     if (key === '未使用') return { days: 0, showDays: false, costText: '-' };
+    const fz = parseWishSince(r.status_since);
     if (key === '已弃用' || key === '已磬用') {
-      const dDays = (r.discarded_days != null && r.discarded_days !== '' && Number(r.discarded_days) > 0) ? Number(r.discarded_days) : null;
-      const dCost = (r.discarded_cost != null && r.discarded_cost !== '') ? Number(r.discarded_cost) : null;
-      if (dDays != null) {
-        const costText = (dCost != null && isFinite(dCost)) ? dCost.toFixed(2) : (dDays > 0 ? (amount / dDays).toFixed(2) : '-');
-        return { days: dDays, showDays: true, costText };
+      if (fz.snap) {
+        return { days: fz.days, showDays: true, costText: fz.cost == null ? '-' : Number(fz.cost).toFixed(2) };
       }
-      // 老数据无快照：回退按冻结日显示天数 + 估算成本（补列并重新定格后才会真正冻结）
-      const since = r.status_since || r.date;
-      const days = daysBetween(since, null);
+      // 旧数据未冻结：按「购入日 → 弃用日」回退估算（自愈补写快照后即真正冻结）
+      const end = fz.date || todayStr();
+      const days = daysBetween(r.date || end, end);
       const cost = days > 0 ? amount / days : NaN;
       return { days, showDays: true, costText: isFinite(cost) ? cost.toFixed(2) : '-' };
     }
-    const since = r.status_since || r.date;
+    const since = fz.date || r.date;
     const days = daysBetween(since, null);
     const cost = days > 0 ? amount / days : NaN; // 使用中 / 闲置中
     return { days, showDays: true, costText: isFinite(cost) ? cost.toFixed(2) : '-' };
@@ -2011,35 +2035,36 @@ const App = {
         const label = b.dataset.st;
         if (Store.missingCol('records', 'status')) { this.toast('请先到设置页补一次建表 SQL（补 status 列）'); return; }
         const ACTIVE = ['使用中', '闲置中'], FROZEN = ['已弃用', '已磬用'];
-        const curKey = rec.status;
+        const curKey = cur.key;                    // 老数据 status 为空时按 favorite 推导
         const wasActive = ACTIVE.includes(curKey);
         const wasFrozen = FROZEN.includes(curKey);
-        let status_since = rec.status_since;
+        const fz = parseWishSince(rec.status_since);
+        let status_since = rec.status_since || '';
         const patch = { status: label };
         if (ACTIVE.includes(label)) {
-          // 使用中↔闲置中 互切：沿用原 status_since（天数连续不清零）；从 未使用/已弃用/已磬用 转入则今天重新起算
+          // 使用中 / 闲置中：原本就在用则沿用起始日（天数连续累积，不重置为 1 天）；从其它状态转入则今天重新起算
           if (!wasActive) status_since = todayStr();
-          patch.status_since = status_since || '';
+          patch.status_since = status_since;
         } else if (label === '未使用') {
-          status_since = '';
-          patch.status_since = ''; // 未使用：清空已陪伴天数、每日成本占位「-」
+          status_since = '';                         // 未使用：清空已陪伴天数、每日成本占位「-」
+          patch.status_since = '';
         } else if (FROZEN.includes(label)) {
-          // 已弃用 / 已磬用：定格快照，规则与已弃用完全一致（天数+每日成本冻结存档，不再变动）
-          if (!wasFrozen) {
-            const d = daysBetween(rec.status_since || rec.date, null);
+          if (wasFrozen && fz.snap) {
+            status_since = rec.status_since;         // 已弃用 ↔ 已磬用：保留原定格快照，数值不变
+          } else {
+            // 变为已弃用 / 已磬用的当天：定格「当天的已陪伴天数 + 每日成本」，此后不再随日期 / 金额变化
+            const end = (wasFrozen && fz.date) ? fz.date : todayStr();  // 已是冻结态但缺快照 → 沿用原弃用日
+            const base = (wasActive && fz.date && !this.isSinceClobbered(rec, fz.date)) ? fz.date : (rec.date || end);
+            const d = daysBetween(base, end);
             const c = d > 0 ? (Number(rec.amount) || 0) / d : NaN;
-            patch.discarded_days = d;
-            patch.discarded_cost = isFinite(c) ? Number(c.toFixed(2)) : null;
-            if (Store.missingCol('records', 'discarded_cost')) this.toast('定格快照需补列：设置页「复制 SQL」执行一次即可', 'err');
+            status_since = fmtWishSince(end, d, isFinite(c) ? c : null);
           }
-          status_since = wasFrozen ? (rec.status_since || todayStr()) : todayStr();
           patch.status_since = status_since;
         }
         const ok = await Store.update('records', rid, patch);
         if (ok === false) { this.toast('状态保存失败，请重试'); return; }
         rec.status = label;
         rec.status_since = status_since;
-        if (patch.discarded_days !== undefined) { rec.discarded_days = patch.discarded_days; rec.discarded_cost = patch.discarded_cost; }
         this.addSeasonLock(rid); // 手动改状态 → 永久锁定，季节自动切换不再动它
         const st = this.wishStatusOf(rec);
         const card = document.querySelector('.wish-card[data-wid="' + rid + '"]');
@@ -2755,14 +2780,7 @@ const App = {
           <button class="btn btn-ghost" id="season-apply">立即应用切换</button>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-head"><div><div class="card-title">数据修复</div><div class="card-sub">修正已陪伴天数 / 补定格快照</div></div></div>
-        <p class="season-note">若好物「已陪伴天数」被误清零（如显示 1 天），点此一键把在用的好物按<b>购入日</b>重新起算天数；并把「已弃用 / 已磬用」的好物补上定格快照（需已执行建表 SQL）。</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn btn-primary" id="repair-data">修复已陪伴天数与定格快照</button>
-        </div>
-      </div>`;
+`;
 
     /* --- 云端配置 --- */
     el.querySelector('#cfg-save').onclick = async () => {
@@ -2926,13 +2944,6 @@ const App = {
         if (applyBtn) applyBtn.onclick = async () => {
           const n = await this.applySeasonStatus();
           this.toast(n ? ('已切换 ' + n + ' 件好物状态') : '没有需要切换的好物', n ? 'ok' : '');
-        };
-        const repairBtn = el.querySelector('#repair-data');
-        if (repairBtn) repairBtn.onclick = async () => {
-          const n = await this.repairWishData();
-          if (n) await this.loadData();
-          if (this.state.route === 'wishlist') this.renderWishlist();
-          this.toast(n ? ('已修复 ' + n + ' 件好物数据') : '没有需要修复的数据', n ? 'ok' : '');
         };
       }
     }
@@ -3766,14 +3777,10 @@ begin
   -- 好物多图（images 优先，兼容老数据单图 image 列）
   execute $ddl$ alter table records add column if not exists images text[] not null default '{}'::text[] $ddl$;
 
-  -- 好物购买平台 / 属性 / 弃用冻结日（弃用后陪伴天数冻结在弃用当日）
+  -- 好物购买平台 / 属性 / 状态起始日（status_since 同时承载已弃用/已磬用的定格快照：弃用日|天数|每日成本）
   execute $ddl$ alter table records add column if not exists purchase_platform text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists attribute text not null default '' $ddl$;
   execute $ddl$ alter table records add column if not exists status_since text not null default '' $ddl$;
-
-  -- 好物已弃用定格快照（弃用当天把已陪伴天数/每日成本冻结存档，此后不再实时计算）
-  execute $ddl$ alter table records add column if not exists discarded_days numeric not null default 0 $ddl$;
-  execute $ddl$ alter table records add column if not exists discarded_cost numeric $ddl$;
 
   -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
   execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
