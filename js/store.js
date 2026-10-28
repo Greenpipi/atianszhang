@@ -365,32 +365,53 @@ const Store = {
     const readLocalMap = () => {
       try { const m = JSON.parse(localStorage.getItem('fin_hero_v1') || 'null'); return (m && typeof m === 'object') ? m : null; } catch (e) { return null; }
     };
+    const norm = h => ({
+      img: typeof h.img === 'string' ? h.img : '',
+      x: h.x == null ? 50 : Number(h.x),
+      y: h.y == null ? 50 : Number(h.y)
+    });
     const localMap = readLocalMap();
-    if (localMap) return localMap;
-    // 旧版单图迁移
-    let legacy = null;
-    try {
-      const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
-      if (s && typeof s === 'object' && s.img) legacy = { img: s.img, x: Number(s.x) || 50, y: Number(s.y) || 50 };
-    } catch (e) { /* ignore */ }
-    if (!legacy && this.mode === 'supabase' && this.user) {
+
+    // 云端镜像：banners.img 里存的是整张 JSON map（不改表结构）；老数据是单张 data URL
+    let cloudMap = null, legacy = null;
+    if (this.mode === 'supabase' && this.user) {
       try {
         const { data, error } = await this.sb.from('banners').select('img, pos_x, pos_y').single();
         if (!error && data && typeof data.img === 'string' && data.img) {
           if (data.img[0] === '{') {
-            try { const m = JSON.parse(data.img); if (m && typeof m === 'object') return m; } catch (e2) { /* ignore */ }
+            try { const m = JSON.parse(data.img); if (m && typeof m === 'object') cloudMap = m; } catch (e2) { /* ignore */ }
           } else {
             legacy = { img: data.img, x: Number(data.pos_x) || 50, y: Number(data.pos_y) || 50 };
           }
         }
+      } catch (e) { /* 网络/RLS 失败时按本机处理 */ }
+    }
+    if (!cloudMap && !legacy) {
+      // 旧版本地单图（fin_bg）迁移
+      try {
+        const s = JSON.parse(localStorage.getItem('fin_bg') || 'null');
+        if (s && typeof s === 'object' && s.img) legacy = { img: s.img, x: Number(s.x) || 50, y: Number(s.y) || 50 };
       } catch (e) { /* ignore */ }
     }
-    if (legacy) {
-      const map = {};
-      HERO_PAGES.forEach(p => { map[p] = { img: legacy.img, x: legacy.x, y: legacy.y }; });
-      return map;
+    if (!localMap && !cloudMap && !legacy) return null;
+
+    // 逐页合并：本机有该页配置（含刻意清空）就尊重本机，否则用云端，
+    // 这样换设备/换浏览器也能拿到云端图，同时不会把「已恢复默认」的页又顶回旧图
+    const map = {};
+    let cloudOnly = 0;
+    HERO_PAGES.forEach(p => {
+      const l = localMap && localMap[p];
+      const c = cloudMap && cloudMap[p];
+      if (l && typeof l === 'object') map[p] = norm(l);
+      else if (c && typeof c === 'object') { map[p] = norm(c); cloudOnly++; }
+      else if (legacy) map[p] = { img: legacy.img, x: legacy.x, y: legacy.y };
+    });
+
+    // 把只在云端存在的页面落回本机，下次离线/弱网也能直接出图
+    if (cloudOnly > 0) {
+      try { localStorage.setItem('fin_hero_v1', JSON.stringify(map)); } catch (e) { /* 配额不足就跳过 */ }
     }
-    return null;
+    return map;
   },
   async saveHeroMap(map) {
     const safe = {};
@@ -398,17 +419,30 @@ const Store = {
       const h = (map && map[p]) || {};
       safe[p] = { img: typeof h.img === 'string' ? h.img : '', x: Number(h.x) || 50, y: Number(h.y) || 50 };
     });
-    try { localStorage.setItem('fin_hero_v1', JSON.stringify(safe)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('fin_hero_v1', JSON.stringify(safe)); } catch (e) { this.lastHeroLocalErr = e; }
     if (this.mode === 'supabase' && this.user) {
       try {
-        await this.sb.from('banners').upsert({
+        const { error } = await this.sb.from('banners').upsert({
           user_id: this.user.id,
           img: JSON.stringify(safe),
           pos_x: 50, pos_y: 50,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
-      } catch (e) { /* 尽力而为，失败不影响本地 */ }
+        if (error) {
+          // 不再静默吞掉：云端写失败时把原因带回上层，页面可提示「仅存本机」
+          this.lastHeroCloudErr = error;
+          console.warn('背景配置云端同步失败（已保留在本机）', error);
+          return false;
+        }
+        this.lastHeroCloudErr = null;
+        return true;
+      } catch (e) {
+        this.lastHeroCloudErr = e;
+        console.warn('背景配置云端同步失败（已保留在本机）', e);
+        return false;
+      }
     }
+    return false;
   },
 
   _dbErr(e) {

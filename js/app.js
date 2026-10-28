@@ -300,6 +300,7 @@ const App = {
       if (!f) return;
       try {
         const ph = this.heroes[pageKey()];
+        if (!ph) { this.toast('该页面暂不支持自定义背景', 'err'); return; }
         ph.img = await compressImage(f, 1600, 0.82);
         ph.x = 50; ph.y = 50;
         this.saveHero(); this.applyHero();
@@ -309,6 +310,7 @@ const App = {
     };
     btnReset.onclick = () => {
       const ph = this.heroes[pageKey()];
+      if (!ph) { this.toast('该页面暂不支持自定义背景', 'err'); return; }
       ph.img = ''; ph.x = 50; ph.y = 50;
       this.saveHero(); this.applyHero();
       this.toast('已恢复默认背景', 'ok');
@@ -326,6 +328,7 @@ const App = {
       if (!this.heroAdjusting) return;
       if (e.target.closest('.hero-tools')) return; // 工具按钮不触发拖动
       const ph = this.heroes[pageKey()];
+      if (!ph) return;
       drag = { sx: e.clientX, sy: e.clientY, x: ph.x, y: ph.y };
       try { hero.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       e.preventDefault();
@@ -333,6 +336,7 @@ const App = {
     hero.addEventListener('pointermove', e => {
       if (!drag) return;
       const ph = this.heroes[pageKey()];
+      if (!ph) return;
       const w = hero.clientWidth || 1, h = hero.clientHeight || 1;
       ph.x = Math.max(0, Math.min(100, drag.x - (e.clientX - drag.sx) / w * 100));
       ph.y = Math.max(0, Math.min(100, drag.y - (e.clientY - drag.sy) / h * 100));
@@ -358,7 +362,14 @@ const App = {
     if (hint) hint.hidden = !this.heroAdjusting;
   },
   saveHero() {
-    Promise.resolve(Store.saveHeroMap(this.heroes)).catch(() => { /* ignore */ });
+    Promise.resolve(Store.saveHeroMap(this.heroes)).then(ok => {
+      // 云端同步失败时给一次明确提示，避免「以为存上了，换台设备却是默认图」
+      if (ok === false && Store.mode === 'supabase' && !this._heroCloudWarned) {
+        this._heroCloudWarned = true;
+        const m = (Store.lastHeroCloudErr && (Store.lastHeroCloudErr.message || Store.lastHeroCloudErr.code)) || '';
+        this.toast('背景已保存到本机，但云端同步失败' + (m ? '：' + m : ''), 'err');
+      }
+    }).catch(() => { /* ignore */ });
   },
 
   /* ---------- 数据加载 ---------- */
