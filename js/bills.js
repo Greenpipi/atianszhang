@@ -232,10 +232,8 @@
           </div>
           <div class="field-row">
             <div class="field"><label>周期</label><select id="bm-cycle">${cycleOpts}</select></div>
-            <div class="field" id="bm-cycmonths-field" ${isCustomCycle ? '' : 'hidden'}><label>每隔（月）</label><input id="bm-cycmonths" type="number" min="1" max="60" step="1" value="${Math.max(1, Number(d.cycle_months) || 1)}"></div>
-          </div>
-          <div class="field-row">
             <div class="field" id="bm-duemonth-field" ${isYearly ? '' : 'hidden'}><label>每年几月</label><select id="bm-duemonth">${Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${m}" ${Number(d.due_month) === m ? 'selected' : ''}>${m} 月</option>`).join('')}</select></div>
+            <div class="field" id="bm-cycmonths-field" ${isCustomCycle ? '' : 'hidden'}><label>每隔（月）</label><input id="bm-cycmonths" type="number" min="1" max="60" step="1" value="${Math.max(1, Number(d.cycle_months) || 1)}"></div>
             <div class="field"><label>到期日（几号）</label><input id="bm-dueday" type="number" min="1" max="31" step="1" value="${Math.max(1, Number(d.due_day) || 1)}"></div>
           </div>
           <div class="field-row">
@@ -255,7 +253,18 @@
           <button class="btn btn-ghost" data-close>取消</button>
           <button class="btn btn-primary" id="bm-save">保存</button>
         </div></div>
-      `, true, '', 'form-mask');
+      `, false, 'edit-modal bill-modal', 'form-mask');
+
+      // 滚动条：与「新增记账 / 编辑记录」一致——平时隐形，滚动时显示浅灰 2px 细线，停止后隐去
+      const modalBody = mask.querySelector('.modal-body');
+      if (modalBody) {
+        let scrollTm = null;
+        modalBody.addEventListener('scroll', () => {
+          modalBody.classList.add('mscrolling');
+          clearTimeout(scrollTm);
+          scrollTm = setTimeout(() => modalBody.classList.remove('mscrolling'), 900);
+        }, { passive: true });
+      }
 
       const $ = id => document.getElementById(id);
       const catSel = $('bm-cat'), subSel = $('bm-sub'), cycleSel = $('bm-cycle'), endModeSel = $('bm-endmode');

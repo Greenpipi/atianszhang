@@ -735,22 +735,26 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .modal-mask.form-mask .modal{box-shadow:0 30px 80px rgba(15,23,42,.20)}
 /* 编辑记录弹窗：左右留白用变量（PC 60px / 小屏 26px） */
 .modal.edit-modal{--ed-pad-x:26px;padding:26px var(--ed-pad-x) 22px;display:flex;flex-direction:column;overflow:hidden}
-/* 编辑记录弹窗（PC）：固定 800×750；小屏回退默认弹窗 */
+/* 编辑记录 / 待办账单弹窗（PC）：固定 800×800；小屏回退默认弹窗 */
 @media (min-width:900px){
-  .modal.edit-modal{--ed-pad-x:60px;width:800px;height:750px;max-width:92vw;max-height:92dvh}
+  .modal.edit-modal{--ed-pad-x:60px;width:800px;height:800px;max-width:92vw;max-height:92dvh}
 }
 /* 内容区独立滚动，滚动条隐形化：不滚动时全透明，滚动时浅灰 2px 圆角细线（无底框，不破坏圆角） */
 .modal.edit-modal .modal-body{
   flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding-bottom:4px;
   /* 右缘延伸到弹窗边框内壁，滚动条紧贴右边缘；等量右内边距保持内容对齐 */
   margin-right:calc(var(--ed-pad-x) * -1);padding-right:var(--ed-pad-x);
-  scrollbar-width:thin;scrollbar-color:transparent transparent;
 }
 .modal.edit-modal .modal-body::-webkit-scrollbar{width:2px}
 .modal.edit-modal .modal-body::-webkit-scrollbar-track{background:transparent}
 .modal.edit-modal .modal-body::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
-.modal.edit-modal .modal-body.mscrolling{scrollbar-color:#D1D5DB transparent}
 .modal.edit-modal .modal-body.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+/* Firefox：不支持 ::-webkit-scrollbar，用标准属性兜底。
+   注意必须隔离——在 Chromium 里 scrollbar-width 会覆盖 webkit 规则，把 2px 细线撑成 8px 粗条 */
+@supports (-moz-appearance:none){
+  .modal.edit-modal .modal-body{scrollbar-width:thin;scrollbar-color:transparent transparent}
+  .modal.edit-modal .modal-body.mscrolling{scrollbar-color:#D1D5DB transparent}
+}
 /* 底部按钮区固定，上方 25px 白色渐变遮罩，滚动内容平滑淡出 */
 .modal.edit-modal .modal-foot{
   position:relative;flex:none;background:#fff;margin-top:16px;
@@ -763,12 +767,14 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 }
 .modal.edit-modal .modal-foot .modal-acts{margin-top:0}
 /* 好物标签框滚动条：同规则 */
-.tag-picker{scrollbar-width:thin;scrollbar-color:transparent transparent}
 .tag-picker::-webkit-scrollbar{width:2px}
 .tag-picker::-webkit-scrollbar-track{background:transparent}
 .tag-picker::-webkit-scrollbar-thumb{background:transparent;border-radius:2px}
-.tag-picker.mscrolling{scrollbar-color:#D1D5DB transparent}
 .tag-picker.mscrolling::-webkit-scrollbar-thumb{background:#D1D5DB}
+@supports (-moz-appearance:none){
+  .tag-picker{scrollbar-width:thin;scrollbar-color:transparent transparent}
+  .tag-picker.mscrolling{scrollbar-color:#D1D5DB transparent}
+}
 /* 金额输入框：加高 60px、去掉上下加减箭头 */
 .modal .amt-input{font-size:24px;font-weight:700;padding:0 14px;height:60px;appearance:textfield;-moz-appearance:textfield}
 .modal .amt-input::-webkit-outer-spin-button,.modal .amt-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
