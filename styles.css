@@ -1179,6 +1179,33 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .amt-opt{font-size:11.5px;font-weight:600;color:var(--muted);margin-left:6px}
 .amt-opt.req{color:var(--danger)}
 .amt-input.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,.1)}
+/* 卡片信息区可点开详情 */
+.bill-main[data-bill-act]{cursor:pointer}
+.bill-main[data-bill-act]:hover .bill-name{color:var(--primary)}
+
+/* 账单详情弹窗 */
+.bd-head{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.bd-head-main{flex:1;min-width:0}
+.bd-name{font-size:16px;font-weight:800;color:var(--text)}
+.bd-sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+.bd-badges{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.bd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.bd-item{display:flex;flex-direction:column;gap:3px;background:#F8FAFC;border-radius:10px;padding:9px 12px;min-width:0}
+.bd-item span{font-size:11.5px;font-weight:600;color:var(--muted)}
+.bd-item b{font-size:13.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+.bd-sec{font-size:12px;font-weight:700;color:var(--muted);margin:16px 0 8px}
+.bd-paid{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:10px 12px}
+.bd-paid b{font-size:16px;font-weight:800;color:#075985}
+.bd-paid span{font-size:12px;color:#0C4A6E}
+.bd-tag{font-style:normal;font-size:11px;font-weight:700;color:#0369A1;background:#E0F2FE;border-radius:999px;padding:2px 8px}
+.bd-tag.gray{color:var(--muted);background:#F1F5F9}
+.bd-terms{display:flex;flex-direction:column;gap:6px}
+.bd-term{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px}
+.bd-term em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--warn)}
+.bd-term.paid{border-color:#DCFCE7;background:#F0FDF4}
+.bd-term.paid em{color:var(--accent-deep)}
+.bd-more,.bd-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:4px}
+@media (max-width:520px){.bd-grid{grid-template-columns:1fr}}
 
 /* 已自动支付通知 */
 .bill-auto-notice{
@@ -1191,7 +1218,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .ban-row{
   display:flex;align-items:center;gap:12px;padding:8px 10px;background:#fff;
   border:1px solid #E0F2FE;border-radius:10px;margin-bottom:8px;
+  cursor:pointer;transition:border-color .15s,background .15s;
 }
+.ban-row:hover{border-color:#7DD3FC;background:#F8FCFF}
 .ban-row:last-child{margin-bottom:0}
 .ban-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .ban-main b{font-size:13.5px}

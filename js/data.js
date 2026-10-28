@@ -411,15 +411,42 @@ function billPayMethod(bill) { return (bill && bill.payment_method === 'auto') ?
 function billIsAuto(bill) { return billPayMethod(bill) === 'auto'; }
 /* 自动付必须要有预设金额作为入账来源；缺金额属于异常数据，按手动付降级处理 */
 function billAutoReady(bill) { return billIsAuto(bill) && Number(bill && bill.preset_amount) > 0; }
+/* 自动付的「生效下限」：创建日（按本地时区取日期，与 SQL 侧 created_at at time zone 'Asia/Shanghai' 对齐）。
+   作用：新建账单时如果开始日期在过去，不该把它当作漏付去补扣历史。 */
+function billAutoFloor(bill) {
+  if (billPayMethod(bill) !== 'auto') return '';
+  const raw = (bill && bill.created_at) || '';
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw).slice(0, 10);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+/* 计算用的账单副本：自动付账单的起点推进到「创建日之后的第一期」。
+   手动付账单原样返回 —— 手动付仍可补记历史期次。 */
+function billAutoBase(bill) {
+  if (!bill) return bill;
+  const floor = billAutoFloor(bill);
+  if (!floor) return bill;
+  const start = bill.start_date || '';
+  if (start && start >= floor) return bill;
+  for (let k = 0; k < 600; k++) {
+    const d = billOccurrence(bill, k);
+    if (d >= floor) return Object.assign({}, bill, { start_date: d });
+    if (bill.end_mode === 'date' && bill.end_date && d > bill.end_date) break;
+  }
+  return bill;
+}
 /* 枚举 <= untilDate 的全部应期（从 start_date 起，最多 600 期，防死循环） */
 function billOccurrencesUntil(bill, untilDate) {
   const out = [];
   const until = untilDate || todayStr();
   const start = (bill && bill.start_date) || '';
+  const floor = billAutoFloor(bill);
   for (let k = 0; k < 600; k++) {
     const d = billOccurrence(bill, k);
     if (d > until) break;
     if (start && d < start) continue;
+    if (floor && d < floor) continue;   // 自动付不回溯创建日之前的期次
     if (bill.end_mode === 'date' && bill.end_date && d > bill.end_date) continue;
     out.push(d);
   }
@@ -513,6 +540,7 @@ function billOccurrenceInMonth(bill, ym) {
 /* 账单状态：待支付 / 逾期未处理 / 已支付 / 已暂停 / 已结束 */
 function billStatus(bill, today) {
   today = today || todayStr();
+  bill = billAutoBase(bill);
   // 展示用类型名：优先「小类」（大类+小类改造后），退回老字段 btype，最后是自定义
   const typeName = bill.sub || (bill.btype === BILL_CUSTOM_TYPE ? (bill.custom_type || '自定义') : bill.btype) || '账单';
   const displayName = typeName;
@@ -569,6 +597,7 @@ function billStatus(bill, today) {
 function billDueThisMonth(bill, today) {
   today = today || todayStr();
   if (!bill || bill.paused) return false;
+  bill = billAutoBase(bill);
   if (bill.end_mode === 'date' && bill.end_date && today > bill.end_date) return false;
   const occ = billOccurrenceInMonth(bill, today.slice(0, 7));
   if (!occ) return false;

@@ -79,7 +79,8 @@
         this.renderBills();
       };
       el.querySelectorAll('[data-auto-fix]').forEach(btn => {
-        btn.onclick = () => this.correctBillAmount(btn.dataset.autoFix);
+        // 按钮在可点击的通知行里，阻止冒泡避免误开详情
+        btn.onclick = e => { if (e && e.stopPropagation) e.stopPropagation(); this.correctBillAmount(btn.dataset.autoFix); };
       });
       body.querySelectorAll('[data-bill-act]').forEach(btn => {
         const id = btn.dataset.bid, act = btn.dataset.billAct;
@@ -89,7 +90,11 @@
           else if (act === 'pause') this.toggleBillPause(id);
           else if (act === 'del') this.deleteBill(id);
           else if (act === 'fix') this.correctBillAmount(id);
+          else if (act === 'detail') this.openBillDetail(id);
         };
+      });
+      el.querySelectorAll('[data-auto-detail]').forEach(row => {
+        row.onclick = () => this.openBillDetail(row.dataset.autoDetail);
       });
       this.enhanceSelects(el);
       if (this.updateBillsBadge) this.updateBillsBadge();
@@ -132,7 +137,7 @@
       return `
       <div class="bill-card ${st.cls}">
         <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
-        <div class="bill-main">
+        <div class="bill-main" data-bill-act="detail" data-bid="${b.id}" title="查看账单详情">
           <div class="bill-name">${esc(b.name || st.displayName)}
             <span class="badge badge-${st.cls}">${esc(st.label)}</span>
             ${isAuto ? '<span class="badge badge-auto">自动</span>' : ''}
@@ -567,7 +572,7 @@
           <button class="btn btn-ghost btn-sm" id="bill-auto-ack">全部已核对</button>
         </div>
         ${rows.map(r => `
-          <div class="ban-row">
+          <div class="ban-row" data-auto-detail="${r.b.id}" title="查看账单详情">
             <div class="bill-ico" style="width:34px;height:34px;font-size:16px;background:${r.st.meta.color}1F;color:${r.st.meta.color}">${r.st.meta.emoji}</div>
             <div class="ban-main">
               <b>${esc(r.b.name || r.st.displayName)}</b>
@@ -590,19 +595,111 @@
       }
     },
 
+    /* ---------- 账单详情（只读）：点卡片信息区或「已自动支付」通知行进入 ---------- */
+    openBillDetail(billId) {
+      const b = billList().find(x => x.id === billId);
+      if (!b) return this.toast('账单不存在', 'err');
+      const today = todayStr();
+      const st = billStatus(b, today);
+      const base = billAutoBase(b);
+      const isAuto = billIsAuto(b);
+      const amt = Number(b.preset_amount);
+      const paidPeriod = b.paid_period || '';
+      const paidAmt = Number(b.paid_amount);
+
+      // 期次清单：从「生效起点」枚举到结束日期（自动付不会出现创建日之前的期次）
+      const limit = (b.end_mode === 'date' && b.end_date) ? b.end_date : '2100-12-31';
+      const terms = [];
+      for (let k = 0; k < 600; k++) {
+        const d = billOccurrence(base, k);
+        if (d > limit) break;
+        if (base.start_date && d < base.start_date) continue;
+        terms.push({ d, paid: !!(paidPeriod && paidPeriod >= d) });
+      }
+      const firstUnpaid = terms.findIndex(t => !t.paid);
+      const from = Math.max(0, (firstUnpaid === -1 ? terms.length : firstUnpaid) - 1);
+      const shown = terms.slice(from, from + 5);
+
+      const remain = (st.paused || st.ended || st.paid) ? ''
+        : (st.daysSince != null && st.daysSince > 0) ? '已过 ' + st.daysSince + ' 天'
+          : st.daysSince === 0 ? '今天到期'
+            : (st.daysTo != null ? st.daysTo + ' 天后' : '');
+      const statusText = st.paused ? '已暂停' : st.ended ? '已结束'
+        : st.paid ? (b.paid_by === 'auto' ? '已自动扣款' : '已支付')
+          : (st.state === 'auto' ? '等待自动入账' : '待支付');
+      const endText = (b.end_mode === 'date' && b.end_date) ? b.end_date : '永不结束';
+      const paidAtText = b.paid_at ? (() => {
+        const d = new Date(b.paid_at);
+        return isNaN(d.getTime()) ? '' : d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      })() : '';
+
+      const item = (label, value) => `<div class="bd-item"><span>${esc(label)}</span><b>${value}</b></div>`;
+
+      const mask = this.openModal(`
+        <div class="modal-title">账单详情<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+        <div class="bd-head">
+          <div class="bill-ico" style="background:${st.meta.color}1F;color:${st.meta.color}">${st.meta.emoji}</div>
+          <div class="bd-head-main">
+            <div class="bd-name">${esc(b.name || st.displayName)}</div>
+            <div class="bd-sub">${esc(b.cat || '未分类')}${b.sub ? ' / ' + esc(b.sub) : ''} · ${esc(billDueText(b))}</div>
+          </div>
+          <div class="bd-badges">
+            <span class="badge badge-${st.cls}">${esc(statusText)}</span>
+            <span class="badge ${isAuto ? 'badge-auto' : 'badge-gray'}">${isAuto ? '自动' : '手动'}</span>
+          </div>
+        </div>
+        <div class="bd-grid">
+          ${item('本期应期', st.dueDate ? esc(billDateText(st.dueDate, true)) + (remain ? '（' + esc(remain) + '）' : '') : '—')}
+          ${item('预设金额', amt > 0 ? fmtMoney(amt) : '未设置')}
+          ${item('开始日期', esc(b.start_date || '—'))}
+          ${item('结束日期', esc(endText))}
+          ${st.nextDate ? item('下次到期', esc(billDateText(st.nextDate, true))) : ''}
+          ${b.note ? item('备注', esc(b.note)) : ''}
+        </div>
+        ${paidPeriod ? `
+        <div class="bd-sec">最近一次入账</div>
+        <div class="bd-paid">
+          <b>${fmtMoney(paidAmt)}</b>
+          <span>${esc(billDateText(paidPeriod, true))} 的期次 · ${b.paid_by === 'auto' ? '自动扣款' : '手动确认'}${paidAtText ? ' · ' + paidAtText + ' 入账' : ''}</span>
+          ${b.paid_record_id ? '<em class="bd-tag">已记入账册</em>' : '<em class="bd-tag gray">账册记录已删除</em>'}
+        </div>` : ''}
+        <div class="bd-sec">期次（共 ${terms.length} 期）</div>
+        <div class="bd-terms">
+          ${shown.length ? shown.map(t => `<div class="bd-term${t.paid ? ' paid' : ''}">
+            <span>${esc(billDateText(t.d, true))}</span>
+            <em>${t.paid ? '已付' : (t.d === st.dueDate ? esc(statusText) : '未付')}</em>
+          </div>`).join('') : '<div class="bd-empty">该周期内没有应期</div>'}
+          ${terms.length > shown.length ? '<div class="bd-more">仅显示当前附近的期次</div>' : ''}
+        </div>
+        <div class="modal-acts">
+          <button class="btn btn-ghost" data-bd-edit style="margin-right:auto">编辑账单</button>
+          ${b.paid_record_id && b.paid_by === 'auto' ? '<button class="btn btn-ghost" data-bd-fix>修正金额</button>' : ''}
+          <button class="btn btn-primary" data-close>关闭</button>
+        </div>
+      `, true, '', 'form-mask');
+
+      const editBtn = mask.querySelector('[data-bd-edit]');
+      if (editBtn) editBtn.onclick = () => { this.closeModal(); this.openBillModal(b.id); };
+      const fixBtn = mask.querySelector('[data-bd-fix]');
+      if (fixBtn) fixBtn.onclick = async () => {
+        const ok = await this.correctBillAmount(b.id);   // 输入框压在详情之上
+        if (ok) this.closeModal();
+      };
+    },
+
     /* ---------- 修正自动入账金额（只改这一笔，不动预设金额） ---------- */
     async correctBillAmount(billId) {
       const b = billList().find(x => x.id === billId);
-      if (!b) return;
-      if (!b.paid_record_id) return this.toast('这一期没有关联的账册记录，无法修正');
+      if (!b) return false;
+      if (!b.paid_record_id) { this.toast('这一期没有关联的账册记录，无法修正'); return false; }
       const raw = await this.promptDialog(
         '修正入账金额',
         (b.name || '账单') + ' · ' + billDateText(b.paid_period) + ' 的实际金额（只改这一笔，不改预设金额）',
         String(Number(b.paid_amount) || '')
       );
-      if (raw == null) return;
+      if (raw == null) return false;
       const amount = Number(raw);
-      if (!(amount > 0)) return this.toast('请输入正确金额', 'err');
+      if (!(amount > 0)) { this.toast('请输入正确金额', 'err'); return false; }
       try {
         await Store.update('records', b.paid_record_id, { amount });
         await Store.update('bills', b.id, { paid_amount: amount });
@@ -611,8 +708,10 @@
         if (rec) rec.amount = amount;
         this.toast('已修正为 ' + fmtMoney(amount) + '，预设金额不变', 'ok');
         this.renderBills();
+        return true;
       } catch (e) {
         this.toast(e.message || '修正失败', 'err');
+        return false;
       }
     },
 
