@@ -561,11 +561,14 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .u-unused{color:#0F172A}
 .u-dropped{color:#94A3B8}
 .u-depleted{color:#7C3AED}
-.season-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:4px}
-.season-cell{display:flex;flex-direction:column;gap:5px;align-items:center;padding:8px 4px;background:#F7F8FB;border:1px solid var(--line);border-radius:10px}
+.season-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:4px}
+.season-cell{display:flex;flex-direction:column;gap:5px;align-items:stretch;padding:8px 4px;background:#F7F8FB;border:1px solid var(--line);border-radius:10px;min-width:0}
 .sc-m{font-size:12px;font-weight:700;color:var(--muted)}
-.sc-sel{height:34px;width:100%;border:1px solid var(--line);border-radius:8px;padding:0 4px;background:#fff;font-size:13px}
-@media (max-width:560px){.season-grid{grid-template-columns:repeat(4,1fr)}}
+.sc-sel{height:34px;width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:0 4px;background:#fff;font-size:13px}
+.season-cell .csel{display:block;width:100%}
+.season-cell .csel-btn{width:100%;font-size:13px;padding:0 6px}
+@media (max-width:560px){.season-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:400px){.season-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
 .filter-bar .field{min-width:150px}
 
