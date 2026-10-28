@@ -1,4 +1,4 @@
-/* ============ 周期性待办账单：渲染 / 交互 / 提醒 ============
+/* ============ 周期性待办账单：渲染 / 交互 ============
  * 依赖 app.js 的 App（弹窗、toast、日历、自定义下拉）与 data.js 的纯计算。
  * 数据存独立 bills 表；仅「已付」时写入 records 并回填 paid_record_id。
  * 本文件在 app.js 之后以 defer 加载，用 Object.assign 挂到 App 上。
@@ -89,7 +89,7 @@
       const amt = Number(b.preset_amount);
       let dueLine = '';
       if (st.paused) {
-        dueLine = billDueText(b) + ' · 已暂停，不会提醒';
+        dueLine = billDueText(b) + ' · 已暂停';
       } else if (st.ended) {
         dueLine = billDueText(b) + ' · 已结束';
       } else if (st.state === 'paid') {
@@ -98,7 +98,11 @@
         const d = st.daysSince;
         if (d != null && d > 0) dueLine = '应于 ' + billDateText(st.dueDate) + ' 支付' + (d > 3 ? ' · 已逾期 ' + d + ' 天' : '');
         else if (d === 0) dueLine = '今天到期 · 请确认是否已付';
-        else dueLine = billDateText(st.dueDate) + ' 到期' + (st.daysTo != null ? '（' + st.daysTo + ' 天后）' : '');
+        else if (st.daysTo != null) {
+          // 剩余 ≤3 天时倒计时标红，提醒尽快处理
+          const urgent = st.daysTo <= 3;
+          dueLine = billDateText(st.dueDate) + ' 到期<span class="bill-countdown' + (urgent ? ' red' : '') + '">（' + st.daysTo + ' 天后）</span>';
+        } else dueLine = billDateText(st.dueDate) + ' 到期';
       }
       const canPay = !st.paused && !st.ended && !st.paid && !!st.dueDate;
       return `
@@ -110,7 +114,7 @@
             ${st.state === 'paid' && b.paid_record_id ? '<span class="badge badge-green">已入账</span>' : ''}
             ${b.paused ? '<span class="badge badge-gray">已暂停</span>' : ''}
           </div>
-          <div class="bill-meta">${esc(billDueText(b))} · ${esc(billCycleLabel(b))} · 提醒 ${esc(b.remind_time || '09:00')}</div>
+          <div class="bill-meta">${esc(billDueText(b))}</div>
           <div class="bill-meta">${esc(dueLine)}</div>
         </div>
         <div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? '预设金额' : '每期填写'}</span></div>
@@ -154,15 +158,29 @@
       }
       const b = billId ? billList().find(x => x.id === billId) : null;
       const d = b || {
-        name: '', btype: '房贷', custom_type: '', cycle: 'monthly', cycle_months: 1,
-        due_day: 15, due_month: new Date().getMonth() + 1, remind_time: '09:00',
+        name: '', cat: '', sub: '', cycle: 'monthly', cycle_months: 1,
+        due_day: 15, due_month: new Date().getMonth() + 1,
         start_date: todayStr(), end_mode: 'never', end_date: '', preset_amount: null, note: ''
       };
-      const isCustomType = d.btype === BILL_CUSTOM_TYPE;
       const isYearly = d.cycle === 'yearly';
       const isCustomCycle = d.cycle === 'custom';
-      const typeOpts = BILL_TYPES.map(t => `<option value="${t.name}" ${d.btype === t.name ? 'selected' : ''}>${t.emoji} ${t.name}</option>`).join('')
-        + `<option value="${BILL_CUSTOM_TYPE}" ${isCustomType ? 'selected' : ''}>✏️ 自定义</option>`;
+      // 大类 / 小类：与「新增记账」完全一致（大类来自账本分类，小类取该大类下的子类）
+      const ledgerId = this.state.currentLedgerId || ((this.state.ledgers || [])[0] || {}).id;
+      const cats = this.catsOf(ledgerId);
+      const defCat = (d.cat && cats.some(c => c.name === d.cat)) ? d.cat
+        : (cats.some(c => c.name === '固定支出') ? '固定支出' : ((cats[0] || {}).name || ''));
+      const catOpts = cats.map(c => `<option value="${esc(c.name)}" ${defCat === c.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+      const subsOf = name => {
+        const c = this.catByName(ledgerId, name);
+        const list = ((c && c.subs) || []).slice();
+        // 合并 10 种预设类型，保证还没建过小类时也能直接选到房贷 / 水电燃气等
+        BILL_TYPES.forEach(t => { if (!list.includes(t.name)) list.push(t.name); });
+        return list;
+      };
+      const firstSubs = subsOf(defCat);
+      const defSub = firstSubs.includes(d.sub) ? d.sub
+        : (firstSubs.includes(d.btype) ? d.btype : (firstSubs[0] || ''));
+      const subOpts = firstSubs.map(s => `<option value="${esc(s)}" ${defSub === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
       const cycleOpts = BILL_CYCLES.map(c => `<option value="${c.key}" ${d.cycle === c.key ? 'selected' : ''}>${c.label}</option>`).join('');
 
       const mask = this.openModal(`
@@ -170,8 +188,8 @@
         <div class="modal-body">
           <div class="field"><label>账单名称</label><input id="bm-name" type="text" maxlength="40" placeholder="如：招商银行房贷" value="${esc(d.name)}"></div>
           <div class="field-row">
-            <div class="field"><label>账单类型</label><select id="bm-type">${typeOpts}</select></div>
-            <div class="field" id="bm-custom-field" ${isCustomType ? '' : 'hidden'}><label>自定义类型</label><input id="bm-custom" type="text" maxlength="20" placeholder="如：宠物保险" value="${esc(d.custom_type || '')}"></div>
+            <div class="field"><label>大类</label><select id="bm-cat">${catOpts}</select></div>
+            <div class="field"><label>小类</label><select id="bm-sub">${subOpts}</select></div>
           </div>
           <div class="field-row">
             <div class="field"><label>周期</label><select id="bm-cycle">${cycleOpts}</select></div>
@@ -180,7 +198,6 @@
           <div class="field-row">
             <div class="field" id="bm-duemonth-field" ${isYearly ? '' : 'hidden'}><label>每年几月</label><select id="bm-duemonth">${Array.from({ length: 12 }, (_, i) => i + 1).map(m => `<option value="${m}" ${Number(d.due_month) === m ? 'selected' : ''}>${m} 月</option>`).join('')}</select></div>
             <div class="field"><label>到期日（几号）</label><input id="bm-dueday" type="number" min="1" max="31" step="1" value="${Math.max(1, Number(d.due_day) || 1)}"></div>
-            <div class="field"><label>提醒时间</label><input id="bm-time" type="time" value="${esc(d.remind_time || '09:00')}"></div>
           </div>
           <div class="field-row">
             <div class="field"><label>开始日期</label><input id="bm-start" type="text" class="cal-input" readonly value="${esc(d.start_date || todayStr())}" data-date="${esc(d.start_date || todayStr())}" placeholder="选择日期"></div>
@@ -188,7 +205,7 @@
             <div class="field" id="bm-end-field" ${d.end_mode === 'date' ? '' : 'hidden'}><label>结束于</label><input id="bm-end" type="text" class="cal-input" readonly value="${esc(d.end_date || '')}" data-date="${esc(d.end_date || '')}" placeholder="选择日期"></div>
           </div>
           <div class="field-row">
-            <div class="field"><label>预设金额（元，可选）</label><input id="bm-amount" type="number" min="0" step="0.01" value="${d.preset_amount != null ? Number(d.preset_amount) : ''}" placeholder="留空表示每期提醒时填写"></div>
+            <div class="field"><label>预设金额（元，可选）</label><input id="bm-amount" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00" value="${d.preset_amount != null ? Number(d.preset_amount) : ''}"></div>
           </div>
           <div class="field"><label>备注</label><textarea id="bm-note" rows="2" placeholder="选填">${esc(d.note || '')}</textarea></div>
           <p class="bill-form-tip" id="bm-preview"></p>
@@ -202,21 +219,24 @@
       `, true, '', 'form-mask');
 
       const $ = id => document.getElementById(id);
-      const typeSel = $('bm-type'), cycleSel = $('bm-cycle'), endModeSel = $('bm-endmode');
-      const customField = $('bm-custom-field'), cycField = $('bm-cycmonths-field'), dueMonthField = $('bm-duemonth-field'), endField = $('bm-end-field');
+      const catSel = $('bm-cat'), subSel = $('bm-sub'), cycleSel = $('bm-cycle'), endModeSel = $('bm-endmode');
+      const cycField = $('bm-cycmonths-field'), dueMonthField = $('bm-duemonth-field'), endField = $('bm-end-field');
       const refresh = () => {
-        customField.hidden = typeSel.value !== BILL_CUSTOM_TYPE;
         cycField.hidden = cycleSel.value !== 'custom';
         dueMonthField.hidden = cycleSel.value !== 'yearly';
         endField.hidden = endModeSel.value !== 'date';
       };
       refresh();
-      typeSel.onchange = refresh;
       cycleSel.onchange = refresh;
       endModeSel.onchange = refresh;
+      // 切大类时重建小类选项
+      const fillSubs = () => {
+        subSel.innerHTML = subsOf(catSel.value).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+        this.enhanceSelects(subSel);
+      };
       this.enhanceSelects(mask);
 
-      // 下一次到期预览（与参考的频率编辑器一致，随输入即时更新）
+      // 下一次到期预览（随输入即时更新）
       const previewEl = $('bm-preview');
       const updatePreview = () => {
         try {
@@ -228,14 +248,14 @@
             start_date: $('bm-start').dataset.date || todayStr()
           };
           const next = billSchedule(tmp, todayStr()).next;
-          previewEl.textContent = next ? '下一次到期：' + billDateText(next, true) + ' ' + ($('bm-time').value || '09:00') : '下一次到期：—';
+          previewEl.textContent = next ? '下一次到期：' + billDateText(next, true) : '下一次到期：—';
         } catch (e) { previewEl.textContent = ''; }
       };
-      ['bm-cycmonths', 'bm-dueday', 'bm-duemonth', 'bm-time', 'bm-start'].forEach(id => {
+      ['bm-cycmonths', 'bm-dueday', 'bm-duemonth', 'bm-start'].forEach(id => {
         const elx = $(id);
         if (elx) elx.addEventListener('change', updatePreview);
       });
-      typeSel.addEventListener('change', updatePreview);
+      catSel.onchange = () => { fillSubs(); updatePreview(); };
       cycleSel.addEventListener('change', updatePreview);
       updatePreview();
 
@@ -248,14 +268,13 @@
       $('bm-save').onclick = async () => {
         const name = $('bm-name').value.trim();
         if (!name) return this.toast('请填写账单名称', 'err');
-        const btype = typeSel.value;
-        const customType = $('bm-custom').value.trim();
-        if (btype === BILL_CUSTOM_TYPE && !customType) return this.toast('请填写自定义类型', 'err');
+        const cat = catSel.value || '';
+        const sub = subSel.value || '';
+        if (!cat || !sub) return this.toast('请选择大类和小类', 'err');
         const cycle = cycleSel.value;
         const cycleMonths = Math.max(1, Math.min(60, parseInt($('bm-cycmonths').value, 10) || 1));
         const dueDay = Math.max(1, Math.min(31, parseInt($('bm-dueday').value, 10) || 1));
         const dueMonth = Math.max(1, Math.min(12, parseInt($('bm-duemonth').value, 10) || 1));
-        const remind = $('bm-time').value || '09:00';
         const startDate = $('bm-start').dataset.date || $('bm-start').value || todayStr();
         const endMode = endModeSel.value;
         const endDate = endMode === 'date' ? ($('bm-end').dataset.date || $('bm-end').value || '') : '';
@@ -265,8 +284,9 @@
         const preset = amtRaw === '' ? null : Math.max(0, Number(amtRaw) || 0);
         const note = $('bm-note').value.trim();
         const row = {
-          name, btype, custom_type: customType, cycle, cycle_months: cycleMonths,
-          due_day: dueDay, due_month: dueMonth, remind_time: remind,
+          name, cat, sub, btype: sub, // btype 继续写入，兼容旧版本客户端与年度统计
+          cycle, cycle_months: cycleMonths,
+          due_day: dueDay, due_month: dueMonth,
           start_date: startDate, end_mode: endMode, end_date: endDate,
           preset_amount: preset, note
         };
@@ -296,7 +316,7 @@
       try {
         await Store.update('bills', id, { paused: next });
         b.paused = next;
-        this.toast(next ? '已暂停提醒' : '已恢复提醒', 'ok');
+        this.toast(next ? '已暂停' : '已启用', 'ok');
         this.renderBills();
       } catch (e) { this.toast(e.message || '操作失败', 'err'); }
     },
@@ -335,13 +355,14 @@
 
       const ledgerId = this.state.currentLedgerId || (this.state.ledgers[0] || {}).id;
       if (!ledgerId) { this.toast('请先选择一个账本', 'err'); return false; }
-      const cat = this.catByName(ledgerId, '固定支出') ? '固定支出' : ((this.catsOf(ledgerId)[0] || {}).name || '');
-      // 入账小类：优先复用「固定支出」下已有小类（如 房贷/保险/物业费），便于预算与统计聚合；
-      // 没有匹配则用账单名称，名称始终写入备注保留。
+      // 入账归类：优先用账单里选好的「大类 / 小类」；老数据没有这两个字段时退回「固定支出」+ 类型名
+      const cat = (b.cat && this.catByName(ledgerId, b.cat)) ? b.cat
+        : (this.catByName(ledgerId, '固定支出') ? '固定支出' : ((this.catsOf(ledgerId)[0] || {}).name || ''));
       const catObj = this.catByName(ledgerId, cat);
       const subs = (catObj && catObj.subs) || [];
-      let sub = b.name || st.displayName;
-      if (subs.includes(b.name)) sub = b.name;
+      let sub = b.sub || b.btype || b.name || st.displayName;
+      if (b.sub && subs.includes(b.sub)) sub = b.sub;
+      else if (subs.includes(b.name)) sub = b.name;
       else if (subs.includes(b.btype)) sub = b.btype;
 
       try {
@@ -372,96 +393,6 @@
         this.toast(e.message || '支付确认失败', 'err');
         return false;
       }
-    },
-
-    /* ---------- 提醒：启动 / 轮询 / 到期弹窗 ---------- */
-    initBillReminders() {
-      this.checkBillReminders();
-      if (this._billTimer) clearInterval(this._billTimer);
-      this._billTimer = setInterval(() => this.checkBillReminders(), 5 * 60 * 1000);
-    },
-
-    checkBillReminders() {
-      if (!Store.user) return;
-      const bills = billList();
-      if (!bills.length) { if (this.updateBillsBadge) this.updateBillsBadge(); return; }
-      const today = todayStr();
-      const now = new Date();
-      const nowHM = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
-      const pre = [], formal = [];
-
-      bills.forEach(b => {
-        if (b.paused) return;
-        const st = billStatus(b, today);
-        if (st.ended) return;
-        // 预提醒：下一个「未付」应期在 1~3 天内（每期只提醒一次）
-        let preDate = null;
-        if (!st.paid && st.dueDate && st.dueDate > today) preDate = st.dueDate;       // 本期未付、尚未到期
-        else if (st.paid && st.nextDate && st.nextDate >= today) preDate = st.nextDate; // 本期已付、下一期将到
-        if (preDate) {
-          const daysTo = dayDiff(today, preDate);
-          if (daysTo >= 1 && daysTo <= 3) {
-            const key = 'fin_brp_' + b.id + '_' + preDate;
-            let seen = false; try { seen = !!localStorage.getItem(key); } catch (e) { seen = false; }
-            if (!seen) pre.push({ bill: b, st, occurrence: preDate, daysTo, key });
-          }
-        }
-        // 正式提醒：今天到期 + 已到提醒时间 + 未支付（每期只提醒一次）
-        if (st.dueDate === today && st.state !== 'paid') {
-          const key = 'fin_brf_' + b.id + '_' + today;
-          let seen = false; try { seen = !!localStorage.getItem(key); } catch (e) { seen = false; }
-          if (!seen && nowHM >= (b.remind_time || '09:00')) formal.push({ bill: b, st, occurrence: today, key });
-        }
-      });
-
-      if (pre.length) {
-        pre.forEach(p => { try { localStorage.setItem(p.key, '1'); } catch (e) { /* ignore */ } });
-        if (pre.length === 1) {
-          const p = pre[0];
-          this.toast('「' + (p.bill.name || p.st.displayName) + '」将在 ' + p.daysTo + ' 天后到期（' + billDateText(p.occurrence) + '）', 'warn');
-        } else {
-          this.toast('有 ' + pre.length + ' 项账单将在 3 天内到期，可到「待办账单」查看', 'warn');
-        }
-      }
-
-      // 已有弹窗时暂不打扰，留待下次检查（不标记已提醒，避免丢失）
-      if (formal.length && !document.querySelector('.modal-mask')) {
-        formal.forEach(f => { try { localStorage.setItem(f.key, '1'); } catch (e) { /* ignore */ } });
-        this.showBillReminderModal(formal);
-      }
-      if (this.updateBillsBadge) this.updateBillsBadge();
-    },
-
-    showBillReminderModal(items) {
-      if (!items || !items.length) return;
-      const modal = this.openModal(`
-        <div class="modal-title">账单到期提醒<button class="icon-btn" style="display:flex" data-close>✕</button></div>
-        <div class="modal-body">
-          <p class="bill-remind-tip">以下账单已到支付日，确认后将自动记入账册：</p>
-          ${items.map(it => {
-            const amt = Number(it.bill.preset_amount);
-            return `<div class="bill-remind-row" data-bid="${it.bill.id}" data-due="${it.occurrence}">
-              <div class="bill-ico" style="width:38px;height:38px;font-size:18px;background:${it.st.meta.color}1F;color:${it.st.meta.color}">${it.st.meta.emoji}</div>
-              <div class="bill-remind-main">
-                <b>${esc(it.bill.name || it.st.displayName)}</b>
-                <span>${billDateText(it.occurrence)} 到期 · ${amt > 0 ? '金额 ' + fmtMoney(amt) : '金额待填写'}</span>
-              </div>
-              <button class="btn btn-primary btn-sm" data-bill-pay>已付</button>
-            </div>`;
-          }).join('')}
-        </div>
-        <div class="modal-foot"><div class="modal-acts"><button class="btn btn-ghost" data-close>稍后处理</button></div></div>
-      `);
-      modal.querySelectorAll('[data-bill-pay]').forEach(btn => {
-        btn.onclick = async () => {
-          const row = btn.closest('.bill-remind-row');
-          const ok = await this.payBill(row.dataset.bid, row.dataset.due);
-          if (ok) {
-            row.remove();
-            if (!modal.querySelectorAll('.bill-remind-row').length) this.closeModal();
-          }
-        };
-      });
     },
 
     /* ---------- 导航红点 ---------- */

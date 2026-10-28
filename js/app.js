@@ -42,7 +42,6 @@ const App = {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (this.state.records.length) this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
-        if (this.checkBillReminders) this.checkBillReminders();
       }
     });
     this.updateOnline();
@@ -162,8 +161,6 @@ const App = {
     // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
     this.paintFromCache();
     await this.loadData();
-    // 待办账单：启动提醒检查 + 定时轮询（bills.js 提供）
-    if (this.initBillReminders) this.initBillReminders();
     // 好物数据自动自愈：补定格快照 + 恢复被误重置的已陪伴天数（无需用户任何操作）
     this.autoRepairWishData().then(n => {
       if (n) {
@@ -3986,6 +3983,8 @@ begin
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users(id) on delete cascade,
     name text not null default '',
+    cat text not null default '',
+    sub text not null default '',
     btype text not null default '',
     custom_type text not null default '',
     cycle text not null default 'monthly',
@@ -4045,6 +4044,8 @@ begin
   execute $ddl$ alter table templates  add column if not exists emoji    text         not null default '' $ddl$;
   execute $ddl$ alter table budgets    add column if not exists month    text         not null default '' $ddl$;
   execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists cat      text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists sub      text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;

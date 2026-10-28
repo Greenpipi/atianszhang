@@ -89,6 +89,8 @@ begin
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users(id) on delete cascade,
     name text not null default '',
+    cat text not null default '',
+    sub text not null default '',
     btype text not null default '',
     custom_type text not null default '',
     cycle text not null default 'monthly',
@@ -148,6 +150,8 @@ begin
   execute $ddl$ alter table templates  add column if not exists emoji    text         not null default '' $ddl$;
   execute $ddl$ alter table budgets    add column if not exists month    text         not null default '' $ddl$;
   execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists cat      text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists sub      text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;

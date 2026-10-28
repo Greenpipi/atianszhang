@@ -490,7 +490,9 @@ function billOccurrenceInMonth(bill, ym) {
 /* 账单状态：待支付 / 逾期未处理 / 已支付 / 已暂停 / 已结束 */
 function billStatus(bill, today) {
   today = today || todayStr();
-  const displayName = bill.btype === BILL_CUSTOM_TYPE ? (bill.custom_type || '自定义') : (bill.btype || '账单');
+  // 展示用类型名：优先「小类」（大类+小类改造后），退回老字段 btype，最后是自定义
+  const typeName = bill.sub || (bill.btype === BILL_CUSTOM_TYPE ? (bill.custom_type || '自定义') : bill.btype) || '账单';
+  const displayName = typeName;
   const base = { meta: billTypeMeta(displayName), displayName, today };
   if (bill.paused) {
     return Object.assign(base, { state: 'paused', label: '已暂停', cls: 'gray', dueDate: null, nextDate: null, paid: false, unpaid: false, paused: true, ended: false, daysSince: null, daysTo: null });
@@ -561,7 +563,7 @@ function billYearOverview(bills, year) {
       count++;
     }
     if (!count) return;
-    const name = b.btype === BILL_CUSTOM_TYPE ? (b.custom_type || '自定义') : (b.btype || '其他');
+    const name = b.sub || (b.btype === BILL_CUSTOM_TYPE ? (b.custom_type || '自定义') : (b.btype || '其他'));
     const amt = Number(b.preset_amount) || 0;
     const row = map[name] || (map[name] = { name, count: 0, amount: 0, hasAmount: false });
     row.count += count;
