@@ -84,6 +84,31 @@ begin
     created_at timestamptz not null default now()
   ) $ddl$;
 
+  -- 周期性待办账单（与 records 分开存储；确认已付时才写入 records）
+  execute $ddl$ create table if not exists bills (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    name text not null default '',
+    btype text not null default '',
+    custom_type text not null default '',
+    cycle text not null default 'monthly',
+    cycle_months integer not null default 1,
+    due_day integer not null default 1,
+    due_month integer not null default 1,
+    remind_time text not null default '09:00',
+    start_date text not null default '',
+    end_mode text not null default 'never',
+    end_date text not null default '',
+    preset_amount numeric,
+    paused boolean not null default false,
+    paid_period text not null default '',
+    paid_amount numeric,
+    paid_record_id uuid,
+    paid_at timestamptz,
+    note text not null default '',
+    created_at timestamptz not null default now()
+  ) $ddl$;
+
   -- 顶部横幅配置（每用户一行，banner 图 + 位置）
   execute $ddl$ create table if not exists banners (
     user_id uuid primary key references auth.users(id) on delete cascade,
@@ -131,6 +156,7 @@ begin
   execute $ddl$ alter table budgets    enable row level security $ddl$;
   execute $ddl$ alter table templates  enable row level security $ddl$;
   execute $ddl$ alter table banners    enable row level security $ddl$;
+  execute $ddl$ alter table bills      enable row level security $ddl$;
 
   execute $ddl$ drop policy if exists "own ledgers" on ledgers $ddl$;
   execute $ddl$ create policy "own ledgers" on ledgers for all
@@ -156,6 +182,10 @@ begin
   execute $ddl$ create policy "own banners" on banners for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：6 张表已创建（含 banners），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  execute $ddl$ drop policy if exists "own bills" on bills $ddl$;
+  execute $ddl$ create policy "own bills" on bills for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
+
+  return 'done：7 张表已创建（含 banners、bills），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;

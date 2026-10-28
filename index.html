@@ -82,6 +82,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v18l-4-2.6L12.4 22 8.8 19.4 5.6 22V5z"/><path d="M8 7h8M8 11h5"/></svg>
         <span>记账本</span>
       </a>
+      <a href="#/bills" data-route="bills" class="nav-item" title="待办账单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
+        <span>待办账单</span>
+        <span class="nav-badge" id="bills-badge" hidden></span>
+      </a>
       <a href="#/wishlist" data-route="wishlist" class="nav-item" title="好物仓库">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.6a5.5 5.5 0 0 0-9.3-2.4l-.5.6-.5-.6a5.5 5.5 0 0 0-9.3 6.3l8.4 8.9a1.8 1.8 0 0 0 2.7 0l8.5-9.1a5.5 5.5 0 0 0 0-3.7z"/></svg>
         <span>好物仓库</span>
@@ -146,6 +151,7 @@
 
     <main class="content" id="content">
       <section class="view" id="view-ledger"></section>
+      <section class="view" id="view-bills"></section>
       <section class="view" id="view-wishlist"></section>
       <section class="view" id="view-stats"></section>
       <section class="view" id="view-rental"></section>
@@ -165,5 +171,6 @@
 <script defer src="js/notion-import.js"></script>
 <script defer src="js/charts.js"></script>
 <script defer src="js/app.js"></script>
+<script defer src="js/bills.js"></script>
 </body>
 </html>

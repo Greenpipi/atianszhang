@@ -10,6 +10,8 @@ const App = {
   state: {
     route: 'ledger',
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
+    bills: [],              // 周期性待办账单（独立于 records）
+    billsTab: 'due',        // due 本月待付 / all 全部 / overview 今年总览
     currentLedgerId: null,
     ledgerMonth: thisMonth(),
     wish: { sort: 'date-desc', tag: '', cats: [], open: [] },
@@ -38,8 +40,9 @@ const App = {
     window.addEventListener('hashchange', () => this.route());
     // 标签页重新可见时检测是否跨入新月份，触发季节自动切换（非实时轮询）
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.state.records.length) {
-        this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
+      if (document.visibilityState === 'visible') {
+        if (this.state.records.length) this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
+        if (this.checkBillReminders) this.checkBillReminders();
       }
     });
     this.updateOnline();
@@ -159,6 +162,8 @@ const App = {
     // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
     this.paintFromCache();
     await this.loadData();
+    // 待办账单：启动提醒检查 + 定时轮询（bills.js 提供）
+    if (this.initBillReminders) this.initBillReminders();
     // 好物数据自动自愈：补定格快照 + 恢复被误重置的已陪伴天数（无需用户任何操作）
     this.autoRepairWishData().then(n => {
       if (n) {
@@ -361,8 +366,9 @@ const App = {
     if (this.state.loading && silent) return;
     this.state.loading = true;
     try {
-      const [ledgers, categories, records, budgets, templates] = await Promise.all([
-        Store.list('ledgers'), Store.list('categories'), Store.list('records'), Store.list('budgets'), Store.list('templates')
+      const [ledgers, categories, records, budgets, templates, bills] = await Promise.all([
+        Store.list('ledgers'), Store.list('categories'), Store.list('records'), Store.list('budgets'), Store.list('templates'),
+        Store.listBills().catch(e => { console.warn('待办账单加载失败（不影响账册）', e); return []; })
       ]);
       let changed = false;
       if (!ledgers.length) {
@@ -493,6 +499,7 @@ const App = {
       this.state.records = records;
       this.state.budgets = budgets;
       this.state.templates = templates;
+      this.state.bills = bills || [];
       this._cacheSnapshot();
       if (!this.state.currentLedgerId || !ledgers.find(l => l.id === this.state.currentLedgerId)) {
         const personal = ledgers.filter(l => l.type === 'personal');
@@ -525,6 +532,7 @@ const App = {
         ts: Date.now(),
         ledgers: this.state.ledgers, categories: this.state.categories,
         records: this.state.records, budgets: this.state.budgets, templates: this.state.templates,
+        bills: this.state.bills,
         currentLedgerId: this.state.currentLedgerId
       };
       localStorage.setItem(key, JSON.stringify(snap));
@@ -544,6 +552,7 @@ const App = {
       this.state.records = s.records || [];
       this.state.budgets = s.budgets || [];
       this.state.templates = s.templates || [];
+      this.state.bills = s.bills || [];
       const valid = s.currentLedgerId && this.state.ledgers.some(l => l.id === s.currentLedgerId);
       this.state.currentLedgerId = valid ? s.currentLedgerId : (this.state.ledgers[0] && this.state.ledgers[0].id) || null;
       this.renderChrome();
@@ -564,7 +573,7 @@ const App = {
   /* ---------- 路由 ---------- */
   route() {
     const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
-    const names = { ledger: '记账本', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
+    const names = { ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
     this.state.route = names[r] ? r : 'ledger';
     document.getElementById('page-title').textContent = names[this.state.route];
     document.querySelectorAll('.nav-item').forEach(a => {
@@ -601,11 +610,14 @@ const App = {
     // 侧栏底部
     document.getElementById('sidebar-foot').innerHTML =
       (Store.mode === 'supabase' ? '☁ 云端模式 · 实时同步' : '📦 本地模式') + '<br>' + esc(email);
+    // 待办账单未处理红点（bills.js 提供）
+    if (this.updateBillsBadge) this.updateBillsBadge();
   },
 
   renderView() {
     const map = {
       ledger: () => this.renderLedger(),
+      bills: () => this.renderBills(),
       wishlist: () => this.renderWishlist(),
       stats: () => this.renderStats(),
       rental: () => this.renderRental(),
@@ -3958,6 +3970,31 @@ begin
     created_at timestamptz not null default now()
   ) $ddl$;
 
+  -- 周期性待办账单（与 records 分开存储；确认已付时才写入 records）
+  execute $ddl$ create table if not exists bills (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    name text not null default '',
+    btype text not null default '',
+    custom_type text not null default '',
+    cycle text not null default 'monthly',
+    cycle_months integer not null default 1,
+    due_day integer not null default 1,
+    due_month integer not null default 1,
+    remind_time text not null default '09:00',
+    start_date text not null default '',
+    end_mode text not null default 'never',
+    end_date text not null default '',
+    preset_amount numeric,
+    paused boolean not null default false,
+    paid_period text not null default '',
+    paid_amount numeric,
+    paid_record_id uuid,
+    paid_at timestamptz,
+    note text not null default '',
+    created_at timestamptz not null default now()
+  ) $ddl$;
+
   -- 顶部横幅配置（每用户一行，banner 图 + 位置）
   execute $ddl$ create table if not exists banners (
     user_id uuid primary key references auth.users(id) on delete cascade,
@@ -4005,6 +4042,7 @@ begin
   execute $ddl$ alter table budgets    enable row level security $ddl$;
   execute $ddl$ alter table templates  enable row level security $ddl$;
   execute $ddl$ alter table banners    enable row level security $ddl$;
+  execute $ddl$ alter table bills      enable row level security $ddl$;
 
   execute $ddl$ drop policy if exists "own ledgers" on ledgers $ddl$;
   execute $ddl$ create policy "own ledgers" on ledgers for all
@@ -4030,7 +4068,11 @@ begin
   execute $ddl$ create policy "own banners" on banners for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：6 张表已创建（含 banners），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  execute $ddl$ drop policy if exists "own bills" on bills $ddl$;
+  execute $ddl$ create policy "own bills" on bills for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
+
+  return 'done：7 张表已创建（含 banners、bills），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;`;
 

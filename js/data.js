@@ -376,3 +376,209 @@ function compressImage(file, maxSide = 720, quality = 0.72) {
     r.readAsDataURL(file);
   });
 }
+
+/* ============ 周期性待办账单（与账册分开存储） ============
+ * 独立于 records 的 bills 表；「已付」时才写入 records 并回填关联。
+ * 这里只放纯计算：周期枚举、到期日、状态判定、年度汇总。 */
+const BILL_CUSTOM_TYPE = '自定义';
+const BILL_TYPES = [
+  { name: '房贷', emoji: '🏠', color: '#3B82F6' },
+  { name: '房租', emoji: '🔑', color: '#0EA5E9' },
+  { name: '医保', emoji: '🏥', color: '#10B981' },
+  { name: '养老金', emoji: '👴', color: '#6366F1' },
+  { name: '保险', emoji: '🛡️', color: '#8B5CF6' },
+  { name: '水电燃气', emoji: '💡', color: '#F59E0B' },
+  { name: '话费', emoji: '📱', color: '#14B8A6' },
+  { name: '会员订阅', emoji: '⭐', color: '#EC4899' },
+  { name: '车险', emoji: '🚗', color: '#F97316' },
+  { name: '物业费', emoji: '🧹', color: '#84CC16' }
+];
+const BILL_CYCLES = [
+  { key: 'monthly', label: '每月', months: 1 },
+  { key: 'quarterly', label: '每季度', months: 3 },
+  { key: 'semiannual', label: '每半年', months: 6 },
+  { key: 'yearly', label: '每年', months: 12 },
+  { key: 'custom', label: '自定义', months: 1 }
+];
+function billTypeMeta(name) {
+  return BILL_TYPES.find(x => x.name === name) || { name: name || '其他', emoji: '🧾', color: '#64748B' };
+}
+function billEveryMonths(bill) {
+  if (!bill) return 1;
+  if (bill.cycle === 'yearly') return 12;
+  if (bill.cycle === 'custom') return Math.max(1, Number(bill.cycle_months) || 1);
+  const c = BILL_CYCLES.find(x => x.key === bill.cycle);
+  return (c && c.months) || 1;
+}
+function billCycleLabel(bill) {
+  if (!bill) return '每月';
+  if (bill.cycle === 'custom') return '每 ' + Math.max(1, Number(bill.cycle_months) || 1) + ' 个月';
+  const c = BILL_CYCLES.find(x => x.key === bill.cycle);
+  return c ? c.label : '每月';
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+/* 两个日期相差天数（b - a） */
+function dayDiff(a, b) {
+  return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+}
+/* 第 k 个到期日（k=0 从开始日期的当月算起） */
+function billOccurrence(bill, k) {
+  const start = (bill && bill.start_date) || todayStr();
+  const sy = Number(start.slice(0, 4)), sm = Number(start.slice(5, 7));
+  let y, m;
+  if (bill.cycle === 'yearly') {
+    y = sy + k;
+    m = bill.due_month ? Number(bill.due_month) : sm;
+  } else {
+    const total = (sm - 1) + k * billEveryMonths(bill);
+    y = sy + Math.floor(total / 12);
+    m = (total % 12) + 1;
+  }
+  const day = Math.min(Math.max(1, Number(bill.due_day) || 1), daysInMonth(y, m));
+  return y + '-' + pad2(m) + '-' + pad2(day);
+}
+/* 在 ref 附近枚举到期日，得到最近已到期 current 与最近将到期 next */
+function billSchedule(bill, ref) {
+  ref = ref || todayStr();
+  const start = (bill && bill.start_date) || ref;
+  const sy = Number(start.slice(0, 4)), sm = Number(start.slice(5, 7));
+  const ry = Number(ref.slice(0, 4)), rm = Number(ref.slice(5, 7));
+  const interval = billEveryMonths(bill);
+  const md = (ry - sy) * 12 + (rm - sm);
+  const k0 = Math.max(0, Math.floor(md / interval) - 2);
+  const list = [];
+  for (let i = -1; i <= 6; i++) {
+    const k = k0 + i;
+    if (k < 0) continue;
+    const d = billOccurrence(bill, k);
+    if (d >= start) list.push(d);
+  }
+  const uniq = [...new Set(list)].sort();
+  const past = uniq.filter(d => d <= ref);
+  const future = uniq.filter(d => d >= ref);
+  return {
+    list: uniq,
+    current: past.length ? past[past.length - 1] : null,
+    next: future.length ? future[0] : null
+  };
+}
+/* 指定月份内的到期日（该周期在此月没有应期则返回 null） */
+function billOccurrenceInMonth(bill, ym) {
+  const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+  const start = (bill && bill.start_date) || todayStr();
+  const sy = Number(start.slice(0, 4)), sm = Number(start.slice(5, 7));
+  const interval = billEveryMonths(bill);
+  const md = (y - sy) * 12 + (m - sm);
+  const k0 = Math.max(0, Math.floor(md / interval) - 2);
+  const first = ym + '-01', last = ym + '-' + pad2(daysInMonth(y, m));
+  for (let i = -1; i <= 6; i++) {
+    const k = k0 + i;
+    if (k < 0) continue;
+    const d = billOccurrence(bill, k);
+    if (d >= first && d <= last && d >= start) return d;
+  }
+  return null;
+}
+/* 账单状态：待支付 / 逾期未处理 / 已支付 / 已暂停 / 已结束 */
+function billStatus(bill, today) {
+  today = today || todayStr();
+  const displayName = bill.btype === BILL_CUSTOM_TYPE ? (bill.custom_type || '自定义') : (bill.btype || '账单');
+  const base = { meta: billTypeMeta(displayName), displayName, today };
+  if (bill.paused) {
+    return Object.assign(base, { state: 'paused', label: '已暂停', cls: 'gray', dueDate: null, nextDate: null, paid: false, unpaid: false, paused: true, ended: false, daysSince: null, daysTo: null });
+  }
+  const sch = billSchedule(bill, today);
+  const ym = today.slice(0, 7);
+  const monthOcc = billOccurrenceInMonth(bill, ym);
+  const paidPeriod = bill.paid_period || '';
+  let ended = !!(bill.end_mode === 'date' && bill.end_date && today > bill.end_date);
+
+  /* 期次优先级：历史的未付先算（逾期不能被本月未来应期掩盖）→ 本月应期 → 最近已到期 → 下一期 */
+  const pastUnpaid = (sch.current && sch.current < today && !(paidPeriod && paidPeriod >= sch.current)) ? sch.current : null;
+  let active = null, statusPaid = false;
+  if (pastUnpaid) {
+    active = pastUnpaid;
+  } else if (monthOcc) {
+    active = monthOcc;
+    statusPaid = !!(paidPeriod && paidPeriod >= monthOcc);
+  } else if (sch.current) {
+    active = sch.current;
+    statusPaid = !!(paidPeriod && paidPeriod >= sch.current);
+  } else {
+    active = sch.next;
+    statusPaid = !!paidPeriod;
+  }
+
+  const paid = statusPaid;
+  let state, label, cls;
+  if (ended) { state = 'ended'; label = '已结束'; cls = 'gray'; }
+  else if (!active) { state = paidPeriod ? 'paid' : 'upcoming'; label = paidPeriod ? '已支付' : '待支付'; cls = paidPeriod ? 'green' : 'blue'; }
+  else if (paid) { state = 'paid'; label = '已支付'; cls = 'green'; }
+  else {
+    const since = dayDiff(active, today);
+    if (since > 3) { state = 'overdue'; label = '逾期未处理'; cls = 'red'; }
+    else { state = 'pending'; label = '待支付'; cls = 'amber'; }
+  }
+
+  let nextDate = null;
+  if (active) nextDate = billSchedule(bill, addDays(active, 1)).next;
+  const daysSince = active ? dayDiff(active, today) : null;
+  const daysTo = active ? dayDiff(today, active) : null;
+  return Object.assign(base, { state, label, cls, dueDate: active, nextDate, paid, unpaid: !paid && !ended, paused: false, ended, daysSince, daysTo });
+}
+/* 本月待付：该月有应期且尚未支付 */
+function billDueThisMonth(bill, today) {
+  today = today || todayStr();
+  if (!bill || bill.paused) return false;
+  if (bill.end_mode === 'date' && bill.end_date && today > bill.end_date) return false;
+  const occ = billOccurrenceInMonth(bill, today.slice(0, 7));
+  if (!occ) return false;
+  const paid = bill.paid_period || '';
+  return !(paid && paid >= occ);
+}
+/* 年度固定支出总览：按类型统计全年预计支出 */
+function billYearOverview(bills, year) {
+  const y = String(year || new Date().getFullYear());
+  const from = y + '-01-01', to = y + '-12-31';
+  const map = {};
+  (bills || []).forEach(b => {
+    if (b.paused) return;
+    let count = 0;
+    for (let k = 0; k < 600; k++) {
+      const d = billOccurrence(b, k);
+      if (d > to) break;
+      if (d < from) continue;
+      if (b.start_date && d < b.start_date) continue;
+      if (b.end_mode === 'date' && b.end_date && d > b.end_date) continue;
+      count++;
+    }
+    if (!count) return;
+    const name = b.btype === BILL_CUSTOM_TYPE ? (b.custom_type || '自定义') : (b.btype || '其他');
+    const amt = Number(b.preset_amount) || 0;
+    const row = map[name] || (map[name] = { name, count: 0, amount: 0, hasAmount: false });
+    row.count += count;
+    row.amount += amt * count;
+    if (amt > 0) row.hasAmount = true;
+  });
+  return Object.values(map).sort((a, b) => b.amount - a.amount);
+}
+/* 日期显示：M月D日（跨年补年份） */
+function billDateText(d, withYear) {
+  if (!d) return '—';
+  const p = String(d).split('-');
+  if (p.length < 3) return d;
+  const sameYear = p[0] === String(new Date().getFullYear());
+  return (!sameYear || withYear ? p[0] + '年' : '') + Number(p[1]) + '月' + Number(p[2]) + '日';
+}
+/* 周期文案：每月 15 日 / 每年 3 月 15 日 */
+function billDueText(bill) {
+  const day = Number(bill.due_day) || 1;
+  if (bill.cycle === 'yearly') return '每年 ' + (Number(bill.due_month) || 1) + ' 月 ' + day + ' 日';
+  return billCycleLabel(bill) + ' ' + day + ' 日';
+}

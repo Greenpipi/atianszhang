@@ -6,6 +6,7 @@ const Store = {
   cfg: { url: '', key: '' },
   _realtimeOn: false,
   _noCols: new Set(),       // 已知缺失的「表.列」（PGRST204），后续不再发送
+  billsMissing: false,      // 云端尚未创建 bills 表（true 时账单页提示补建表，但不影响账册）
   _onDataChange: null,
   _onAuthChange: null,
 
@@ -22,6 +23,7 @@ const Store = {
   _initClient() {
     this.mode = 'local';
     this.sb = null;
+    this.billsMissing = false;
     if (this.cfg.url && this.cfg.key && window.supabase && window.supabase.createClient) {
       try {
         this.sb = window.supabase.createClient(this.cfg.url, this.cfg.key, {
@@ -173,21 +175,25 @@ const Store = {
   /* list：分页拉全。PostgREST 有单次返回行数上限（Supabase 项目默认 1000），
      一次 select('*') 只会拿到前 N 行——云端 2701 条时永远只显示最早的 1000 条，
      且导入去重比对也看不到全部，导致重复导入。按 500/页循环拉全。 */
+  async _listPaged(table) {
+    const all = [];
+    const PAGE = 500;
+    let from = 0;
+    for (;;) {
+      const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+      if (error) throw error;
+      const rows = data || [];
+      for (const r of rows) all.push(r);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+    return all;
+  },
+
   async list(table) {
     if (this.mode === 'supabase') {
       try {
-        const all = [];
-        const PAGE = 500;
-        let from = 0;
-        for (;;) {
-          const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
-          if (error) throw error;
-          const rows = data || [];
-          for (const r of rows) all.push(r);
-          if (rows.length < PAGE) break;
-          from += PAGE;
-        }
-        return all;
+        return await this._listPaged(table);
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
         else throw new Error(this._dbErr(e));
@@ -195,6 +201,23 @@ const Store = {
     }
     const db = this._localRead();
     return db ? (db[table] || []) : [];
+  },
+
+  /* 待办账单专用：表缺失时不回退本地（避免把整个 App 切成离线模式），
+     返回空数组并置 billsMissing，由「待办账单」页提示补建表。 */
+  async listBills() {
+    if (this.mode === 'supabase' && this.user) {
+      try {
+        const rows = await this._listPaged('bills');
+        this.billsMissing = false;
+        return rows;
+      } catch (e) {
+        if (this._isTableErr(e)) { this.billsMissing = true; return []; }
+        throw new Error(this._dbErr(e));
+      }
+    }
+    const db = this._localRead();
+    return db ? (db.bills || []) : [];
   },
 
   /* 批量删除（去重用）：一次删多个 id，100 个一批由调用方控制 */
@@ -402,7 +425,7 @@ const Store = {
     if (this.mode !== 'supabase' || this._realtimeOn) return;
     this._realtimeOn = true;
     const ch = this.sb.channel('fin-db-changes');
-    ['ledgers', 'categories', 'records', 'budgets', 'templates'].forEach(t => {
+    ['ledgers', 'categories', 'records', 'budgets', 'templates', 'bills'].forEach(t => {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => this._emitData());
     });
     ch.subscribe();
