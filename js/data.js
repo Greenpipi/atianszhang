@@ -566,8 +566,11 @@ function billStatus(bill, today) {
     active = sch.current;
     statusPaid = !!(paidPeriod && paidPeriod >= sch.current);
   } else {
+    /* 只剩下一期（还没到期）：只有「已付到这一期或更后」才算已付。
+       注意不能只看 paidPeriod 有没有值 —— 自动付的账单起点会推进到创建日之后的第一期，
+       老的下限期次（创建日前的补记）如果只判断「有值」，会把未来这一期误显示成已支付。 */
     active = sch.next;
-    statusPaid = !!paidPeriod;
+    statusPaid = !!(paidPeriod && active && paidPeriod >= active);
   }
 
   const paid = statusPaid;
