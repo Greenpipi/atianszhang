@@ -107,6 +107,8 @@ begin
     paid_amount numeric,
     paid_record_id uuid,
     paid_at timestamptz,
+    payment_method text not null default 'manual',
+    paid_by text not null default '',
     note text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
@@ -152,6 +154,8 @@ begin
   execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
   execute $ddl$ alter table bills      add column if not exists cat      text         not null default '' $ddl$;
   execute $ddl$ alter table bills      add column if not exists sub      text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists payment_method text  not null default 'manual' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists paid_by  text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;

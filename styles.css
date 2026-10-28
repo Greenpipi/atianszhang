@@ -1150,6 +1150,47 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .bill-countdown.red{color:var(--danger);font-weight:600}
 .bill-form-tip{font-size:12px;color:var(--muted);line-height:1.6;margin-top:2px}
 
+/* ---------- 自动付（代扣） ---------- */
+.badge-auto{background:#E0F2FE;color:#0369A1}
+.badge-auto::before{content:'⚡';margin-right:3px;font-size:10px}
+.bill-warn{color:var(--warn)}
+.bill-card.blue{box-shadow:inset 3px 0 0 var(--blue)}
+
+/* 付款方式单选组（原生 radio，样式与表单其它控件一致） */
+.pay-method{display:flex;gap:10px}
+.pm-opt{
+  flex:1;display:flex;flex-direction:column;gap:2px;cursor:pointer;
+  border:1px solid var(--line);border-radius:10px;padding:9px 12px;
+  transition:border-color .15s,background .15s,box-shadow .15s;background:#fff;
+}
+.pm-opt:hover{border-color:#CFD8E3}
+.pm-opt.on{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+.pm-opt input{position:absolute;opacity:0;width:0;height:0}
+.pm-label{font-size:13.5px;font-weight:700;color:var(--text)}
+.pm-opt.on .pm-label{color:var(--primary)}
+.pm-hint{font-size:11.5px;color:var(--muted);line-height:1.4}
+.pm-tip{color:var(--primary);margin-top:6px}
+.amt-opt{font-size:11.5px;font-weight:600;color:var(--muted);margin-left:6px}
+.amt-opt.req{color:var(--danger)}
+.amt-input.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,.1)}
+
+/* 已自动支付通知 */
+.bill-auto-notice{
+  border:1px solid #BAE6FD;background:#F0F9FF;border-radius:12px;
+  padding:12px 14px;margin-bottom:16px;
+}
+.ban-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.ban-title{font-size:14px;font-weight:800;color:#075985;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ban-sub{font-size:12px;font-weight:500;color:#0C4A6E;opacity:.75}
+.ban-row{
+  display:flex;align-items:center;gap:12px;padding:8px 10px;background:#fff;
+  border:1px solid #E0F2FE;border-radius:10px;margin-bottom:8px;
+}
+.ban-row:last-child{margin-bottom:0}
+.ban-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ban-main b{font-size:13.5px}
+.ban-main span{font-size:12px;color:var(--muted)}
+
 @media (max-width:760px){
   .bill-card{flex-wrap:wrap;align-items:flex-start}
   .bill-amount{text-align:left}

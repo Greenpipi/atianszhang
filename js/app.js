@@ -42,6 +42,8 @@ const App = {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (this.state.records.length) this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
+        // 回到前台补一次自动付（浏览器后台时定时器可能被节流）
+        if (this.autoSettleBills) this.autoSettleBills().catch(e => console.warn('自动付入账失败', e));
       }
     });
     this.updateOnline();
@@ -172,6 +174,23 @@ const App = {
     this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
+    // 自动付：打开应用先补算一次（服务端 pg_cron 之外的兜底），再展示「已自动支付」通知
+    this.startAutoPayWatch();
+  },
+
+  /* 自动付巡检：进入应用立即跑一次，之后每 30 分钟、以及页面切回前台时再跑 */
+  startAutoPayWatch() {
+    if (!this.autoSettleBills) return;
+    const run = () => {
+      this.autoSettleBills()
+        .catch(e => console.warn('自动付入账失败', e))
+        .then(() => { if (this.notifyAutoPaid) this.notifyAutoPaid(); });
+    };
+    run();
+    if (this._autoPayTimer) clearInterval(this._autoPayTimer);
+    this._autoPayTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') run();
+    }, 30 * 60 * 1000);
   },
 
   /* ---------- 本地数据自动上云（一次性，幂等去重） ---------- */
@@ -4001,6 +4020,8 @@ begin
     paid_amount numeric,
     paid_record_id uuid,
     paid_at timestamptz,
+    payment_method text not null default 'manual',
+    paid_by text not null default '',
     note text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
@@ -4046,6 +4067,8 @@ begin
   execute $ddl$ alter table budgets    add column if not exists note     text         not null default '' $ddl$;
   execute $ddl$ alter table bills      add column if not exists cat      text         not null default '' $ddl$;
   execute $ddl$ alter table bills      add column if not exists sub      text         not null default '' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists payment_method text  not null default 'manual' $ddl$;
+  execute $ddl$ alter table bills      add column if not exists paid_by  text         not null default '' $ddl$;
 
   -- 行级安全：每个用户只能读写自己的数据
   execute $ddl$ alter table ledgers    enable row level security $ddl$;

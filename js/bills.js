@@ -29,8 +29,9 @@
       const yearRows = billYearOverview(bills, year);
       const yearTotal = yearRows.reduce((s, x) => s + x.amount, 0);
       const missing = Store.mode === 'supabase' && Store.billsMissing;
+      const autoNotices = this.billAutoNotices();
 
-      const rank = st => st.state === 'overdue' ? 0 : st.state === 'pending' ? 1 : st.state === 'upcoming' ? 2 : st.state === 'paid' ? 3 : st.state === 'paused' ? 4 : 5;
+      const rank = st => st.state === 'overdue' ? 0 : (st.state === 'pending' || st.state === 'auto') ? 1 : st.state === 'upcoming' ? 2 : st.state === 'paid' ? 3 : st.state === 'paused' ? 4 : 5;
       const listRows = (tab === 'due' ? dueRows : rows.slice()).sort((a, b) => {
         const dr = rank(a.st) - rank(b.st);
         if (dr) return dr;
@@ -49,6 +50,7 @@
           <button class="btn btn-primary" id="bill-add" ${missing ? 'disabled' : ''}>＋ 添加待办账单</button>
         </div>
         ${missing ? '<div class="bills-notice">云端尚未创建待办账单数据表。请到「设置 → 云端同步」重新执行建表 SQL（已新增 bills 表）后刷新；账册功能不受影响。</div>' : ''}
+        ${autoNotices.length ? this.billAutoNoticeHTML(autoNotices) : ''}
         <div class="grid grid-4" style="margin-bottom:18px">
           <div class="stat-card"><div class="stat-label">本月待付</div><div class="stat-value expense">${fmtMoney(monthAmount)}</div><div class="stat-foot">${dueRows.length} 笔待处理</div></div>
           <div class="stat-card"><div class="stat-label">逾期未处理</div><div class="stat-value" style="color:${overdueRows.length ? 'var(--danger)' : 'var(--text)'}">${overdueRows.length}</div><div class="stat-foot">${overdueRows.length ? '请尽快确认支付' : '暂无逾期'}</div></div>
@@ -71,6 +73,14 @@
       });
       const add = el.querySelector('#bill-add');
       if (add) add.onclick = () => this.openBillModal();
+      const ack = el.querySelector('#bill-auto-ack');
+      if (ack) ack.onclick = () => {
+        this.markAutoNoticesSeen(autoNotices.map(r => this._billAutoKey(r.b)));
+        this.renderBills();
+      };
+      el.querySelectorAll('[data-auto-fix]').forEach(btn => {
+        btn.onclick = () => this.correctBillAmount(btn.dataset.autoFix);
+      });
       body.querySelectorAll('[data-bill-act]').forEach(btn => {
         const id = btn.dataset.bid, act = btn.dataset.billAct;
         btn.onclick = () => {
@@ -78,6 +88,7 @@
           else if (act === 'edit') this.openBillModal(id);
           else if (act === 'pause') this.toggleBillPause(id);
           else if (act === 'del') this.deleteBill(id);
+          else if (act === 'fix') this.correctBillAmount(id);
         };
       });
       this.enhanceSelects(el);
@@ -87,39 +98,54 @@
     billCardHTML(b, st) {
       const meta = st.meta;
       const amt = Number(b.preset_amount);
+      const isAuto = billIsAuto(b);
+      const autoOk = billAutoReady(b);
+      const degraded = isAuto && !autoOk;   // 自动付缺预设金额 → 降级走手动确认
       let dueLine = '';
       if (st.paused) {
         dueLine = billDueText(b) + ' · 已暂停';
       } else if (st.ended) {
         dueLine = billDueText(b) + ' · 已结束';
       } else if (st.state === 'paid') {
-        dueLine = '本期已支付' + (Number(b.paid_amount) > 0 ? ' ' + fmtMoney(Number(b.paid_amount)) : '') + (st.dueDate ? ' · ' + billDateText(st.dueDate) : '') + (st.nextDate ? ' · 下次 ' + billDateText(st.nextDate) : '');
+        const how = b.paid_by === 'auto' ? '本期已自动扣款' : '本期已支付';
+        dueLine = how + (Number(b.paid_amount) > 0 ? ' ' + fmtMoney(Number(b.paid_amount)) : '') + (st.dueDate ? ' · ' + billDateText(st.dueDate) : '') + (st.nextDate ? ' · 下次 ' + billDateText(st.nextDate) : '');
       } else if (st.dueDate) {
         const d = st.daysSince;
-        if (d != null && d > 0) dueLine = '应于 ' + billDateText(st.dueDate) + ' 支付' + (d > 3 ? ' · 已逾期 ' + d + ' 天' : '');
-        else if (d === 0) dueLine = '今天到期 · 请确认是否已付';
-        else if (st.daysTo != null) {
+        if (autoOk && st.state === 'auto') {
+          // 自动付：到期即自动入账，这里只是「等定时任务/补算执行」的过渡文案
+          const over = d != null && d > 0 ? d : 0;
+          dueLine = billDateText(st.dueDate) + ' 到期 · 将自动扣款并入账' + (over > 0 ? '（已过 ' + over + ' 天，等待入账）' : '');
+        } else if (d != null && d > 0) {
+          dueLine = '应于 ' + billDateText(st.dueDate) + ' 支付' + (d > 3 ? ' · 已逾期 ' + d + ' 天' : '');
+        } else if (d === 0) {
+          dueLine = '今天到期 · 请确认是否已付';
+        } else if (st.daysTo != null) {
           // 剩余 ≤3 天时倒计时标红，提醒尽快处理
           const urgent = st.daysTo <= 3;
-          dueLine = billDateText(st.dueDate) + ' 到期<span class="bill-countdown' + (urgent ? ' red' : '') + '">（' + st.daysTo + ' 天后）</span>';
+          dueLine = billDateText(st.dueDate) + ' 到期<span class="bill-countdown' + (urgent ? ' red' : '') + '">（' + st.daysTo + ' 天后）</span>' + (autoOk ? ' · 自动扣款' : '');
         } else dueLine = billDateText(st.dueDate) + ' 到期';
       }
-      const canPay = !st.paused && !st.ended && !st.paid && !!st.dueDate;
+      // 自动付但没有预设金额：明确告知已降级，避免以为会自动扣款
+      if (degraded && !st.paused && !st.ended) dueLine += ' · <span class="bill-warn">未设预设金额，已降级为手动</span>';
+      const canPay = !st.paused && !st.ended && !st.paid && !!st.dueDate && !autoOk;
+      const canFix = st.state === 'paid' && !!b.paid_record_id;
       return `
       <div class="bill-card ${st.cls}">
         <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
         <div class="bill-main">
           <div class="bill-name">${esc(b.name || st.displayName)}
             <span class="badge badge-${st.cls}">${esc(st.label)}</span>
+            ${isAuto ? '<span class="badge badge-auto">自动</span>' : ''}
             ${st.state === 'paid' && b.paid_record_id ? '<span class="badge badge-green">已入账</span>' : ''}
             ${b.paused ? '<span class="badge badge-gray">已暂停</span>' : ''}
           </div>
           <div class="bill-meta">${esc(billDueText(b))}</div>
-          <div class="bill-meta">${esc(dueLine)}</div>
+          <div class="bill-meta">${dueLine}</div>
         </div>
-        <div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? '预设金额' : '每期填写'}</span></div>
+        <div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? (autoOk ? '预设金额 · 自动扣款' : '预设金额') : '每期填写'}</span></div>
         <div class="bill-acts">
           ${canPay ? '<button class="btn btn-primary btn-sm" data-bill-act="pay" data-bid="' + b.id + '">已付</button>' : ''}
+          ${canFix ? '<button class="btn btn-ghost btn-sm" data-bill-act="fix" data-bid="' + b.id + '">修正金额</button>' : ''}
           <button class="btn btn-ghost btn-sm" data-bill-act="edit" data-bid="${b.id}">编辑</button>
           <button class="btn btn-ghost btn-sm" data-bill-act="pause" data-bid="${b.id}">${b.paused ? '启用' : '暂停'}</button>
           <button class="btn btn-danger btn-sm" data-bill-act="del" data-bid="${b.id}">删除</button>
@@ -160,8 +186,10 @@
       const d = b || {
         name: '', cat: '', sub: '', cycle: 'monthly', cycle_months: 1,
         due_day: 15, due_month: new Date().getMonth() + 1,
-        start_date: todayStr(), end_mode: 'never', end_date: '', preset_amount: null, note: ''
+        start_date: todayStr(), end_mode: 'never', end_date: '', preset_amount: null, note: '',
+        payment_method: 'manual'
       };
+      const payMethod = billPayMethod(d);
       const isYearly = d.cycle === 'yearly';
       const isCustomCycle = d.cycle === 'custom';
       // 大类 / 小类：与「新增记账」完全一致（大类来自账本分类，小类取该大类下的子类）
@@ -191,6 +219,17 @@
             <div class="field"><label>大类</label><select id="bm-cat">${catOpts}</select></div>
             <div class="field"><label>小类</label><select id="bm-sub">${subOpts}</select></div>
           </div>
+          <div class="field">
+            <label>付款方式</label>
+            <div class="pay-method" id="bm-paymethod">
+              ${BILL_PAY_METHODS.map(m => `<label class="pm-opt${payMethod === m.key ? ' on' : ''}">
+                <input type="radio" name="bm-pm" value="${m.key}" ${payMethod === m.key ? 'checked' : ''}>
+                <span class="pm-label">${m.label}</span>
+                <span class="pm-hint">${m.hint}</span>
+              </label>`).join('')}
+            </div>
+            <p class="bill-form-tip pm-tip" id="bm-pm-tip" ${payMethod === 'auto' ? '' : 'hidden'}>自动付账单需设置预设金额，到期将自动确认并入账。</p>
+          </div>
           <div class="field-row">
             <div class="field"><label>周期</label><select id="bm-cycle">${cycleOpts}</select></div>
             <div class="field" id="bm-cycmonths-field" ${isCustomCycle ? '' : 'hidden'}><label>每隔（月）</label><input id="bm-cycmonths" type="number" min="1" max="60" step="1" value="${Math.max(1, Number(d.cycle_months) || 1)}"></div>
@@ -205,11 +244,11 @@
             <div class="field" id="bm-end-field" ${d.end_mode === 'date' ? '' : 'hidden'}><label>结束于</label><input id="bm-end" type="text" class="cal-input" readonly value="${esc(d.end_date || '')}" data-date="${esc(d.end_date || '')}" placeholder="选择日期"></div>
           </div>
           <div class="field-row">
-            <div class="field"><label>预设金额（元，可选）</label><input id="bm-amount" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00" value="${d.preset_amount != null ? Number(d.preset_amount) : ''}"></div>
+            <div class="field"><label>预设金额（元）<span id="bm-amt-opt" class="amt-opt">可选</span></label><input id="bm-amount" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00" value="${d.preset_amount != null ? Number(d.preset_amount) : ''}"></div>
           </div>
           <div class="field"><label>备注</label><textarea id="bm-note" rows="2" placeholder="选填">${esc(d.note || '')}</textarea></div>
           <p class="bill-form-tip" id="bm-preview"></p>
-          <p class="bill-form-tip">预设金额设置后每期沿用，直到你手动修改；确认「已付」时若没有预设金额，会提示填写实际金额。</p>
+          <p class="bill-form-tip">预设金额设置后每期沿用，直到你手动修改；手动付在确认「已付」时若没有预设金额，会提示填写实际金额。</p>
         </div>
         <div class="modal-foot"><div class="modal-acts">
           ${b ? '<button class="btn btn-danger" id="bm-del" style="margin-right:auto">删除</button>' : ''}
@@ -235,6 +274,22 @@
         this.enhanceSelects(subSel);
       };
       this.enhanceSelects(mask);
+
+      // 付款方式：选「自动付」时提示必须填预设金额，并同步金额标签
+      const pmSync = () => {
+        const checked = mask.querySelector('input[name="bm-pm"]:checked');
+        const auto = !!checked && checked.value === 'auto';
+        $('bm-pm-tip').hidden = !auto;
+        const opt = $('bm-amt-opt');
+        opt.textContent = auto ? '自动付必填' : '可选';
+        opt.className = 'amt-opt' + (auto ? ' req' : '');
+        mask.querySelectorAll('.pm-opt').forEach(o => {
+          const inp = o.querySelector('input');
+          if (inp) o.classList.toggle('on', !!inp.checked);
+        });
+      };
+      mask.querySelectorAll('input[name="bm-pm"]').forEach(r => r.addEventListener('change', pmSync));
+      pmSync();
 
       // 下一次到期预览（随输入即时更新）
       const previewEl = $('bm-preview');
@@ -282,13 +337,21 @@
         if (endMode === 'date' && endDate < startDate) return this.toast('结束日期不能早于开始日期', 'err');
         const amtRaw = $('bm-amount').value;
         const preset = amtRaw === '' ? null : Math.max(0, Number(amtRaw) || 0);
+        const pmChecked = mask.querySelector('input[name="bm-pm"]:checked');
+        const paymentMethod = (pmChecked && pmChecked.value) === 'auto' ? 'auto' : 'manual';
+        if (paymentMethod === 'auto' && !(Number(preset) > 0)) {
+          this.toast('自动付账单需先填写预设金额', 'err');
+          const amtEl = $('bm-amount');
+          if (amtEl) { amtEl.focus(); amtEl.classList.add('invalid'); }
+          return;
+        }
         const note = $('bm-note').value.trim();
         const row = {
           name, cat, sub, btype: sub, // btype 继续写入，兼容旧版本客户端与年度统计
           cycle, cycle_months: cycleMonths,
           due_day: dueDay, due_month: dueMonth,
           start_date: startDate, end_mode: endMode, end_date: endDate,
-          preset_amount: preset, note
+          preset_amount: preset, note, payment_method: paymentMethod
         };
         try {
           if (b) {
@@ -335,10 +398,69 @@
       } catch (e) { this.toast(e.message || '删除失败', 'err'); }
     },
 
-    /* ---------- 确认已付：写入账册并回填关联 ---------- */
+    /* ---------- 入账：手动「已付」与自动付共用 ---------- */
+    /* 该账单该落到哪个大类/小类：优先用账单里选好的，老数据退回「固定支出」+ 类型名 */
+    _billEntryTarget(b, ledgerId) {
+      const st = billStatus(b, todayStr());
+      const cat = (b.cat && this.catByName(ledgerId, b.cat)) ? b.cat
+        : (this.catByName(ledgerId, '固定支出') ? '固定支出' : ((this.catsOf(ledgerId)[0] || {}).name || ''));
+      const catObj = this.catByName(ledgerId, cat);
+      const subs = (catObj && catObj.subs) || [];
+      let sub = b.sub || b.btype || b.name || st.displayName;
+      if (b.sub && subs.includes(b.sub)) sub = b.sub;
+      else if (subs.includes(b.name)) sub = b.name;
+      else if (subs.includes(b.btype)) sub = b.btype;
+      return { cat, sub };
+    },
+
+    /* 结清某一期：先原子认领（防并发重复入账）→ 写 records → 回填关联
+       by = 'manual'（用户点已付）| 'auto'（到期自动扣款）
+       返回 false 表示该期已被其他地方处理过，调用方应停止 */
+    async _settleBill(b, occurrence, amount, by) {
+      const prevPeriod = b.paid_period || '';
+      const ledgerId = this.state.currentLedgerId || ((this.state.ledgers || [])[0] || {}).id;
+      if (!ledgerId) throw new Error('请先选择一个账本');
+      const target = this._billEntryTarget(b, ledgerId);
+      const nowIso = new Date().toISOString();
+      const claimed = await Store.claimBillPeriod(b.id, occurrence, {
+        paid_period: occurrence,
+        paid_amount: amount,
+        paid_by: by,
+        paid_at: nowIso
+      });
+      if (!claimed) return false;
+      Object.assign(b, { paid_period: occurrence, paid_amount: amount, paid_by: by, paid_at: nowIso });
+      try {
+        const rec = await Store.insert('records', {
+          ledger_id: ledgerId,
+          category: target.cat,
+          sub: target.sub,
+          amount,
+          note: '周期性账单：' + (b.name || '账单') + (by === 'auto' ? '（自动扣款）' : ''),
+          date: occurrence,
+          kind: 'expense',
+          favorite: false,
+          rating: 0
+        });
+        const rid = (rec && rec.id) || null;
+        if (rec && rec.id) this.state.records.push(rec);
+        await Store.update('bills', b.id, { paid_record_id: rid });
+        b.paid_record_id = rid;
+        return true;
+      } catch (e) {
+        // 入账失败要回滚认领，否则会出现「显示已支付但账册里没有记录」
+        const back = { paid_period: prevPeriod, paid_amount: null, paid_by: '', paid_at: null, paid_record_id: null };
+        Object.assign(b, back);
+        try { await Store.update('bills', b.id, back); } catch (e2) { /* 尽力而为 */ }
+        throw e;
+      }
+    },
+
+    /* ---------- 手动付：确认已付 ---------- */
     async payBill(billId, dueDate) {
       const b = billList().find(x => x.id === billId);
       if (!b) { this.toast('账单不存在'); return false; }
+      if (billAutoReady(b)) { this.toast('该账单为自动付，到期会自动入账'); return false; }
       const today = todayStr();
       const st = billStatus(b, today);
       const occurrence = dueDate || st.dueDate || st.nextDate;
@@ -353,45 +475,135 @@
         if (!(amount > 0)) { this.toast('请输入正确金额', 'err'); return false; }
       }
 
-      const ledgerId = this.state.currentLedgerId || (this.state.ledgers[0] || {}).id;
-      if (!ledgerId) { this.toast('请先选择一个账本', 'err'); return false; }
-      // 入账归类：优先用账单里选好的「大类 / 小类」；老数据没有这两个字段时退回「固定支出」+ 类型名
-      const cat = (b.cat && this.catByName(ledgerId, b.cat)) ? b.cat
-        : (this.catByName(ledgerId, '固定支出') ? '固定支出' : ((this.catsOf(ledgerId)[0] || {}).name || ''));
-      const catObj = this.catByName(ledgerId, cat);
-      const subs = (catObj && catObj.subs) || [];
-      let sub = b.sub || b.btype || b.name || st.displayName;
-      if (b.sub && subs.includes(b.sub)) sub = b.sub;
-      else if (subs.includes(b.name)) sub = b.name;
-      else if (subs.includes(b.btype)) sub = b.btype;
-
       try {
-        const rec = await Store.insert('records', {
-          ledger_id: ledgerId,
-          category: cat,
-          sub,
-          amount,
-          note: '周期性账单：' + (b.name || st.displayName),
-          date: occurrence,
-          kind: 'expense',
-          favorite: false,
-          rating: 0
-        });
-        if (rec && rec.id) this.state.records.push(rec);
-        const patch = {
-          paid_period: occurrence,
-          paid_amount: amount,
-          paid_record_id: (rec && rec.id) || null,
-          paid_at: new Date().toISOString()
-        };
-        await Store.update('bills', b.id, patch);
-        Object.assign(b, patch);
+        const ok = await this._settleBill(b, occurrence, amount, 'manual');
+        if (!ok) { this.toast('该期已支付'); return false; }
         this.toast('已确认支付 ' + fmtMoney(amount) + '，已记入账册', 'ok');
         this.renderBills();
         return true;
       } catch (e) {
         this.toast(e.message || '支付确认失败', 'err');
         return false;
+      }
+    },
+
+    /* ---------- 自动付：到期自动入账 ---------- */
+    /* 打开应用 / 页面切回 / 每 30 分钟跑一次；与服务端 pg_cron 互为兜底，
+       两边都靠 paid_period 原子认领，谁先到谁入账，不会重复。 */
+    async autoSettleBills() {
+      if (this._autoSettling) return 0;
+      if (Store.mode !== 'supabase' && !(Store.user)) return 0;
+      this._autoSettling = true;
+      let settled = 0;
+      try {
+        const today = todayStr();
+        const list = billList().slice();
+        for (const b of list) {
+          if (b.paused || !billAutoReady(b)) continue;   // 暂停 / 缺预设金额 → 降级走手动
+          if (b.end_mode === 'date' && b.end_date && today > b.end_date) continue;
+          const amt = Number(b.preset_amount);
+          const due = billOccurrencesUntil(b, today).filter(d => d > (b.paid_period || ''));
+          for (const occ of due.slice(0, 24)) {
+            let ok = false;
+            try { ok = await this._settleBill(b, occ, amt, 'auto'); }
+            catch (e) { console.warn('自动付入账失败', e); break; }
+            if (!ok) break;   // 已被服务端定时任务处理
+            settled++;
+          }
+        }
+        if (settled) {
+          if (this.state.route === 'bills') this.renderBills();
+          else if (this.updateBillsBadge) this.updateBillsBadge();
+          this.notifyAutoPaid();
+        }
+      } finally {
+        this._autoSettling = false;
+      }
+      return settled;
+    },
+
+    /* ---------- 「已自动支付」通知（供核对 / 修正） ---------- */
+    _billAutoKey(b) { return b.id + '_' + (b.paid_period || ''); },
+    _billAutoSeen() {
+      try {
+        const arr = JSON.parse(localStorage.getItem('fin_bill_auto_seen') || '[]');
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    },
+    markAutoNoticesSeen(keys) {
+      try {
+        const set = new Set(this._billAutoSeen());
+        (keys || []).forEach(k => set.add(k));
+        localStorage.setItem('fin_bill_auto_seen', JSON.stringify(Array.from(set).slice(-300)));
+      } catch (e) { /* ignore */ }
+    },
+    billAutoNotices() {
+      const seen = new Set(this._billAutoSeen());
+      const today = todayStr();
+      return billList()
+        .filter(b => b.payment_method === 'auto' && b.paid_by === 'auto' && b.paid_period && b.paid_record_id)
+        .filter(b => !seen.has(this._billAutoKey(b)))
+        .filter(b => {
+          const d = String(b.paid_at || '').slice(0, 10);
+          return !d || dayDiff(d, today) <= 60;   // 太久远的自动入账不再打扰
+        })
+        .map(b => ({ b, st: billStatus(b, today) }))
+        .sort((x, y) => String(y.b.paid_period || '').localeCompare(String(x.b.paid_period || '')));
+    },
+    billAutoNoticeHTML(rows) {
+      return `
+      <div class="bill-auto-notice">
+        <div class="ban-head">
+          <div class="ban-title">已自动支付<span class="ban-sub">按预设金额自动入账，可核对或修正本次金额</span></div>
+          <button class="btn btn-ghost btn-sm" id="bill-auto-ack">全部已核对</button>
+        </div>
+        ${rows.map(r => `
+          <div class="ban-row">
+            <div class="bill-ico" style="width:34px;height:34px;font-size:16px;background:${r.st.meta.color}1F;color:${r.st.meta.color}">${r.st.meta.emoji}</div>
+            <div class="ban-main">
+              <b>${esc(r.b.name || r.st.displayName)}</b>
+              <span>${fmtMoney(Number(r.b.paid_amount) || 0)} 已自动扣款并入账 · ${billDateText(r.b.paid_period)}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-auto-fix="${r.b.id}">修正金额</button>
+          </div>`).join('')}
+      </div>`;
+    },
+    notifyAutoPaid() {
+      const rows = this.billAutoNotices();
+      if (!rows.length) return;
+      const key = 'fin_bill_auto_toast_' + todayStr();
+      try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { /* ignore */ }
+      if (rows.length === 1) {
+        const r = rows[0];
+        this.toast('「' + (r.b.name || r.st.displayName) + '」' + fmtMoney(Number(r.b.paid_amount) || 0) + ' 已自动扣款并入账', 'ok');
+      } else {
+        this.toast('有 ' + rows.length + ' 笔账单已自动扣款并入账，可到「待办账单」核对', 'ok');
+      }
+    },
+
+    /* ---------- 修正自动入账金额（只改这一笔，不动预设金额） ---------- */
+    async correctBillAmount(billId) {
+      const b = billList().find(x => x.id === billId);
+      if (!b) return;
+      if (!b.paid_record_id) return this.toast('这一期没有关联的账册记录，无法修正');
+      const raw = await this.promptDialog(
+        '修正入账金额',
+        (b.name || '账单') + ' · ' + billDateText(b.paid_period) + ' 的实际金额（只改这一笔，不改预设金额）',
+        String(Number(b.paid_amount) || '')
+      );
+      if (raw == null) return;
+      const amount = Number(raw);
+      if (!(amount > 0)) return this.toast('请输入正确金额', 'err');
+      try {
+        await Store.update('records', b.paid_record_id, { amount });
+        await Store.update('bills', b.id, { paid_amount: amount });
+        b.paid_amount = amount;
+        const rec = (this.state.records || []).find(r => r.id === b.paid_record_id);
+        if (rec) rec.amount = amount;
+        this.toast('已修正为 ' + fmtMoney(amount) + '，预设金额不变', 'ok');
+        this.renderBills();
+      } catch (e) {
+        this.toast(e.message || '修正失败', 'err');
       }
     },
 
@@ -403,6 +615,7 @@
       let n = 0;
       billList().forEach(b => {
         if (b.paused) return;
+        if (billAutoReady(b)) return;   // 自动付由到期自动入账，不产生待付红点
         const st = billStatus(b, today);
         const inWindow = st.state !== 'paid' && st.state !== 'ended' && st.daysSince != null && st.daysSince >= -3 && st.daysSince <= 3;
         if (st.state === 'overdue' || inWindow) n++;

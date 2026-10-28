@@ -288,6 +288,38 @@ const Store = {
     return true;
   },
 
+  /* 原子认领某一期：只有 paid_period 仍早于 occurrence 时才写入成功。
+     手动「已付」、前端自动补算、服务端定时任务都走这里，避免同一期重复入账。 */
+  async claimBillPeriod(id, occurrence, patch) {
+    if (this.mode === 'supabase' && this.user) {
+      try {
+        const p = this._stripNoCols('bills', patch);
+        if (!Object.keys(p).length) return false;
+        const { data, error } = await this.sb.from('bills')
+          .update(p).eq('id', id).lt('paid_period', occurrence).select();
+        if (error) {
+          if (this._isColErr(error)) {
+            const col = this._colName(error);
+            if (col) { this._noCols.add('bills.' + col); return this.claimBillPeriod(id, occurrence, patch); }
+          }
+          throw error;
+        }
+        return !!(data && data.length);
+      } catch (e) {
+        if (this._isTableErr(e)) this._fallbackToLocal();
+        else throw new Error(this._dbErr(e));
+      }
+    }
+    const db = this._localRead();
+    if (!db) return true;   // 本地模式没有并发来源，认领直接通过
+    const row = (db.bills || []).find(x => x.id === id);
+    if (!row) return true;  // 内存里刚建、还没落本地库的账单，同样放行
+    if ((row.paid_period || '') >= occurrence) return false;
+    Object.assign(row, patch);
+    this._localWrite(db);
+    return true;
+  },
+
   async remove(table, id) {
     if (this.mode === 'supabase') {
       try {

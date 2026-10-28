@@ -402,6 +402,29 @@ const BILL_CYCLES = [
   { key: 'yearly', label: '每年', months: 12 },
   { key: 'custom', label: '自定义', months: 1 }
 ];
+/* 付款方式：manual 手动付 / auto 自动付（代扣） */
+const BILL_PAY_METHODS = [
+  { key: 'manual', label: '手动付', hint: '到期后自己点「已付」确认' },
+  { key: 'auto', label: '自动付（代扣）', hint: '到期自动入账，无需确认' }
+];
+function billPayMethod(bill) { return (bill && bill.payment_method === 'auto') ? 'auto' : 'manual'; }
+function billIsAuto(bill) { return billPayMethod(bill) === 'auto'; }
+/* 自动付必须要有预设金额作为入账来源；缺金额属于异常数据，按手动付降级处理 */
+function billAutoReady(bill) { return billIsAuto(bill) && Number(bill && bill.preset_amount) > 0; }
+/* 枚举 <= untilDate 的全部应期（从 start_date 起，最多 600 期，防死循环） */
+function billOccurrencesUntil(bill, untilDate) {
+  const out = [];
+  const until = untilDate || todayStr();
+  const start = (bill && bill.start_date) || '';
+  for (let k = 0; k < 600; k++) {
+    const d = billOccurrence(bill, k);
+    if (d > until) break;
+    if (start && d < start) continue;
+    if (bill.end_mode === 'date' && bill.end_date && d > bill.end_date) continue;
+    out.push(d);
+  }
+  return out;
+}
 function billTypeMeta(name) {
   return BILL_TYPES.find(x => x.name === name) || { name: name || '其他', emoji: '🧾', color: '#64748B' };
 }
@@ -493,7 +516,7 @@ function billStatus(bill, today) {
   // 展示用类型名：优先「小类」（大类+小类改造后），退回老字段 btype，最后是自定义
   const typeName = bill.sub || (bill.btype === BILL_CUSTOM_TYPE ? (bill.custom_type || '自定义') : bill.btype) || '账单';
   const displayName = typeName;
-  const base = { meta: billTypeMeta(displayName), displayName, today };
+  const base = { meta: billTypeMeta(displayName), displayName, today, payMethod: billPayMethod(bill), auto: billAutoReady(bill) };
   if (bill.paused) {
     return Object.assign(base, { state: 'paused', label: '已暂停', cls: 'gray', dueDate: null, nextDate: null, paid: false, unpaid: false, paused: true, ended: false, daysSince: null, daysTo: null });
   }
@@ -526,7 +549,13 @@ function billStatus(bill, today) {
   else if (paid) { state = 'paid'; label = '已支付'; cls = 'green'; }
   else {
     const since = dayDiff(active, today);
-    if (since > 3) { state = 'overdue'; label = '逾期未处理'; cls = 'red'; }
+    if (billAutoReady(bill)) {
+      /* 自动付：不等待人工确认、也不进入逾期；「待自动入账」只是入账前的瞬时态
+         （定时任务或前端补算失败时才会停留在这里） */
+      state = 'auto';
+      label = since >= 0 ? '待自动入账' : '待支付';
+      cls = 'blue';
+    } else if (since > 3) { state = 'overdue'; label = '逾期未处理'; cls = 'red'; }
     else { state = 'pending'; label = '待支付'; cls = 'amber'; }
   }
 
