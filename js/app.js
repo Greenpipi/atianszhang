@@ -170,6 +170,15 @@ const App = {
         this.toast('已自动修复 ' + n + ' 件好物数据', 'ok');
       }
     }).catch(e => console.warn('好物数据自愈失败', e));
+    // 出租屋固定费用迁入待办账单（老数据一次性搬家，幂等）
+    if (this.migrateRentalBills) {
+      this.migrateRentalBills().then(n => {
+        if (n) {
+          if (this.state.route === 'rental') this.renderRental();
+          this.toast('出租屋固定费用已并入待办账单', 'ok');
+        }
+      }).catch(e => console.warn('出租屋固定费用迁移失败', e));
+    }
     // 季节自动切换：打开应用时执行一次（不阻塞渲染，后台完成）
     this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
     if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
@@ -2560,8 +2569,6 @@ const App = {
     const scopeRecs = scope === 'all' ? rentalRecs
       : scope === 'year' ? rentalRecs.filter(r => String(r.date || '').slice(0, 4) === curYear)
       : rentalRecs.filter(r => monthOf(r.date) === month);
-    // 固定费用始终按所选月份（不随统计范围变化）
-    const monthRecs = rentalRecs.filter(r => monthOf(r.date) === month);
 
     // 收入 / 支出 / 结余（按范围）
     let income = 0, expense = 0;
@@ -2575,24 +2582,18 @@ const App = {
       : scope === 'year' ? (curYear + ' 年累计')
       : (month.replace('-', ' 年 ') + ' 月');
 
-    // 固定费用月金额（挂在「出租屋」大类下）
-    const fixedBudget = name => {
-      const b = this.state.budgets.find(x => x.ledger_id === lid && x.category === RENTAL_CAT && x.sub === name);
-      return b ? Number(b.amount) || 0 : 0;
-    };
-    const fixedTotal = RENTAL_FIXED.reduce((s, n) => s + fixedBudget(n), 0);
-    const fixedRows = RENTAL_FIXED.map(name => {
-      const limit = fixedBudget(name);
-      const generated = monthRecs.some(r => r.sub === name);
-      return `
-      <div class="budget-row">
-        <div class="budget-top">
-          <div class="budget-name">${(RENTAL_META[name] || {}).emoji || '•'} ${esc(name)}</div>
-          <input class="budget-input" type="number" min="0" step="0.01" value="${limit || ''}" placeholder="月金额" data-fixed="${esc(name)}">
-          <span class="badge ${generated ? 'badge-green' : 'badge-gray'}">${generated ? '本月已生成' : '待生成'}</span>
-        </div>
-      </div>`;
-    }).join('');
+    // 固定费用 = 待办账单里「出租屋」大类的账单（同一份数据，两边改动同步）
+    const fixedBills = (this.state.bills || []).filter(b => b.cat === RENTAL_CAT);
+    const fixedStatus = fixedBills.map(b => billStatus(b, todayStr()));
+    // 合计只算本月有应期的账单（每半年/每年那种本月没到期的计进来会虚高）
+    const fixedTotal = fixedBills.reduce((s, b, i) => {
+      const st = fixedStatus[i];
+      const inMonth = st.dueDate && st.dueDate.slice(0, 7) === thisMonth();
+      return s + (inMonth ? (Number(b.preset_amount) || Number(b.paid_amount) || 0) : 0);
+    }, 0);
+    const fixedHTML = fixedBills.length
+      ? '<div class="bill-list">' + fixedBills.map((b, i) => this.billCardHTML(b, fixedStatus[i])).join('') + '</div>'
+      : '<div class="empty"><p>还没有固定费用账单，点右上角添加房租、水费、电费…</p></div>';
 
     // 分类统计（按小类，范围口径）
     const bySub = {};
@@ -2642,15 +2643,15 @@ const App = {
       <div class="grid grid-3" style="margin-bottom:20px">
         <div class="stat-card"><div class="stat-label">${scopeName}支出</div><div class="stat-value expense">${fmtMoney(expense)}</div><div class="stat-foot">${scopeDesc} · ${scopeRecs.length} 笔</div></div>
         <div class="stat-card"><div class="stat-label">记录数</div><div class="stat-value">${scopeRecs.length}</div><div class="stat-foot">${scopeName}出租屋记录</div></div>
-        <div class="stat-card"><div class="stat-label">月度固定费用合计</div><div class="stat-value" style="color:var(--accent-deep)">${fmtMoney(fixedTotal)}</div><div class="stat-foot">${RENTAL_FIXED.join(' / ')}</div></div>
+        <div class="stat-card"><div class="stat-label">月度固定费用合计</div><div class="stat-value" style="color:var(--accent-deep)">${fmtMoney(fixedTotal)}</div><div class="stat-foot">与待办账单同步</div></div>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <div><div class="card-title">固定费用</div><div class="card-sub">设置每月金额，一键生成本月记录</div></div>
-          <button class="btn btn-primary" id="gen-fixed">⚡ 一键生成本月记录</button>
+          <div><div class="card-title">固定费用</div><div class="card-sub">就是待办账单里的出租屋账单 · 填金额点已付即记账</div></div>
+          <button class="btn btn-primary" id="fixed-add">＋ 添加固定费用</button>
         </div>
-        ${fixedRows}
+        ${fixedHTML}
       </div>
 
       <div class="grid grid-2" style="margin-bottom:18px;align-items:stretch">
@@ -2689,43 +2690,9 @@ const App = {
         <div id="rental-recs"></div>
       </div>`;
 
-    // 固定费用金额设置
-    el.querySelectorAll('[data-fixed]').forEach(inp => {
-      inp.onchange = async () => {
-        const name = inp.dataset.fixed;
-        const v = parseFloat(inp.value) || 0;
-        try {
-          const b = this.state.budgets.find(x => x.ledger_id === lid && x.category === RENTAL_CAT && x.sub === name);
-          if (b) await Store.update('budgets', b.id, { amount: v });
-          else if (v > 0) await Store.insert('budgets', { ledger_id: lid, category: RENTAL_CAT, sub: name, amount: v });
-          this.toast(name + ' 月金额已设为 ' + fmtMoney(v, { plain: true }), 'ok');
-          await this.loadData();
-          this.renderRental();
-        } catch (e) { this.toast(e.message, 'err'); }
-      };
-    });
-
-    // 一键生成
-    el.querySelector('#gen-fixed').onclick = async () => {
-      const isCur = month === thisMonth();
-      const date = isCur ? todayStr() : month + '-01';
-      let n = 0;
-      for (const name of RENTAL_FIXED) {
-        const amt = fixedBudget(name);
-        if (amt <= 0) continue;
-        if (monthRecs.some(r => r.sub === name)) continue;
-        try {
-          await Store.insert('records', {
-            ledger_id: lid, category: RENTAL_CAT, sub: name, amount: amt,
-            note: '本月固定费用', favorite: false, rental: true, rating: 0, date, image: null, kind: 'expense'
-          });
-          n++;
-        } catch (e) { this.toast(e.message, 'err'); }
-      }
-      this.toast(n ? '已生成 ' + n + ' 条固定费用记录' : '本月固定费用已全部生成', n ? 'ok' : '');
-      await this.loadData();
-      this.renderRental();
-    };
+    // 固定费用卡片：与待办账单同一套交互（填金额 / 已付 / 编辑 / 暂停 / 删除）
+    this.bindBillActions(el);
+    el.querySelector('#fixed-add').onclick = () => this.openBillModal(null, { cat: RENTAL_CAT });
 
     el.querySelector('#rental-add').onclick = () => {
       const isCur = month === thisMonth();
@@ -2738,7 +2705,7 @@ const App = {
         const v = b.dataset.scope;
         if (this.state.rentalScope === v) return;
         this.state.rentalScope = v;
-        // 切到「本年/总计」时回到当月，保证「记一笔 / 一键生成本月记录」始终是当月语义
+        // 切到「本年/总计」时回到当月，保证固定费用与「记一笔」始终是当月语义
         if (v !== 'month') this.state.rentalMonth = thisMonth();
         this.renderRental();
       };

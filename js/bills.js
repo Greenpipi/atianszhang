@@ -71,10 +71,24 @@
       });
       const add = el.querySelector('#bill-add');
       if (add) add.onclick = () => this.openBillModal();
-      body.querySelectorAll('[data-bill-act]').forEach(btn => {
-        const id = btn.dataset.bid, act = btn.dataset.billAct;
-        btn.onclick = () => {
-          if (act === 'pay') this.payBill(id);
+      this.bindBillActions(el);
+      this.enhanceSelects(el);
+      if (this.updateBillsBadge) this.updateBillsBadge();
+    },
+
+    /* 账单卡片交互：待办页与出租屋「固定费用」共用同一套绑定 */
+    bindBillActions(scope) {
+      if (!scope) return;
+      scope.querySelectorAll('[data-bill-act]').forEach(node => {
+        const id = node.dataset.bid, act = node.dataset.billAct;
+        node.onclick = () => {
+          if (act === 'pay') {
+            const card = node.closest('.bill-card');
+            const inp = card && card.querySelector('[data-bill-amt]');
+            const v = inp ? Number(inp.value) : NaN;
+            if (inp && !(v > 0)) { this.toast('先填本期金额', 'err'); inp.focus(); return; }
+            this.payBill(id, null, v > 0 ? v : null);
+          }
           else if (act === 'edit') this.openBillModal(id);
           else if (act === 'pause') this.toggleBillPause(id);
           else if (act === 'del') this.deleteBill(id);
@@ -82,8 +96,19 @@
           else if (act === 'detail') this.openBillDetail(id);
         };
       });
-      this.enhanceSelects(el);
-      if (this.updateBillsBadge) this.updateBillsBadge();
+      // 金额框：回车等于点「已付」，Esc 退出输入
+      scope.querySelectorAll('[data-bill-amt]').forEach(inp => {
+        inp.onclick = e => e.stopPropagation();
+        inp.onkeydown = e => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const card = inp.closest('.bill-card');
+            const payBtn = card && card.querySelector('[data-bill-act="pay"]');
+            if (payBtn) payBtn.click();
+            else this.toast('本期还没有应期', 'err');
+          } else if (e.key === 'Escape') inp.blur();
+        };
+      });
     },
 
     billCardHTML(b, st) {
@@ -120,6 +145,22 @@
       if (degraded && !st.paused && !st.ended) dueLine += ' · <span class="bill-warn">未设预设金额，已降级为手动</span>';
       const canPay = !st.paused && !st.ended && !st.paid && !!st.dueDate && !autoOk;
       const canFix = st.state === 'paid' && !!b.paid_record_id;
+      /* 金额区：未付的账单直接给输入框 —— 没预设金额的账单（水费电费等每期不同）
+         就在这里填本期实际金额，回车或点「已付」即入账，不再弹窗追问。 */
+      const editable = !st.paused && !st.ended && !st.paid && !autoOk;
+      let amountHTML;
+      if (editable) {
+        amountHTML = `<div class="bill-amount">
+          <input class="bill-amt-input" type="number" inputmode="decimal" min="0" step="0.01"
+                 value="${amt > 0 ? amt : ''}" placeholder="未设金额" data-bill-amt="${b.id}" aria-label="本期金额">
+          <span class="sub">${amt > 0 ? '预设金额' : '每期填写'}</span>
+        </div>`;
+      } else if (st.paid) {
+        const paidAmt = Number(b.paid_amount) || amt;
+        amountHTML = `<div class="bill-amount">${paidAmt > 0 ? fmtMoney(paidAmt) : '—'}<span class="sub">${b.paid_by === 'auto' ? '已自动扣款' : '本期已付'}</span></div>`;
+      } else {
+        amountHTML = `<div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? (autoOk ? '预设金额 · 自动扣款' : '预设金额') : '每期填写'}</span></div>`;
+      }
       return `
       <div class="bill-card ${st.cls}">
         <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
@@ -133,7 +174,7 @@
           <div class="bill-meta">${esc(billDueText(b))}</div>
           <div class="bill-meta">${dueLine}</div>
         </div>
-        <div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? (autoOk ? '预设金额 · 自动扣款' : '预设金额') : '每期填写'}</span></div>
+        ${amountHTML}
         <div class="bill-acts">
           ${canPay ? '<button class="btn btn-primary btn-sm" data-bill-act="pay" data-bid="' + b.id + '">已付</button>' : ''}
           ${canFix ? '<button class="btn btn-ghost btn-sm" data-bill-act="fix" data-bid="' + b.id + '">修正金额</button>' : ''}
@@ -168,18 +209,19 @@
     },
 
     /* ---------- 新增 / 编辑 ---------- */
-    openBillModal(billId) {
+    /* preset：新建时的默认值（出租屋页传 { cat: '出租屋' } 直接归到出租屋大类） */
+    openBillModal(billId, preset) {
       if (Store.mode === 'supabase' && Store.billsMissing) {
         this.toast('请先在「设置」执行最新建表 SQL（新增 bills 表）');
         return;
       }
       const b = billId ? billList().find(x => x.id === billId) : null;
-      const d = b || {
+      const d = b || Object.assign({
         name: '', cat: '', sub: '', cycle: 'monthly', cycle_months: 1,
         due_day: 15, due_month: new Date().getMonth() + 1,
         start_date: todayStr(), end_mode: 'never', end_date: '', preset_amount: null, note: '',
         payment_method: 'manual'
-      };
+      }, preset || {});
       const payMethod = billPayMethod(d);
       const isYearly = d.cycle === 'yearly';
       const isCustomCycle = d.cycle === 'custom';
@@ -364,7 +406,7 @@
             this.toast('待办账单已创建', 'ok');
           }
           this.closeModal();
-          this.renderBills();
+          this.refreshBillViews();
         } catch (e) {
           this.toast(e.message || '保存失败', 'err');
         }
@@ -380,7 +422,7 @@
         await Store.update('bills', id, { paused: next });
         b.paused = next;
         this.toast(next ? '已暂停' : '已启用', 'ok');
-        this.renderBills();
+        this.refreshBillViews();
       } catch (e) { this.toast(e.message || '操作失败', 'err'); }
     },
 
@@ -394,7 +436,7 @@
         await Store.remove('bills', id);
         this.state.bills = billList().filter(x => x.id !== id);
         this.toast('已删除', 'ok');
-        this.renderBills();
+        this.refreshBillViews();
       } catch (e) { this.toast(e.message || '删除失败', 'err'); }
     },
 
@@ -440,7 +482,9 @@
           date: occurrence,
           kind: 'expense',
           favorite: false,
-          rating: 0
+          rating: 0,
+          // 大类是「出租屋」的账单要打出租屋标记，才能出现在出租屋明细与统计里
+          rental: target.cat === RENTAL_CAT
         });
         const rid = (rec && rec.id) || null;
         if (rec && rec.id) this.state.records.push(rec);
@@ -456,8 +500,15 @@
       }
     },
 
+    /* 账单改动后刷新看得见的地方：待办页、出租屋页（固定费用与待办同一份数据）、导航红点 */
+    refreshBillViews() {
+      if (this.state.route === 'bills') this.renderBills();
+      else if (this.state.route === 'rental') this.renderRental();
+      if (this.updateBillsBadge) this.updateBillsBadge();
+    },
+
     /* ---------- 手动付：确认已付 ---------- */
-    async payBill(billId, dueDate) {
+    async payBill(billId, dueDate, amountInput) {
       const b = billList().find(x => x.id === billId);
       if (!b) { this.toast('账单不存在'); return false; }
       if (billAutoReady(b)) { this.toast('该账单为自动付，到期会自动入账'); return false; }
@@ -467,7 +518,8 @@
       if (!occurrence) { this.toast('该账单暂无应期'); return false; }
       if (b.paid_period && b.paid_period >= occurrence) { this.toast('该期已支付'); return false; }
 
-      let amount = Number(b.preset_amount);
+      // 金额来源：卡片输入框 > 预设金额 > 弹窗补填（其它入口调用时兜底）
+      let amount = Number(amountInput) > 0 ? Number(amountInput) : Number(b.preset_amount);
       if (!(amount > 0)) {
         const raw = await this.promptDialog('填写实际金额', '本期「' + (b.name || st.displayName) + '」实际支付金额（元）', '');
         if (raw == null) return false;
@@ -479,7 +531,7 @@
         const ok = await this._settleBill(b, occurrence, amount, 'manual');
         if (!ok) { this.toast('该期已支付'); return false; }
         this.toast('已确认支付 ' + fmtMoney(amount) + '，已记入账册', 'ok');
-        this.renderBills();
+        this.refreshBillViews();
         return true;
       } catch (e) {
         this.toast(e.message || '支付确认失败', 'err');
@@ -639,6 +691,38 @@
         this.toast(e.message || '修正失败', 'err');
         return false;
       }
+    },
+
+    /* ---------- 出租屋固定费用并入待办账单（一次性，幂等） ----------
+       出租屋页的「固定费用」原来存在 budgets（月金额）里，现在统一为待办账单：
+       每项房租 / 水费 / 电费…各建一条每月账单，金额沿用原月金额，
+       本月已经记过账的直接标记为已付，不会重复入账。 */
+    async migrateRentalBills() {
+      if (Store.mode === 'supabase' && Store.billsMissing) return 0;
+      const key = 'fin_rental_bills_' + ((Store.user && Store.user.email) || '');
+      try { if (localStorage.getItem(key)) return 0; } catch (e) { /* 隐私模式照常跑 */ }
+      const budgets = (this.state.budgets || []).filter(x => x.category === RENTAL_CAT && Number(x.amount) > 0);
+      const ym = thisMonth();
+      let n = 0;
+      for (const bud of budgets) {
+        const same = (this.state.bills || []).some(x => x.cat === RENTAL_CAT && (x.sub === bud.sub || x.name === bud.sub));
+        if (same) continue;
+        const paidRec = (this.state.records || []).find(r => r.rental && r.sub === bud.sub && monthOf(r.date) === ym);
+        const dueDay = paidRec ? Number(String(paidRec.date).slice(8, 10)) : 1;
+        const row = {
+          name: bud.sub, cat: RENTAL_CAT, sub: bud.sub,
+          cycle: 'monthly', cycle_months: 1, due_day: dueDay || 1, due_month: 1,
+          start_date: ym + '-01', end_mode: 'never', end_date: '',
+          preset_amount: Number(bud.amount) || 0, payment_method: 'manual', note: ''
+        };
+        row.paid_period = paidRec ? (billOccurrenceInMonth(row, ym) || '') : '';
+        try {
+          const saved = await Store.insert('bills', row);
+          if (saved) { this.state.bills.push(saved); n++; }
+        } catch (e) { console.warn('出租屋固定费用迁移失败', bud.sub, e); }
+      }
+      try { localStorage.setItem(key, '1'); } catch (e) { /* ignore */ }
+      return n;
     },
 
     /* ---------- 导航红点 ---------- */
