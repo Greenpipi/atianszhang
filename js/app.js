@@ -2615,12 +2615,8 @@ const App = {
       : (month.replace('-', ' 年 ') + ' 月');
 
     // 固定费用 = 待办账单里「出租屋」大类的账单（同一份数据，两边改动同步）
-    // 出租屋账单 + 名字命中五项固定费用的账单（如归在「固定支出」下的物业费，也让人在出租屋页看得见）
-    const hitFixedName = b => {
-      const nm = String(b.name || ''), sb = String(b.sub || '');
-      return RENTAL_FIXED.some(n => sb === n || nm === n || (nm.length > 1 && nm.includes(n)));
-    };
-    const fixedBills = (this.state.bills || []).filter(b => b.cat === RENTAL_CAT || hitFixedName(b));
+    // 只看「出租屋」分类的待办账单（其它分类的账单不进出租屋页）
+    const fixedBills = (this.state.bills || []).filter(b => b.cat === RENTAL_CAT);
     const fixedSt = new Map(fixedBills.map(b => [b.id, billStatus(b, todayStr())]));
     // 房租/水费/电费/燃气费/物业费 五项固定列出：还没建账单的先出占位卡，点「设置」直接建到待办账单里
     const usedFixed = new Set();
@@ -2699,8 +2695,8 @@ const App = {
 
       <div class="card">
         <div class="card-head">
-          <div><div class="card-title">固定费用</div><div class="card-sub">就是待办账单里的出租屋账单 · 填金额点已付即记账</div></div>
-          <button class="btn btn-primary" id="fixed-add">＋ 添加固定费用</button>
+          <div><div class="card-title">待办账单</div></div>
+          <button class="btn btn-primary" id="fixed-add">＋ 添加待办账单</button>
         </div>
         ${fixedHTML}
       </div>
