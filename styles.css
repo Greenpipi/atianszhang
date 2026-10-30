@@ -458,6 +458,38 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .budget-input{width:96px;height:34px;border:1px solid var(--line);border-radius:9px;padding:0 10px;text-align:right;background:#fff;outline:none;font-variant-numeric:tabular-nums}
 .budget-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
 
+/* ============ 预算设置：年度总控 + 关注类目 ============ */
+.yb-input{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:600}
+.yb-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.yb-metric{background:var(--line-soft);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.yb-metric .k{font-size:12px;color:var(--muted);font-weight:600}
+.yb-metric .v{font-size:19px;font-weight:800;letter-spacing:-.2px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.yb-metric .v.warn{color:var(--warn)}
+.yb-metric .v.over{color:var(--danger)}
+.yb-hint{font-size:12px;color:var(--muted);margin-top:7px}
+.yb-hint.warn{color:var(--warn);font-weight:600}
+.yb-hint.over{color:var(--danger);font-weight:600}
+.bar.blank{background:#F9FAFB;border:1px dashed var(--line)}
+.bar-note{font-size:11px;color:var(--muted);margin-top:3px}
+.bar-note.warn{color:var(--warn);font-weight:600}
+.bar-note.over{color:var(--danger);font-weight:600}
+.tbl .num.warn{color:var(--warn)}
+.tbl .num.over{color:var(--danger)}
+.budget-empty{text-align:center;color:var(--muted);padding:30px 0}
+
+/* 关注类目选择器 */
+.modal.follow-modal{max-width:600px;width:100%}
+.fp-tip{font-size:12.5px;color:var(--muted);margin:-8px 0 14px}
+.fp-wrap{max-height:52vh;overflow:auto;padding-right:4px;margin-bottom:4px}
+.fp-group{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.fp-cat{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.fp-kind{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;line-height:1.5}
+.fp-count{font-size:11.5px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.fp-subs{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;padding-left:24px}
+.fp-sub{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+.fp-none{font-size:12.5px;color:var(--muted)}
+.fp-cat input,.fp-sub input{accent-color:var(--primary);width:15px;height:15px;cursor:pointer}
+
 .alert-strip{
   display:flex;align-items:center;gap:10px;background:#FFF7ED;border:1px solid #FFEDD5;
   border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13px;color:#9A3412;font-weight:600;
@@ -1231,4 +1263,31 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 @media (max-width:480px){
   .bills-head .btn{width:100%}
   .bill-acts .btn{padding:0 10px}
+}
+
+/* ============ 预算页 · 窄屏行卡（置于末尾，覆盖 .tbl 基础样式） ============ */
+@media (max-width:760px){
+  .yb-metrics{grid-template-columns:1fr}
+  .yb-input{width:100%}
+  .yb-input .budget-input{flex:1}
+  /* 月度规划表：窄屏转成每类目一张"行卡"（大类 / 小类 / 限额 / 已用 / 进度 全部可见，无需横滑） */
+  .budget-tbl thead{display:none}
+  .budget-tbl,.budget-tbl tbody{display:block}
+  .budget-tbl tr{
+    display:grid;grid-template-columns:1fr auto;
+    grid-template-areas:"cat limit" "sub limit" "used used" "prog prog";
+    align-items:center;gap:2px 10px;padding:13px 2px;
+    border-bottom:1px solid var(--line);
+  }
+  .budget-tbl tr:last-child{border-bottom:none}
+  .budget-tbl tr:has(.budget-empty){display:block;padding:0}
+  .tbl.budget-tbl td{border:none;padding:0}
+  .tbl.budget-tbl .bc-cat{grid-area:cat;font-size:11.5px;color:var(--muted);font-weight:600;text-align:left}
+  .tbl.budget-tbl .bc-sub{grid-area:sub;font-size:14px;font-weight:700;color:var(--text);text-align:left}
+  .budget-tbl .bc-limit{grid-area:limit;align-self:start;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .budget-tbl .bc-limit::before{content:"月度限额";font-size:11px;color:var(--muted);font-weight:600}
+  .tbl.budget-tbl .bc-used{grid-area:used;text-align:left;margin-top:6px}
+  .tbl.budget-tbl .bc-used::before{content:"本月已用 ";font-size:11.5px;color:var(--muted);font-weight:600}
+  .budget-tbl .bc-prog{grid-area:prog;margin-top:3px}
+  .budget-tbl .budget-empty{text-align:center;padding:26px 0}
 }

@@ -7,6 +7,12 @@ const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用
  * 该窗口内被自动切换过的好物，status_since 精确等于 2026-10-26 或 2026-10-27 → 即被污染值。 */
 const WISH_STATUS_BUG_DATES = ['2026-10-26', '2026-10-27'];
 const ROUTE_NAMES = { ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
+/* 预算表复用标记行（不新增表/列，云端无需 DDL）：
+ *   __annual__ + sub=年份  → 年度总预算（amount）
+ *   __follow__ + sub=''    → 关注的类目清单（note 存 JSON 数组，元素 "大类::小类"） */
+const BUDGET_ANNUAL = '__annual__';
+const BUDGET_FOLLOW = '__follow__';
+const isBudgetMeta = b => b && (b.category === BUDGET_ANNUAL || b.category === BUDGET_FOLLOW);
 const App = {
   state: {
     route: 'ledger',
@@ -715,15 +721,58 @@ const App = {
 
   budgetAlerts(ledgerId, month) {
     const alerts = [];
-    this.state.budgets.filter(b => b.ledger_id === ledgerId).forEach(b => {
+    this.state.budgets.filter(b => b.ledger_id === ledgerId && !isBudgetMeta(b)).forEach(b => {
       const used = this.monthUsed(ledgerId, b.category, b.sub, month);
       const limit = Number(b.amount) || 0;
       if (limit <= 0) return;
       const pct = used / limit;
       if (pct > 1) alerts.push({ ...b, used, limit, pct, level: 'over' });
-      else if (pct >= 0.7) alerts.push({ ...b, used, limit, pct, level: 'warn' });
+      else if (pct >= 0.8) alerts.push({ ...b, used, limit, pct, level: 'warn' });
     });
     return alerts.sort((a, b2) => b2.pct - a.pct);
+  },
+
+  /* ---------- 年度总控 / 关注类目 ---------- */
+  // 全年汇总（含未关注类目，保证年度已用与统计口径一致）
+  yearSummary(ledgerId, year) {
+    const y = String(year);
+    const recs = this.recsOf(ledgerId).filter(r => (r.date || '').slice(0, 4) === y);
+    let income = 0, expense = 0;
+    recs.forEach(r => {
+      const kind = r.kind || this.kindOf(ledgerId, r.category);
+      if (kind === 'income') income += Number(r.amount) || 0; else expense += Number(r.amount) || 0;
+    });
+    return { income, expense, balance: income - expense, count: recs.length };
+  },
+  annualRow(ledgerId, year) {
+    return this.state.budgets.find(b => b.ledger_id === ledgerId && b.category === BUDGET_ANNUAL && b.sub === String(year)) || null;
+  },
+  annualBudgetOf(ledgerId, year) {
+    const b = this.annualRow(ledgerId, year);
+    return b ? Number(b.amount) || 0 : 0;
+  },
+  // 关注类目：["大类::小类", ...]；未保存过则沿用已有月度预算的类目（老数据平滑过渡）
+  followKeys(ledgerId) {
+    const row = this.state.budgets.find(b => b.ledger_id === ledgerId && b.category === BUDGET_FOLLOW && !b.sub);
+    if (row) {
+      try {
+        const arr = JSON.parse(row.note || '[]');
+        if (Array.isArray(arr)) return arr.filter(x => typeof x === 'string');
+      } catch (e) { /* 脏数据按未配置处理 */ }
+      return [];
+    }
+    const legacy = this.state.budgets
+      .filter(b => b.ledger_id === ledgerId && !isBudgetMeta(b) && Number(b.amount) > 0)
+      .map(b => b.category + '::' + b.sub);
+    return [...new Set(legacy)];
+  },
+  async saveFollowKeys(keys) {
+    const lid = this.state.currentLedgerId;
+    if (!lid) return;
+    const row = this.state.budgets.find(b => b.ledger_id === lid && b.category === BUDGET_FOLLOW && !b.sub);
+    const note = JSON.stringify([...new Set(keys)]);
+    if (row) await Store.update('budgets', row.id, { note });
+    else await Store.insert('budgets', { ledger_id: lid, category: BUDGET_FOLLOW, sub: '', amount: 0, month: '', note });
   },
 
   /* ---------- 记账表单（记账本 / 出租屋共用） ---------- */
@@ -2771,55 +2820,125 @@ const App = {
     Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#3B82F6', data: trendData }]);
   },
 
-  /* ---------- 视图：预算设置 ---------- */
+  /* ---------- 视图：预算设置（年度总控 + 关注类目月度规划） ---------- */
   renderBudget() {
     const el = document.getElementById('view-budget');
     const lid = this.state.currentLedgerId;
     const month = thisMonth();
+    const year = String(new Date().getFullYear());
+    const ledgerName = this.curLedger() ? this.curLedger().name : '';
+
+    // 关注的类目 → 月度规划行（只渲染勾选过的；分类被删则自动跳过）
     const rows = [];
-    this.catsOf(lid).forEach(c => {
-      (c.subs || []).forEach(sub => {
-        const b = this.budgetOf(lid, c.name, sub);
-        const used = this.monthUsed(lid, c.name, sub, month);
-        const limit = b ? Number(b.amount) || 0 : 0;
-        const pct = limit > 0 ? used / limit : 0;
-        rows.push({ cat: c.name, sub, used, limit, pct, id: b ? b.id : null, kind: c.kind });
-      });
+    const cats = this.catsOf(lid);
+    const catRank = c => { const i = cats.findIndex(x => x.name === c); return i < 0 ? 999 : i; };
+    const subRank = (c, s) => { const cs = this.catByName(lid, c); const subs = cs ? (cs.subs || []) : []; const i = subs.indexOf(s); return i < 0 ? 999 : i; };
+    this.followKeys(lid).forEach(k => {
+      const i = k.indexOf('::');
+      if (i < 0) return;
+      const cat = k.slice(0, i), sub = k.slice(i + 2);
+      const c = this.catByName(lid, cat);
+      if (!c || !(c.subs || []).includes(sub)) return;
+      const b = this.budgetOf(lid, cat, sub);
+      const used = this.monthUsed(lid, cat, sub, month);
+      const limit = b ? Number(b.amount) || 0 : 0;
+      rows.push({ cat, sub, used, limit, id: b ? b.id : null, pct: limit > 0 ? used / limit : 0 });
     });
+    // 按分类管理里的原始顺序排（大类 → 小类），不按字面排序
+    rows.sort((a, b) => (catRank(a.cat) - catRank(b.cat)) || (subRank(a.cat, a.sub) - subRank(b.cat, b.sub)));
+
+    // 年度总控
+    const sec = this.yearSummary(lid, year);
+    const annual = this.annualBudgetOf(lid, year);
+    const remain = annual - sec.expense;
+    const aPct = annual > 0 ? sec.expense / annual : 0;
+    const lvl = p => (p > 1 ? 'over' : p >= 0.8 ? 'warn' : '');
+
+    const monthLimitSum = rows.reduce((s, r) => s + r.limit, 0);
+    const monthUsedSum = rows.reduce((s, r) => s + r.used, 0);
 
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><div class="card-title">月度预算</div><div class="card-sub">为每个小类设置月度限额 · ${esc(this.curLedger() ? this.curLedger().name : '')} · 留空表示不限额</div></div>
+          <div>
+            <div class="card-title">年度总控</div>
+            <div class="card-sub">${year} 年 · ${esc(ledgerName)} · 全部类目（含未关注）均计入</div>
+          </div>
+          <div class="yb-input">
+            <span>年度总预算</span>
+            <input class="budget-input" id="annual-input" type="number" min="0" step="100" value="${annual || ''}" placeholder="未设置">
+            <span>元</span>
+          </div>
+        </div>
+        <div class="yb-metrics">
+          <div class="yb-metric"><span class="k">年度总预算</span><span class="v">${annual ? fmtMoney(annual, { plain: true }) : '未设置'}</span></div>
+          <div class="yb-metric"><span class="k">年度已用</span><span class="v ${annual ? lvl(aPct) : ''}">${fmtMoney(sec.expense, { plain: true })}</span></div>
+          <div class="yb-metric"><span class="k">年度剩余</span><span class="v ${annual && remain < 0 ? 'over' : ''}">${annual ? fmtMoney(remain, { plain: true }) : '—'}</span></div>
+        </div>
+        <div class="bar"><div class="bar-fill ${annual ? lvl(aPct) : ''}" style="width:${annual ? Math.min(100, aPct * 100) : 0}%"></div></div>
+        <div class="yb-hint ${annual ? lvl(aPct) : ''}">${annual
+          ? (aPct > 1 ? '年度总体进度 · 已超支 ' + Math.round((aPct - 1) * 100) + '%' : '年度总体进度 · 已用 ' + Math.round(aPct * 100) + '%')
+          : '设置年度总预算后即可查看总体进度'}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">感兴趣的类目（月度规划）</div>
+            <div class="card-sub">只规划关注的类目 · 未关注类目仍计入年度已用 · ${month.replace('-', ' 年 ')} 月限额合计 ${fmtMoney(monthLimitSum, { plain: true })} / 已用 ${fmtMoney(monthUsedSum, { plain: true })}</div>
+          </div>
+          <button class="btn btn-ghost" id="pick-cats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M4 12h7M4 17h10"/><path d="M17.5 14.5 20 17l-2.5 2.5"/></svg>
+            选择关注类目
+          </button>
         </div>
         <div style="overflow-x:auto">
-        <table class="tbl">
-          <thead><tr><th>大类</th><th>小类</th><th class="num">月度限额</th><th class="num">本月已用</th><th style="width:32%">进度</th></tr></thead>
+        <table class="tbl budget-tbl">
+          <thead><tr><th>关注类目</th><th>小类</th><th class="num">月度限额</th><th class="num">本月已用</th><th style="width:34%">进度</th></tr></thead>
           <tbody>
             ${rows.map(r => `
             <tr data-bid="${r.id || ''}" data-cat="${esc(r.cat)}" data-sub="${esc(r.sub)}">
-              <td>${esc(r.cat)}</td>
-              <td>${esc(r.sub)}</td>
-              <td class="num"><input class="budget-input" type="number" min="0" step="0.01" value="${r.limit || ''}" placeholder="不限" data-binput></td>
-              <td class="num">${fmtMoney(r.used, { plain: true })}</td>
-              <td>
-                <div class="bar"><div class="bar-fill ${r.pct > 1 ? 'over' : r.pct >= 0.7 ? 'warn' : ''}" style="width:${r.limit ? Math.min(100, r.pct * 100) : 0}%"></div></div>
-                <div style="font-size:11px;color:var(--muted);margin-top:3px">${r.limit ? (r.pct > 1 ? '已超支 ' + Math.round((r.pct - 1) * 100) + '%' : '已用 ' + Math.round(r.pct * 100) + '%') : ''}</div>
+              <td class="bc-cat">${esc(r.cat)}</td>
+              <td class="bc-sub">${esc(r.sub)}</td>
+              <td class="num bc-limit"><input class="budget-input" type="number" min="0" step="0.01" value="${r.limit || ''}" placeholder="不限" data-binput></td>
+              <td class="num bc-used ${r.limit > 0 ? lvl(r.pct) : ''}">${fmtMoney(r.used, { plain: true })}</td>
+              <td class="bc-prog">
+                ${r.limit > 0
+                  ? `<div class="bar"><div class="bar-fill ${lvl(r.pct)}" style="width:${Math.min(100, r.pct * 100)}%"></div></div>
+                     <div class="bar-note ${lvl(r.pct)}">${r.pct > 1 ? '已超支 ' + Math.round((r.pct - 1) * 100) + '%' : '已用 ' + Math.round(r.pct * 100) + '%'}</div>`
+                  : r.used > 0
+                    ? '<div class="bar blank"></div><div class="bar-note warn">未设置月度预算，建议补充</div>'
+                    : '<div class="bar blank"></div><div class="bar-note">—</div>'}
               </td>
-            </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">该账本暂无分类</td></tr>'}
+            </tr>`).join('') || `<tr><td colspan="5" class="budget-empty">还没有关注类目 · 点右上角「选择关注类目」开始规划</td></tr>`}
           </tbody>
         </table>
         </div>
       </div>
+
       <div class="card">
         <div class="card-title" style="margin-bottom:10px">颜色规则</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#34D399;margin-right:6px"></span>70% 以下 · 绿色正常</span>
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F59E0B;margin-right:6px"></span>70%–100% · 黄色警告</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#34D399;margin-right:6px"></span>80% 以下 · 正常</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F97316;margin-right:6px"></span>80%–100% · 橙色预警</span>
           <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF4444;margin-right:6px"></span>超过 100% · 红色超支</span>
         </div>
       </div>`;
 
+    // 年度总预算
+    const ai = el.querySelector('#annual-input');
+    if (ai) ai.onchange = async () => {
+      const v = Math.max(0, parseFloat(ai.value) || 0);
+      const row = this.annualRow(lid, year);
+      try {
+        if (row) await Store.update('budgets', row.id, { amount: v });
+        else await Store.insert('budgets', { ledger_id: lid, category: BUDGET_ANNUAL, sub: year, amount: v, month: '', note: '' });
+        this.toast('年度总预算已更新', 'ok');
+        await this.loadData();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+
+    // 月度限额
     el.querySelectorAll('[data-binput]').forEach(inp => {
       inp.onchange = async () => {
         const tr = inp.closest('tr');
@@ -2833,6 +2952,70 @@ const App = {
         } catch (e) { this.toast(e.message, 'err'); }
       };
     });
+
+    el.querySelector('#pick-cats').onclick = () => this.openFollowPicker();
+  },
+
+  /* 关注类目选择器（分类树，勾选后进入月度规划） */
+  openFollowPicker() {
+    const lid = this.state.currentLedgerId;
+    const cats = this.catsOf(lid);
+    const chosen = new Set(this.followKeys(lid));
+    if (!cats.length) { this.toast('该账本暂无分类', ''); return; }
+
+    const body = cats.map(c => {
+      const subs = c.subs || [];
+      const n = subs.filter(s => chosen.has(c.name + '::' + s)).length;
+      return `<div class="fp-group" data-cat="${esc(c.name)}">
+        <label class="fp-cat"><input type="checkbox" data-gcat ${n && n === subs.length ? 'checked' : ''}> <b>${esc(c.name)}</b><span class="fp-kind">${c.kind === 'income' ? '收入' : '支出'}</span><span class="fp-count" data-gcount>${n}/${subs.length}</span></label>
+        <div class="fp-subs">${subs.map(s => `<label class="fp-sub"><input type="checkbox" data-k="${esc(c.name + '::' + s)}" ${chosen.has(c.name + '::' + s) ? 'checked' : ''}>${esc(s)}</label>`).join('') || '<span class="fp-none">暂无小类</span>'}</div>
+      </div>`;
+    }).join('');
+
+    const m = this.openModal(`
+      <div class="modal-title">选择关注类目<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <p class="fp-tip">勾选后才会出现在月度预算列表；未勾选的类目照常记账，并计入年度已用。</p>
+      <div class="fp-wrap">${body}</div>
+      <div class="modal-acts">
+        <button class="btn btn-ghost" id="fp-none">全不选</button>
+        <button class="btn btn-ghost" data-close>取消</button>
+        <button class="btn btn-primary" id="fp-save">确定</button>
+      </div>
+    `, false, 'follow-modal');
+
+    const syncGroup = g => {
+      const boxes = [...g.querySelectorAll('.fp-sub input')];
+      const on = boxes.filter(b => b.checked).length;
+      const gb = g.querySelector('[data-gcat]');
+      gb.checked = on > 0 && on === boxes.length;
+      gb.indeterminate = on > 0 && on < boxes.length;
+      const cnt = g.querySelector('[data-gcount]');
+      if (cnt) cnt.textContent = on + '/' + boxes.length;
+    };
+
+    m.querySelectorAll('.fp-group').forEach(g => {
+      syncGroup(g);
+      g.querySelector('[data-gcat]').onchange = e => {
+        g.querySelectorAll('.fp-sub input').forEach(b => { b.checked = e.target.checked; });
+        syncGroup(g);
+      };
+      g.querySelectorAll('.fp-sub input').forEach(b => { b.onchange = () => syncGroup(g); });
+    });
+
+    m.querySelector('#fp-none').onclick = () => {
+      m.querySelectorAll('.fp-sub input').forEach(b => { b.checked = false; });
+      m.querySelectorAll('.fp-group').forEach(syncGroup);
+    };
+
+    m.querySelector('#fp-save').onclick = async () => {
+      const keys = [...m.querySelectorAll('.fp-sub input')].filter(b => b.checked).map(b => b.dataset.k);
+      try {
+        await this.saveFollowKeys(keys);
+        this.closeModal();
+        await this.loadData();
+        this.toast(keys.length ? '已关注 ' + keys.length + ' 个类目' : '已清空关注类目', 'ok');
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
   },
 
   /* ---------- 视图：设置 ---------- */
