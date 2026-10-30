@@ -6,6 +6,7 @@ const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用
  * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
  * 该窗口内被自动切换过的好物，status_since 精确等于 2026-10-26 或 2026-10-27 → 即被污染值。 */
 const WISH_STATUS_BUG_DATES = ['2026-10-26', '2026-10-27'];
+const ROUTE_NAMES = { ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
 const App = {
   state: {
     route: 'ledger',
@@ -157,6 +158,8 @@ const App = {
   async enterApp() {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
+    // 先按地址栏定位页面：刷新后直接停在当前页，不再先闪一下记账本
+    this.primeRoute();
     this.initNavToggle();
     // banner 配置与本地迁移检查互相独立，并行发起省一个来回（弱网下登录后内容出现更快）
     await Promise.all([this.initHero(), this.migrateLocalIfNeeded()]);
@@ -181,7 +184,6 @@ const App = {
     }
     // 季节自动切换：打开应用时执行一次（不阻塞渲染，后台完成）
     this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
-    if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     this.route();
     // 自动付：打开应用先补算一次（服务端 pg_cron 之外的兜底），再展示「已自动支付」通知
     this.startAutoPayWatch();
@@ -607,11 +609,27 @@ const App = {
   },
 
   /* ---------- 路由 ---------- */
-  route() {
+  /* 地址栏 → 页面 key（无 hash 时归一到记账本并写回地址） */
+  routeKey() {
+    if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
     const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
-    const names = { ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
-    this.state.route = names[r] ? r : 'ledger';
-    document.getElementById('page-title').textContent = names[this.state.route];
+    return ROUTE_NAMES[r] ? r : 'ledger';
+  },
+
+  /* 进入应用的最早一刻就把外壳切到当前页（只切视图与标题，不渲染内容），数据到位后再走 route() 完整渲染 */
+  primeRoute() {
+    this.state.route = this.routeKey();
+    const on = this.state.route;
+    document.getElementById('page-title').textContent = ROUTE_NAMES[on];
+    document.querySelectorAll('.nav-item').forEach(a => {
+      a.classList.toggle('active', a.dataset.route === on);
+    });
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + on));
+  },
+
+  route() {
+    this.state.route = this.routeKey();
+    document.getElementById('page-title').textContent = ROUTE_NAMES[this.state.route];
     document.querySelectorAll('.nav-item').forEach(a => {
       a.classList.toggle('active', a.dataset.route === this.state.route);
     });
