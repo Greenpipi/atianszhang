@@ -705,7 +705,12 @@
       const ym = thisMonth();
       let n = 0;
       for (const bud of budgets) {
-        const same = (this.state.bills || []).some(x => x.cat === RENTAL_CAT && (x.sub === bud.sub || x.name === bud.sub));
+        // 已经有一条同名/近名的账单就不再建（如待办里已有「绿地物业费」，别再补一条「物业费」）
+        const same = (this.state.bills || []).some(x => {
+          const name = String(x.name || ''), sub = String(x.sub || '');
+          return name === bud.sub || sub === bud.sub ||
+            (name && (name.includes(bud.sub) || bud.sub.includes(name)));
+        });
         if (same) continue;
         const paidRec = (this.state.records || []).find(r => r.rental && r.sub === bud.sub && monthOf(r.date) === ym);
         const dueDay = paidRec ? Number(String(paidRec.date).slice(8, 10)) : 1;
