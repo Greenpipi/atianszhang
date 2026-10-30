@@ -13,6 +13,7 @@
   Object.assign(App, {
 
     /* ---------- 页面渲染 ---------- */
+    /* 整页渲染：只在路由进入 / 数据变化后调用（头部、统计卡、内容区一起出） */
     renderBills() {
       const el = document.getElementById('view-bills');
       if (!el) return;
@@ -29,15 +30,6 @@
       const yearRows = billYearOverview(bills, year);
       const yearTotal = yearRows.reduce((s, x) => s + x.amount, 0);
       const missing = Store.mode === 'supabase' && Store.billsMissing;
-
-      const rank = st => st.state === 'overdue' ? 0 : (st.state === 'pending' || st.state === 'auto') ? 1 : st.state === 'upcoming' ? 2 : st.state === 'paid' ? 3 : st.state === 'paused' ? 4 : 5;
-      const listRows = (tab === 'due' ? dueRows : rows.slice()).sort((a, b) => {
-        const dr = rank(a.st) - rank(b.st);
-        if (dr) return dr;
-        const da = a.st.dueDate || a.st.nextDate || '9999-12-31';
-        const db = b.st.dueDate || b.st.nextDate || '9999-12-31';
-        return da < db ? -1 : da > db ? 1 : 0;
-      });
 
       el.innerHTML = `
         <div class="bills-head">
@@ -57,23 +49,57 @@
         </div>
         <div id="bills-body"></div>`;
 
-      const body = el.querySelector('#bills-body');
+      el.querySelectorAll('#bills-tabs [data-tab]').forEach(btn => {
+        // 切 Tab：只更新选中态 + 内容区，头部/统计卡原地不动（避免整页重排与跳动）
+        btn.onclick = () => this.setBillsTab(btn.dataset.tab);
+      });
+      const add = el.querySelector('#bill-add');
+      if (add) add.onclick = () => this.openBillModal();
+      this.renderBillsBody();
+      if (this.updateBillsBadge) this.updateBillsBadge();
+    },
+
+    /* 只重绘内容区：#bills-body 里的卡片 / 总览表 / 空态 */
+    renderBillsBody() {
+      const el = document.getElementById('view-bills');
+      const body = el && el.querySelector('#bills-body');
+      if (!body) return;
+      const today = todayStr();
+      const tab = this.state.billsTab || 'due';
+      const rows = billList().map(b => ({ b, st: billStatus(b, today) }));
+      const dueRows = rows.filter(r => r.st.state === 'overdue' || billDueThisMonth(r.b, today));
+      const rank = st => st.state === 'overdue' ? 0 : (st.state === 'pending' || st.state === 'auto') ? 1 : st.state === 'upcoming' ? 2 : st.state === 'paid' ? 3 : st.state === 'paused' ? 4 : 5;
+      const listRows = (tab === 'due' ? dueRows : rows.slice()).sort((a, b) => {
+        const dr = rank(a.st) - rank(b.st);
+        if (dr) return dr;
+        const da = a.st.dueDate || a.st.nextDate || '9999-12-31';
+        const db = b.st.dueDate || b.st.nextDate || '9999-12-31';
+        return da < db ? -1 : da > db ? 1 : 0;
+      });
+
       if (tab === 'overview') {
-        body.innerHTML = this.billOverviewHTML(yearRows, year, yearTotal);
+        const year = String(new Date().getFullYear());
+        const yearRows = billYearOverview(billList(), year);
+        body.innerHTML = this.billOverviewHTML(yearRows, year, yearRows.reduce((s, x) => s + x.amount, 0));
       } else if (listRows.length) {
         body.innerHTML = '<div class="bill-list">' + listRows.map(r => this.billCardHTML(r.b, r.st)).join('') + '</div>';
       } else {
         body.innerHTML = `<div class="card"><div class="empty"><p>${tab === 'due' ? '本月没有待付账单，轻松一下 🎉' : '还没有待办账单，点右上角「添加待办账单」创建第一条'}</p></div></div>`;
       }
+      this.bindBillActions(body);
+      this.enhanceSelects(body);
+    },
 
-      el.querySelectorAll('#bills-tabs [data-tab]').forEach(btn => {
-        btn.onclick = () => { this.state.billsTab = btn.dataset.tab; this.renderBills(); };
+    /* Tab 切换入口 */
+    setBillsTab(tab) {
+      if (!tab) return;
+      this.state.billsTab = tab;
+      const el = document.getElementById('view-bills');
+      if (!el) return;
+      el.querySelectorAll('#bills-tabs [data-tab]').forEach(b => {
+        if (b.dataset.tab === tab) b.classList.add('on'); else b.classList.remove('on');
       });
-      const add = el.querySelector('#bill-add');
-      if (add) add.onclick = () => this.openBillModal();
-      this.bindBillActions(el);
-      this.enhanceSelects(el);
-      if (this.updateBillsBadge) this.updateBillsBadge();
+      this.renderBillsBody();
     },
 
     /* 账单卡片交互：待办页与出租屋「固定费用」共用同一套绑定 */

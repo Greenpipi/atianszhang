@@ -29,7 +29,8 @@
   --shadow-hover:0 2px 10px rgba(15,23,42,.09);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+/* 滚动条始终占位：待办各 Tab 内容长短不一，滚动条忽隐忽现会让整页宽度变化、内容左右抖一下 */
+html{-webkit-text-size-adjust:100%;overflow-y:scroll;scrollbar-gutter:stable}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
   background:var(--bg);color:var(--text);
@@ -1161,6 +1162,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   padding:12px 16px;font-size:13px;margin-bottom:16px;line-height:1.6;
 }
 
+/* 内容区锁一个最小高度：三个 Tab 内容长短差很多，切换时不至于页面骤缩、滚动位置被强行拉回顶部 */
+#bills-body{min-height:max(360px,52dvh);display:flex;flex-direction:column}
+#bills-body>*{flex:0 0 auto}
 .bill-list{display:flex;flex-direction:column;gap:10px}
 .bill-card{
   display:flex;align-items:center;gap:14px;padding:14px 16px;
