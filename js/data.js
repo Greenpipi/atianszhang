@@ -453,7 +453,11 @@ function billOccurrencesUntil(bill, untilDate) {
   return out;
 }
 function billTypeMeta(name) {
-  return BILL_TYPES.find(x => x.name === name) || { name: name || '其他', emoji: '🧾', color: '#64748B' };
+  // 出租屋子类（水费/电费/燃气费…）沿用出租屋那套图标配色，待办账单里也一致
+  const rental = RENTAL_META[name];
+  return BILL_TYPES.find(x => x.name === name)
+    || (rental ? { name, emoji: rental.emoji, color: rental.color } : null)
+    || { name: name || '其他', emoji: '🧾', color: '#64748B' };
 }
 function billEveryMonths(bill) {
   if (!bill) return 1;

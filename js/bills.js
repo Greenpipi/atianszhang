@@ -94,6 +94,10 @@
           else if (act === 'del') this.deleteBill(id);
           else if (act === 'fix') this.correctBillAmount(id);
           else if (act === 'detail') this.openBillDetail(id);
+          else if (act === 'new') {
+            const nm = node.dataset.billName || '';
+            this.openBillModal(null, { cat: RENTAL_CAT, name: nm, sub: nm, btype: nm });
+          }
         };
       });
       // 金额框：回车等于点「已付」，Esc 退出输入
@@ -152,14 +156,13 @@
       if (editable) {
         amountHTML = `<div class="bill-amount">
           <input class="bill-amt-input" type="number" inputmode="decimal" min="0" step="0.01"
-                 value="${amt > 0 ? amt : ''}" placeholder="未设金额" data-bill-amt="${b.id}" aria-label="本期金额">
-          <span class="sub">${amt > 0 ? '预设金额' : '每期填写'}</span>
+                 value="${amt > 0 ? amt : ''}" placeholder="填写金额" data-bill-amt="${b.id}" aria-label="本期金额">${amt > 0 ? '<span class="sub">预设金额</span>' : ''}
         </div>`;
       } else if (st.paid) {
         const paidAmt = Number(b.paid_amount) || amt;
         amountHTML = `<div class="bill-amount">${paidAmt > 0 ? fmtMoney(paidAmt) : '—'}<span class="sub">${b.paid_by === 'auto' ? '已自动扣款' : '本期已付'}</span></div>`;
       } else {
-        amountHTML = `<div class="bill-amount">${amountText(b)}<span class="sub">${amt > 0 ? (autoOk ? '预设金额 · 自动扣款' : '预设金额') : '每期填写'}</span></div>`;
+        amountHTML = `<div class="bill-amount">${amountText(b)}${amt > 0 ? `<span class="sub">${autoOk ? '预设金额 · 自动扣款' : '预设金额'}</span>` : ''}</div>`;
       }
       return `
       <div class="bill-card ${st.cls}">
@@ -473,13 +476,15 @@
       if (!claimed) return false;
       Object.assign(b, { paid_period: occurrence, paid_amount: amount, paid_by: by, paid_at: nowIso });
       try {
+        // 已付就当天的账：应期还没到（提前付）就记在今天，避免账册里出现未来日期的记录
+        const entryDate = occurrence > todayStr() ? todayStr() : occurrence;
         const rec = await Store.insert('records', {
           ledger_id: ledgerId,
           category: target.cat,
           sub: target.sub,
           amount,
           note: '周期性账单：' + (b.name || '账单') + (by === 'auto' ? '（自动扣款）' : ''),
-          date: occurrence,
+          date: entryDate,
           kind: 'expense',
           favorite: false,
           rating: 0,

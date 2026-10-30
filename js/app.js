@@ -2574,6 +2574,20 @@ const App = {
   },
 
   /* ---------- 视图：出租屋（主账本中标记了「出租屋」的记录） ---------- */
+  /* 固定费用占位卡：还没建对应账单时也列出来，点「设置」带着名称建到待办账单 */
+  fixedSlotHTML(name) {
+    const meta = RENTAL_META[name] || { emoji: '•', color: '#94A3B8' };
+    return `
+      <div class="bill-card slot">
+        <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
+        <div class="bill-main">
+          <div class="bill-name">${esc(name)}<span class="badge badge-gray">未设置</span></div>
+          <div class="bill-meta">出租屋固定费用</div>
+        </div>
+        <div class="bill-acts"><button class="btn btn-primary btn-sm" data-bill-act="new" data-bill-name="${esc(name)}">设置</button></div>
+      </div>`;
+  },
+
   renderRental() {
     const el = document.getElementById('view-rental');
     const lid = this.state.currentLedgerId;
@@ -2601,17 +2615,36 @@ const App = {
       : (month.replace('-', ' 年 ') + ' 月');
 
     // 固定费用 = 待办账单里「出租屋」大类的账单（同一份数据，两边改动同步）
-    const fixedBills = (this.state.bills || []).filter(b => b.cat === RENTAL_CAT);
-    const fixedStatus = fixedBills.map(b => billStatus(b, todayStr()));
+    // 出租屋账单 + 名字命中五项固定费用的账单（如归在「固定支出」下的物业费，也让人在出租屋页看得见）
+    const hitFixedName = b => {
+      const nm = String(b.name || ''), sb = String(b.sub || '');
+      return RENTAL_FIXED.some(n => sb === n || nm === n || (nm.length > 1 && nm.includes(n)));
+    };
+    const fixedBills = (this.state.bills || []).filter(b => b.cat === RENTAL_CAT || hitFixedName(b));
+    const fixedSt = new Map(fixedBills.map(b => [b.id, billStatus(b, todayStr())]));
+    // 房租/水费/电费/燃气费/物业费 五项固定列出：还没建账单的先出占位卡，点「设置」直接建到待办账单里
+    const usedFixed = new Set();
+    const fixedSlots = RENTAL_FIXED.map(name => {
+      const bill = fixedBills.find(x => {
+        if (usedFixed.has(x.id)) return false;
+        const nm = String(x.name || ''), sb = String(x.sub || '');
+        return sb === name || nm === name || (nm && (nm.includes(name) || name.includes(nm)));
+      });
+      if (bill) usedFixed.add(bill.id);
+      return { name, bill: bill || null };
+    });
+    const fixedCards = fixedSlots.map(s => s.bill
+      ? this.billCardHTML(s.bill, fixedSt.get(s.bill.id))
+      : this.fixedSlotHTML(s.name)
+    // 不在这五项里的出租屋账单（如自建的其他费用）照旧排在后面
+    ).concat(fixedBills.filter(b => !usedFixed.has(b.id)).map(b => this.billCardHTML(b, fixedSt.get(b.id))));
     // 合计只算本月有应期的账单（每半年/每年那种本月没到期的计进来会虚高）
-    const fixedTotal = fixedBills.reduce((s, b, i) => {
-      const st = fixedStatus[i];
-      const inMonth = st.dueDate && st.dueDate.slice(0, 7) === thisMonth();
+    const fixedTotal = fixedBills.reduce((s, b) => {
+      const st = fixedSt.get(b.id);
+      const inMonth = st && st.dueDate && st.dueDate.slice(0, 7) === thisMonth();
       return s + (inMonth ? (Number(b.preset_amount) || Number(b.paid_amount) || 0) : 0);
     }, 0);
-    const fixedHTML = fixedBills.length
-      ? '<div class="bill-list">' + fixedBills.map((b, i) => this.billCardHTML(b, fixedStatus[i])).join('') + '</div>'
-      : '<div class="empty"><p>还没有固定费用账单，点右上角添加房租、水费、电费…</p></div>';
+    const fixedHTML = '<div class="bill-list">' + fixedCards.join('') + '</div>';
 
     // 分类统计（按小类，范围口径）
     const bySub = {};
