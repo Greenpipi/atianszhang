@@ -13,6 +13,11 @@ const ROUTE_NAMES = { ledger: '记账本', bills: '待办账单', wishlist: '好
 const BUDGET_ANNUAL = '__annual__';
 const BUDGET_FOLLOW = '__follow__';
 const isBudgetMeta = b => b && (b.category === BUDGET_ANNUAL || b.category === BUDGET_FOLLOW);
+
+/* 一次性数据迁移版本号。loadData 里的历史数据修补（废账本清理 / 重复账本合并 / 模板去重 /
+ * 出租屋大类补齐 / 模板元数据回填 / 好物标签补齐）只在版本落后时跑一次，之后整段跳过。
+ * 新增或修改迁移逻辑时 +1，老客户端会自动重跑一轮。 */
+const DATA_MIGRATION_VERSION = 3;
 const App = {
   state: {
     route: 'ledger',
@@ -405,6 +410,20 @@ const App = {
     }).catch(() => { /* ignore */ });
   },
 
+  /* ---------- 一次性数据迁移的版本门闩 ---------- */
+  _migKey() {
+    return 'fin_data_mig_v_' + ((Store.user && Store.user.email) || 'anon');
+  },
+  // 已迁到目标版本 → 启动时跳过全部历史修补（省掉全表遍历与多余往返）
+  _migrationDone() {
+    try { return parseInt(localStorage.getItem(this._migKey()) || '0', 10) >= DATA_MIGRATION_VERSION; }
+    catch (e) { return false; }
+  },
+  // 只在所有迁移都干净跑完后写入；中途抛错/提前 return 则不写，下次启动自动重试
+  _commitMigration() {
+    try { localStorage.setItem(this._migKey(), String(DATA_MIGRATION_VERSION)); } catch (e) { /* 隐私模式忽略 */ }
+  },
+
   /* ---------- 数据加载 ---------- */
   async loadData(silent = false) {
     if (this.state.loading && silent) return;
@@ -419,7 +438,10 @@ const App = {
         for (const l of DEFAULT_LEDGERS) await Store.insert('ledgers', l);
         changed = true;
       }
-      // 旧版数据清理：出租屋曾是独立账本，现改为主账本的记录标记
+      /* 下面三段是一次性历史数据修补：版本落后时才跑，正常启动整段跳过 */
+      const needMig = !this._migrationDone();
+      if (needMig) {
+      // 迁移 1：旧版数据清理 —— 出租屋曾是独立账本，现改为主账本的记录标记
       const staleRental = ledgers.filter(l => l.type === 'rental');
       if (staleRental.length) {
         const ops = [];
@@ -493,6 +515,8 @@ const App = {
           templates.splice(0, templates.length, ...templates.filter(t => !dead.has(t.id)));
         }
       }
+      }   // end if (needMig)：迁移 1–3
+
       if (!categories.length) {
         const ls = await Store.list('ledgers');
         for (const l of ls) {
@@ -500,8 +524,8 @@ const App = {
           for (const c of defs) await Store.insert('categories', { ledger_id: l.id, name: c.name, kind: c.kind, subs: c.subs });
         }
         changed = true;
-      } else {
-        // 老用户补「出租屋」大类
+      } else if (needMig) {
+        // 迁移 4：老用户补「出租屋」大类
         const personal = (await Store.list('ledgers')).find(l => l.type === 'personal') || ledgers[0];
         if (personal && !categories.some(c => c.ledger_id === personal.id && c.name === RENTAL_CAT)) {
           const def = (DEFAULT_CATEGORIES.personal || []).find(c => c.name === RENTAL_CAT);
@@ -516,8 +540,8 @@ const App = {
         }
         changed = true;
       }
-      // 老模板补 label/section/emoji（此前缺列被剥离入库的模板，按 category+sub 回填默认值；每会话只试一次防递归）
-      if (!this._tplMetaMigrated && templates.length && templates.some(t => !t.label || !t.section || !t.emoji)) {
+      // 迁移 5：老模板补 label/section/emoji（此前缺列被剥离入库的模板，按 category+sub 回填默认值；每会话只试一次防递归）
+      if (needMig && !this._tplMetaMigrated && templates.length && templates.some(t => !t.label || !t.section || !t.emoji)) {
         this._tplMetaMigrated = true;
         let fixed = 0;
         for (const t of templates) {
@@ -529,14 +553,17 @@ const App = {
       }
       if (changed) return this.loadData(silent);
 
-      // 好物仓库多标签迁移：老数据无 tags 字段，按分类名匹配补默认标签（每次会话最多尝试一次，防止缺列时无限递归）
-      const needTags = !this._wishTagsMigrated && records.filter(r => r.favorite && r.tags == null);
-      if (needTags.length) {
-        this._wishTagsMigrated = true;
-        for (const r of needTags) await Store.update('records', r.id, { tags: legacyGoodsTags(r) });
-        changed = true;
+      // 迁移 6：好物仓库多标签迁移 —— 老数据无 tags 字段，按分类名匹配补默认标签（每次会话最多尝试一次，防止缺列时无限递归）
+      if (needMig) {
+        const needTags = !this._wishTagsMigrated && records.filter(r => r.favorite && r.tags == null);
+        if (needTags.length) {
+          this._wishTagsMigrated = true;
+          for (const r of needTags) await Store.update('records', r.id, { tags: legacyGoodsTags(r) });
+          changed = true;
+        }
+        if (changed) return this.loadData(silent);
+        this._commitMigration();   // 全部干净通过 → 记下版本号，之后启动不再进这些分支
       }
-      if (changed) return this.loadData(silent);
 
       this.state.ledgers = ledgers;
       this.state.categories = categories;

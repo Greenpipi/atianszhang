@@ -491,7 +491,11 @@ const Store = {
     if (this.mode !== 'supabase' || this._realtimeOn) return;
     this._realtimeOn = true;
     const ch = this.sb.channel('fin-db-changes');
-    ['ledgers', 'categories', 'records', 'budgets', 'templates', 'bills'].forEach(t => {
+    // 只订阅高频变更、且直接决定当前视图的 3 张核心表：流水 / 预算 / 待办。
+    // ledgers / categories / templates 变更频率极低（只有本机改设置时才动），
+    // 而本机改完自己会 loadData 刷新，无需实时通道；
+    // 去掉后每个客户端少 3 个订阅，也避免别的设备改分类时触发本机全表重载。
+    ['records', 'budgets', 'bills'].forEach(t => {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => this._emitData());
     });
     ch.subscribe();
