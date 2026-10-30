@@ -56,6 +56,9 @@ const Store = {
 
   _emitData() { if (this._onDataChange) this._onDataChange(); },
   _emitAuth() { if (this._onAuthChange) this._onAuthChange(); },
+  /* 自己刚写过库：记一个时间戳，realtime 回声在窗口内直接丢弃，
+     避免「保存 → 自己收到变更 → 又全量重载」的自读回环 */
+  _noteWrite() { this._lastWriteAt = Date.now(); },
 
   /* ---------- 认证 ---------- */
   async restoreSession() {
@@ -174,26 +177,99 @@ const Store = {
   /* ---------- 通用 CRUD（按用户隔离） ---------- */
   /* list：分页拉全。PostgREST 有单次返回行数上限（Supabase 项目默认 1000），
      一次 select('*') 只会拿到前 N 行——云端 2701 条时永远只显示最早的 1000 条，
-     且导入去重比对也看不到全部，导致重复导入。按 500/页循环拉全。 */
-  async _listPaged(table) {
-    const all = [];
+     且导入去重比对也看不到全部，导致重复导入。按 500/页拉全。
+     提速：先取首页并带回 count，其余页一次性并发发出（原来串行 6 个来回 → 现在 2 个）。 */
+  async _listPaged(table, cols) {
     const PAGE = 500;
-    let from = 0;
-    for (;;) {
-      const { data, error } = await this.sb.from(table).select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
-      if (error) throw error;
-      const rows = data || [];
-      for (const r of rows) all.push(r);
-      if (rows.length < PAGE) break;
-      from += PAGE;
+    const sel = cols || '*';
+    const page = from => this.sb.from(table).select(sel, { count: 'exact' })
+      .order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+
+    const first = await page(0);
+    if (first.error) throw first.error;
+    const rows = (first.data || []).slice();
+    const total = typeof first.count === 'number' ? first.count : null;
+
+    // 服务端没回 count（代理/旧版本）：退回顺序翻页，保证一条不漏
+    if (total === null) {
+      if (rows.length < PAGE) return rows;
+      let from = rows.length;
+      for (;;) {
+        const r = await page(from);
+        if (r.error) throw r.error;
+        const batch = r.data || [];
+        for (const x of batch) rows.push(x);
+        if (batch.length < PAGE) break;
+        from += PAGE;
+      }
+      return rows;
     }
-    return all;
+    if (total <= rows.length) return rows;
+
+    const rest = [];
+    for (let from = rows.length; from < total; from += PAGE) rest.push(page(from));
+    for (const r of await Promise.all(rest)) {
+      if (r.error) throw r.error;
+      for (const x of (r.data || [])) rows.push(x);
+    }
+    return rows;
+  },
+
+  /* records 的轻量列集：不含 images / image（base64 dataURL，单张 60–120KB）。
+     列表、统计、预算、好物卡片全部用不到原图，图片改为进入页面时按需单条拉取。
+     首屏因此不再下载全部图片，本地快照也不会撑爆 localStorage 配额。 */
+  RECORD_COLS: 'id,ledger_id,category,sub,amount,note,remark,favorite,tags,rental,'
+    + 'purchase_platform,attribute,rating,date,kind,status,status_since,created_at',
+
+  /* 按 id 批量取图片（records.images，缺列时回退老的单图 image） */
+  async fetchImages(ids) {
+    const out = {};
+    const list = (ids || []).filter(Boolean);
+    if (!list.length) return out;
+    if (this.mode !== 'supabase') {
+      const db = this._localRead();
+      for (const r of ((db && db.records) || [])) {
+        if (list.indexOf(r.id) < 0) continue;
+        out[r.id] = Array.isArray(r.images) ? r.images : (r.image ? [r.image] : []);
+      }
+      return out;
+    }
+    const take = arr => {
+      for (const r of (arr || [])) {
+        out[r.id] = Array.isArray(r.images) ? r.images.filter(Boolean) : (r.image ? [r.image] : []);
+      }
+    };
+    for (let i = 0; i < list.length; i += 40) {
+      const chunk = list.slice(i, i + 40);
+      try {
+        const { data, error } = await this.sb.from('records').select('id,images,image').in('id', chunk);
+        if (error) {
+          // images 列缺失：退回只取老的单图列
+          if (this._isColErr(error)) {
+            const r2 = await this.sb.from('records').select('id,image').in('id', chunk);
+            if (!r2.error) take(r2.data);
+          }
+          continue;
+        }
+        take(data);
+      } catch (e) { /* 图片取不到不影响主体数据 */ }
+    }
+    return out;
   },
 
   async list(table) {
     if (this.mode === 'supabase') {
       try {
-        return await this._listPaged(table);
+        const cols = table === 'records' && this._recordColsOk !== false ? this.RECORD_COLS : null;
+        try {
+          return await this._listPaged(table, cols);
+        } catch (e2) {
+          // 轻量列集不被识别（库里缺某列）：退回全列，绝不因为取数优化把页面弄白
+          if (!cols || this._isTableErr(e2)) throw e2;
+          this._recordColsOk = false;
+          console.warn('records 轻量列集不可用，退回 select(*)', e2);
+          return await this._listPaged(table, null);
+        }
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
         else throw new Error(this._dbErr(e));
@@ -226,6 +302,7 @@ const Store = {
     if (this.mode === 'supabase') {
       const { error } = await this.sb.from(table).delete().in('id', ids);
       if (error) throw new Error(this._dbErr(error));
+      this._noteWrite();
       return ids.length;
     }
     const db = this._localRead();
@@ -247,6 +324,7 @@ const Store = {
           }
           throw error;
         }
+        this._noteWrite();
         return data;
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
@@ -274,6 +352,7 @@ const Store = {
             }
             throw error;
           }
+          this._noteWrite();
           return true;
         }
         return false; // 字段全部缺失被剥离：未发送任何更新
@@ -304,7 +383,7 @@ const Store = {
           }
           throw error;
         }
-        return !!(data && data.length);
+        return !!(data && data.length) && (this._noteWrite(), true);
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
         else throw new Error(this._dbErr(e));
@@ -325,6 +404,7 @@ const Store = {
       try {
         const { error } = await this.sb.from(table).delete().eq('id', id);
         if (error) throw error;
+        this._noteWrite();
         return;
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();
@@ -496,7 +576,12 @@ const Store = {
     // 而本机改完自己会 loadData 刷新，无需实时通道；
     // 去掉后每个客户端少 3 个订阅，也避免别的设备改分类时触发本机全表重载。
     ['records', 'budgets', 'bills'].forEach(t => {
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => this._emitData());
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => {
+        // 自己刚写库（2.5s 内）的变更回声直接丢弃：保存流程本身已经本地更新过 UI，
+        // 再来一轮全量 loadData 就是纯浪费（原来一次保存要拉两到三轮全表）
+        if (Date.now() - (this._lastWriteAt || 0) < 2500) return;
+        this._emitData();
+      });
     });
     ch.subscribe();
   },

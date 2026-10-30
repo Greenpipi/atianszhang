@@ -607,7 +607,11 @@ const App = {
         currentLedgerId: this.state.currentLedgerId
       };
       localStorage.setItem(key, JSON.stringify(snap));
-    } catch (e) { /* 隐私模式/容量超限忽略 */ }
+    } catch (e) {
+      // 容量超限：清掉旧快照 —— 旧版快照把 base64 图片一并存了进来（单条可达数 MB），
+      // 留着会让每次刷新都去解析一个超大字符串，比没有缓存还慢
+      try { localStorage.removeItem(this._cacheKey()); } catch (e2) { /* ignore */ }
+    }
   },
   // 用上次成功的快照即时渲染，避免每次刷新都等云端往返；返回是否命中缓存
   paintFromCache() {
@@ -616,6 +620,9 @@ const App = {
       if (!key) return false;
       const raw = localStorage.getItem(key);
       if (!raw) return false;
+      // 旧版快照把 base64 图片一起存了进来（单个账号可达十几 MB）：解析它比不用缓存还慢，
+      // 直接丢弃让本次走网络，随后 loadData 会写回不含图片的轻量快照
+      if (raw.length > 4000000) { try { localStorage.removeItem(key); } catch (e2) { /* ignore */ } return false; }
       const s = JSON.parse(raw);
       if (!s || !Array.isArray(s.records)) return false;
       this.state.ledgers = s.ledgers || [];
@@ -1902,6 +1909,7 @@ const App = {
           const rec = this.state.records.find(r => r.id === rid);
           if (!rec) return;
           if (act === 'img') {
+            if (rec._imgLoaded !== true) await this.ensureImages([rec]);
             const imgs = this.recImages(rec);
             if (imgs.length) this.openWishLight(imgs, 0);
             else await this.addWishImages(rid);
@@ -1913,6 +1921,8 @@ const App = {
         };
       });
     });
+    // 图片按需加载：卡片先用占位图成型（打开即见），图片到位后原地补图
+    this.ensureImages(items).then(got => { if (got) this._paintWishImages(); });
   },
 
   /* ---------- 好物卡片：图片/状态/标签辅助与浮层 ---------- */
@@ -1920,6 +1930,50 @@ const App = {
   recImages(r) {
     if (Array.isArray(r && r.images)) return r.images.filter(x => typeof x === 'string' && x);
     return r && r.image ? [r.image] : [];
+  },
+  /* 图片按需加载：records 列表查询已排除 images（base64 单张 60–120KB），
+     只有真的要展示图片的地方（好物仓库、编辑弹窗、大图灯箱）才补一次，按记录标记 _imgLoaded。
+     同一记录并发调用会复用同一个请求，避免「还在拉图时追加图片」把原图覆盖掉。 */
+  _imgJobs: new Map(),
+  async ensureImages(recs) {
+    const need = (recs || []).filter(r => r && r.id && r._imgLoaded !== true);
+    if (!need.length) return false;
+    const waits = [], fresh = [];
+    for (const r of need) {
+      const job = this._imgJobs.get(r.id);
+      if (job) waits.push(job); else fresh.push(r);
+    }
+    if (fresh.length) {
+      const job = (async () => {
+        let map = {};
+        try { map = await Store.fetchImages(fresh.map(r => r.id)); }
+        catch (e) { /* 图片失败不影响主体 */ }
+        for (const r of fresh) {
+          r._imgLoaded = true;
+          const imgs = map[r.id];
+          if (imgs && imgs.length) r.images = imgs;
+        }
+      })();
+      fresh.forEach(r => this._imgJobs.set(r.id, job));
+      job.then(() => fresh.forEach(r => this._imgJobs.delete(r.id)));
+      waits.push(job);
+    }
+    await Promise.all(waits);
+    return need.some(r => this.recImages(r).length > 0);
+  },
+  /* 图片到位后原地补图：不重排、不闪烁、不打断滚动 */
+  _paintWishImages() {
+    document.querySelectorAll('.wish-card').forEach(card => {
+      const rec = this.state.records.find(r => r.id === card.dataset.wid);
+      const box = card.querySelector('.wish-imgbox');
+      if (!rec || !box) return;
+      const imgs = this.recImages(rec);
+      if (!imgs.length) return;
+      const cur = box.querySelector('img');
+      if (cur && cur.getAttribute('src') === imgs[0]) return;
+      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
+      box.title = '点击查看大图';
+    });
   },
   /* 选本地图片（可多选）并压缩，返回 dataURL 数组 */
   pickImages() {
@@ -1941,11 +1995,13 @@ const App = {
   /* 卡片占位图点击：直接选图上传（多张） */
   async addWishImages(rid) {
     if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+    const rec = this.state.records.find(r => r.id === rid);
+    if (!rec) return;
+    // 图片是懒加载的：先确保拿到已有图片再追加，否则会用空数组覆盖掉原图
+    if (rec._imgLoaded !== true) await this.ensureImages([rec]);
     this.toast('图片处理中…');
     const added = await this.pickImages();
     if (!added.length) return;
-    const rec = this.state.records.find(r => r.id === rid);
-    if (!rec) return;
     const next = [...this.recImages(rec), ...added];
     const ok = await Store.update('records', rid, { images: next });
     if (ok === false) { this.toast('图片保存失败，请重试'); return; }
@@ -2618,7 +2674,7 @@ const App = {
           rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
         });
         // 即存即显：把新记录乐观加入内存并局部刷新日历/列表，避免全量重载的秒级延迟
-        if (row && row.id) this.state.records.push(row);
+        if (row && row.id) { row._imgLoaded = true; this.state.records.push(row); }
         this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
         this.refreshLedgerPane();
         if (continuous) {
@@ -2639,12 +2695,12 @@ const App = {
           document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
           document.getElementById('ad-amt').focus();
           this.toast('已保存，可继续记下一笔', 'ok');
-          this.loadData(true); // 后台静默同步，不阻塞
+          this._cacheSnapshot(); // 只落本地快照，不再整表重拉
           return;
         }
         this.closeModal();
         this.toast('已记账 ' + fmtMoney(amount), 'ok');
-        this.loadData(true); // 后台静默同步，不阻塞
+        this._cacheSnapshot(); // 只落本地快照，不再整表重拉
       } catch (e) { this.toast(e.message, 'err'); }
     };
   },
@@ -3548,8 +3604,17 @@ const App = {
     favEl.addEventListener('change', syncImgField);
     syncImgField();
     renderImgGrid();
+    // 图片懒加载：弹窗先开、图片后补（本记录只会拉一次）
+    const ensureEdImgs = async () => {
+      if (r._imgLoaded === true) return;
+      await this.ensureImages([r]);
+      edImgs = this.recImages(r);
+      renderImgGrid();
+    };
+    ensureEdImgs();
     imgUp.onclick = async () => {
       if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
+      await ensureEdImgs();   // 必须等原图到位，否则会把已有图片覆盖成空
       this.toast('图片处理中…');
       const added = await this.pickImages();
       if (!added.length) return;
@@ -3580,7 +3645,8 @@ const App = {
     };
     bindThinScroll(edMask && edMask.querySelector('.modal-body'));
     bindThinScroll(document.getElementById('ed-tagpicker'));
-    document.getElementById('ed-img-link').onclick = () => {
+    document.getElementById('ed-img-link').onclick = async () => {
+      await ensureEdImgs();   // 同上：先补齐全量图片再追加链接
       this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });
     };
     document.querySelectorAll('#ed-stars button').forEach(b => {
@@ -3625,7 +3691,7 @@ const App = {
         this.refreshLedgerPane(); // 即时刷新日历/列表
         this.closeModal();
         this.toast('已保存修改', 'ok');
-        this.loadData(true); // 后台静默同步，不阻塞
+        this._cacheSnapshot(); // 只落本地快照，不再整表重拉
       } catch (e) { this.toast(e.message, 'err'); }
     };
   },
