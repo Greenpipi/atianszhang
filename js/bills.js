@@ -108,8 +108,14 @@
       scope.querySelectorAll('[data-bill-act]').forEach(node => {
         const id = node.dataset.bid, act = node.dataset.billAct;
         node.onclick = () => {
+          const row = node.closest('.bill-row');
+          const inActs = !!node.closest('.bill-swipe-acts');
+          // 刚滑完手（同一次手势产生的 click）直接忽略，避免误触
+          if (!inActs && row && row.dataset.justSwiped === '1') return;
+          // 行已滑开时，点卡片其它区域只做收回（操作按钮除外）
+          if (row && row.dataset.open === '1' && !inActs) { this.closeBillSwipe(row); return; }
           if (act === 'pay') {
-            const card = node.closest('.bill-card');
+            const card = row || node.closest('.bill-card');
             const inp = card && card.querySelector('[data-bill-amt]');
             const v = inp ? Number(inp.value) : NaN;
             if (inp && !(v > 0)) { this.toast('先填本期金额', 'err'); inp.focus(); return; }
@@ -138,6 +144,117 @@
             else this.toast('本期还没有应期', 'err');
           } else if (e.key === 'Escape') inp.blur();
         };
+      });
+      this.initBillSwipe(scope);
+    },
+
+    /* ---------- 移动端左滑操作区（≤760px 生效，PC 端按钮保持原样） ---------- */
+    billSwipeEnabled() {
+      return !!(window.matchMedia && window.matchMedia('(max-width:760px)').matches);
+    },
+
+    closeBillSwipe(row) {
+      if (!row) return;
+      const card = row.querySelector('.bill-card');
+      const acts = row.querySelector('.bill-swipe-acts');
+      row.dataset.open = '0';
+      row.classList.remove('dragging');
+      if (card) { card.style.transition = ''; card.style.transform = ''; }
+      if (acts) acts.style.pointerEvents = 'none';
+    },
+
+    initBillSwipe(scope) {
+      if (!this.billSwipeEnabled()) return;
+      (scope || document).querySelectorAll('.bill-row:not([data-swipe])').forEach(row => this.bindBillSwipe(row));
+      if (this._billSwipeDocBound) return;
+      this._billSwipeDocBound = true;
+      document.addEventListener('touchstart', e => {
+        document.querySelectorAll('.bill-row[data-open="1"]').forEach(r => {
+          if (!r.contains(e.target)) this.closeBillSwipe(r);
+        });
+      }, { passive: true });
+      document.addEventListener('scroll', () => {
+        document.querySelectorAll('.bill-row[data-open="1"]').forEach(r => this.closeBillSwipe(r));
+      }, { passive: true, capture: true });
+    },
+
+    bindBillSwipe(row) {
+      const card = row.querySelector('.bill-card');
+      const acts = row.querySelector('.bill-swipe-acts');
+      if (!card || !acts) return;
+      row.dataset.swipe = '1';
+      acts.style.pointerEvents = 'none';
+      const panelW = () => acts.offsetWidth || 0;
+
+      let startX = 0, startY = 0, startT = 0, base = 0, cur = 0;
+      let dragging = false, axis = null;
+
+      const place = (x, animate) => {
+        card.style.transition = animate ? '' : 'none';
+        card.style.transform = x ? 'translate3d(' + x + 'px,0,0)' : '';
+      };
+      const settle = open => {
+        const w = panelW();
+        row.classList.remove('dragging');
+        row.dataset.open = open ? '1' : '0';
+        card.style.transition = '';
+        card.style.transform = open && w ? 'translate3d(' + (-w) + 'px,0,0)' : '';
+        acts.style.pointerEvents = open ? 'auto' : 'none';
+        if (open) {
+          document.querySelectorAll('.bill-row[data-open="1"]').forEach(r => { if (r !== row) this.closeBillSwipe(r); });
+        }
+      };
+
+      card.addEventListener('touchstart', e => {
+        if (e.touches.length > 1) return;
+        const t = e.touches[0];
+        startX = t.clientX; startY = t.clientY; startT = Date.now();
+        base = row.dataset.open === '1' ? -panelW() : 0;
+        cur = base; dragging = false; axis = null;
+        card.style.transition = 'none';
+      }, { passive: true });
+
+      card.addEventListener('touchmove', e => {
+        if (e.touches.length > 1) return;
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (axis === null) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+          if (axis === 'y') { place(base, true); return; }   // 竖向手势：交给页面滚动
+          dragging = true;
+          row.classList.add('dragging');
+        }
+        if (axis !== 'x') return;
+        if (e.cancelable) e.preventDefault();
+        const w = panelW();
+        let x = base + dx;
+        if (x > 0) x = x / 4;                       // 右滑阻尼，不会把卡片拖出屏外
+        else if (x < -w) x = -w + (x + w) / 4;      // 过度左滑阻尼
+        cur = x;
+        place(x, false);
+      }, { passive: false });
+
+      const finish = () => {
+        if (!dragging) { place(base, true); return; }
+        dragging = false;
+        const w = panelW();
+        const fast = Date.now() - startT < 220 && Math.abs(cur - base) > 24;
+        const open = cur < -w * 0.34 || (fast && cur < base - 24) || (base < 0 && !(fast && cur > base + 24));
+        settle(open);
+        row.dataset.justSwiped = '1';
+        setTimeout(() => { delete row.dataset.justSwiped; }, 260);
+      };
+      card.addEventListener('touchend', finish);
+      card.addEventListener('touchcancel', finish);
+
+      // 已滑出时，点卡片任意位置（操作按钮除外）即收回
+      row.addEventListener('click', e => {
+        if (row.dataset.open !== '1') return;
+        if (e.target.closest('.bill-swipe-acts')) return;   // 让按钮自身处理
+        if (row.dataset.justSwiped === '1') return;
+        this.closeBillSwipe(row);
       });
     },
 
@@ -190,26 +307,36 @@
       } else {
         amountHTML = `<div class="bill-amount">${amountText(b)}${amt > 0 ? `<span class="sub">${autoOk ? '预设金额 · 自动扣款' : '预设金额'}</span>` : ''}</div>`;
       }
+      // 移动端左滑操作区：已付（仅手动付且本期可付）/ 编辑 / 删除
+      // 自动扣款（有预设金额 + 自动付）不出现「已付」，与 PC 端按钮的显示条件保持一致
+      const swipeActs = [
+        canPay ? `<button type="button" class="bill-act act-pay" data-bill-act="pay" data-bid="${b.id}">已付</button>` : '',
+        `<button type="button" class="bill-act act-edit" data-bill-act="edit" data-bid="${b.id}">编辑</button>`,
+        `<button type="button" class="bill-act act-del" data-bill-act="del" data-bid="${b.id}">删除</button>`
+      ].join('');
       return `
-      <div class="bill-card ${st.cls}">
-        <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
-        <div class="bill-main" data-bill-act="detail" data-bid="${b.id}" title="查看账单详情">
-          <div class="bill-name">${esc(b.name || st.displayName)}
-            <span class="badge badge-${st.cls}">${esc(st.label)}</span>
-            ${isAuto ? '<span class="badge badge-auto">自动</span>' : ''}
-            ${st.state === 'paid' && b.paid_record_id ? '<span class="badge badge-green">已入账</span>' : ''}
-            ${b.paused ? '<span class="badge badge-gray">已暂停</span>' : ''}
+      <div class="bill-row ${st.cls}" data-bill-row="${b.id}" data-open="0">
+        <div class="bill-swipe-acts" aria-hidden="true">${swipeActs}</div>
+        <div class="bill-card ${st.cls}">
+          <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
+          <div class="bill-main" data-bill-act="detail" data-bid="${b.id}" title="查看账单详情">
+            <div class="bill-name">${esc(b.name || st.displayName)}
+              <span class="badge badge-${st.cls}">${esc(st.label)}</span>
+              ${isAuto ? '<span class="badge badge-auto">自动</span>' : ''}
+              ${st.state === 'paid' && b.paid_record_id ? '<span class="badge badge-green">已入账</span>' : ''}
+              ${b.paused ? '<span class="badge badge-gray">已暂停</span>' : ''}
+            </div>
+            <div class="bill-meta">${esc(billDueText(b))}</div>
+            <div class="bill-meta">${dueLine}</div>
           </div>
-          <div class="bill-meta">${esc(billDueText(b))}</div>
-          <div class="bill-meta">${dueLine}</div>
-        </div>
-        ${amountHTML}
-        <div class="bill-acts">
-          ${canPay ? '<button class="btn btn-primary btn-sm" data-bill-act="pay" data-bid="' + b.id + '">已付</button>' : ''}
-          ${canFix ? '<button class="btn btn-ghost btn-sm" data-bill-act="fix" data-bid="' + b.id + '">修正金额</button>' : ''}
-          <button class="btn btn-ghost btn-sm" data-bill-act="edit" data-bid="${b.id}">编辑</button>
-          <button class="btn btn-ghost btn-sm" data-bill-act="pause" data-bid="${b.id}">${b.paused ? '启用' : '暂停'}</button>
-          <button class="btn btn-danger btn-sm" data-bill-act="del" data-bid="${b.id}">删除</button>
+          ${amountHTML}
+          <div class="bill-acts">
+            ${canPay ? '<button class="btn btn-primary btn-sm" data-bill-act="pay" data-bid="' + b.id + '">已付</button>' : ''}
+            ${canFix ? '<button class="btn btn-ghost btn-sm" data-bill-act="fix" data-bid="' + b.id + '">修正金额</button>' : ''}
+            <button class="btn btn-ghost btn-sm" data-bill-act="edit" data-bid="${b.id}">编辑</button>
+            <button class="btn btn-ghost btn-sm" data-bill-act="pause" data-bid="${b.id}">${b.paused ? '启用' : '暂停'}</button>
+            <button class="btn btn-danger btn-sm" data-bill-act="del" data-bid="${b.id}">删除</button>
+          </div>
         </div>
       </div>`;
     },

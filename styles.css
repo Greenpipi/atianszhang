@@ -1202,6 +1202,9 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .bill-amt-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
 .bill-amt-none{font-size:13px;font-weight:700;color:var(--muted)}
 .bill-acts{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:260px}
+/* 账单行：桌面端只是普通包裹层（左滑操作区完全不参与布局，隐藏） */
+.bill-row{position:relative}
+.bill-swipe-acts{display:none}
 
 .bill-countdown{color:var(--muted)}
 .bill-countdown.red{color:var(--danger);font-weight:600}
@@ -1258,15 +1261,49 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 .bd-more,.bd-empty{font-size:11.5px;color:var(--muted);text-align:center;padding:4px}
 @media (max-width:520px){.bd-grid{grid-template-columns:1fr}}
 
+/* ---------- 移动端：紧凑卡片 + 左滑操作（PC 端完全不变） ---------- */
 @media (max-width:760px){
-  .bill-card{flex-wrap:wrap;align-items:flex-start}
-  .bill-amount{text-align:left}
-  .bill-acts{width:100%;justify-content:flex-end;max-width:none}
-  .bill-card .bill-main{flex-basis:calc(100% - 60px)}
+  .bill-list{gap:8px}
+  .bill-row{
+    position:relative;overflow:hidden;border-radius:14px;background:#fff;
+    -webkit-transform:translateZ(0);
+  }
+  /* 滑出的操作区：贴在卡片右侧，被卡片整体遮住 */
+  .bill-swipe-acts{
+    display:flex;align-items:stretch;
+    position:absolute;top:0;right:0;bottom:0;z-index:0;
+  }
+  .bill-act{
+    width:66px;flex:0 0 66px;border:0;padding:0;margin:0;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:13px;font-weight:700;font-family:inherit;line-height:1;
+    -webkit-tap-highlight-color:transparent;cursor:pointer;
+  }
+  .bill-act:active{filter:brightness(.93)}
+  .bill-act.act-pay{background:#3B82F6}
+  .bill-act.act-edit{background:#F59E0B}
+  .bill-act.act-del{background:#EF4444}
+
+  .bill-card{
+    position:relative;z-index:1;
+    display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+    border-radius:14px;
+    touch-action:pan-y;-webkit-user-select:none;user-select:none;
+    transition:transform .22s cubic-bezier(.22,.61,.36,1),border-color .15s,box-shadow .15s;
+  }
+  .bill-row.dragging .bill-card{transition:none}
+  .bill-card:hover{box-shadow:none}
+  .bill-ico{width:40px;height:40px;border-radius:11px;font-size:19px}
+  .bill-main{flex:1;min-width:0}
+  .bill-name{font-size:14px;line-height:1.35;gap:6px}
+  .bill-amount{font-size:16px;line-height:1.2;padding-left:2px;text-align:right}
+  .bill-amount .sub{font-size:10.5px;margin-top:1px}
+  .bill-meta{font-size:12px;margin-top:2px;line-height:1.45}
+  .bill-acts{display:none}            /* 底部平铺按钮在移动端隐藏，改为左滑呼出 */
+  .bill-card.gray{opacity:1}           /* 去掉半透明，避免透出后面的操作区 */
 }
 @media (max-width:480px){
   .bills-head .btn{width:100%}
-  .bill-acts .btn{padding:0 10px}
 }
 
 /* ============ 预算页 · 窄屏行卡（置于末尾，覆盖 .tbl 基础样式） ============ */
