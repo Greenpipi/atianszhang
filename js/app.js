@@ -835,7 +835,7 @@ const App = {
         </div>
         <div class="field f-amt">
           <label>金额（元）</label>
-          <input id="en-amt" type="number" min="0" step="0.01" placeholder="0.00">
+          <input id="en-amt" type="number" step="0.01" placeholder="0.00">
         </div>
         <div class="field f-date">
           <label>日期</label>
@@ -944,7 +944,7 @@ const App = {
 
     $('en-save').onclick = async () => {
       const amount = parseFloat($('en-amt').value);
-      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
       const date = $('en-date').dataset.date || todayStr();
       const fav = $('en-fav').checked;
       try {
@@ -2546,7 +2546,7 @@ const App = {
           <div class="field"><label>小类</label><select id="ad-sub"></select></div>
           <div class="field"><label>日期</label><input id="ad-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
         </div>
-        <div class="field"><label>金额（元）</label><input id="ad-amt" class="amt-input" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label>金额（元）</label><input id="ad-amt" class="amt-input" type="number" step="0.01" placeholder="0.00"></div>
         <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
         <div class="field"><label>描述</label><input id="ad-note" type="text" placeholder="选填"></div>
         <div class="field"><label>备注</label><textarea id="ad-remark" rows="2"></textarea></div>
@@ -2658,7 +2658,7 @@ const App = {
     bindThinScroll(document.getElementById('ad-tagpicker'));
     document.getElementById('ad-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ad-amt').value);
-      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
       const fav = document.getElementById('ad-fav').checked;
       try {
         const row = await Store.insert('records', {
@@ -3528,7 +3528,7 @@ const App = {
         <div class="field"><label>小类</label><select id="ed-sub"></select></div>
         <div class="field"><label>日期</label><input id="ed-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${esc(r.date)}" data-date="${esc(r.date)}"></div>
       </div>
-      <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" min="0" step="0.01" value="${(Number(r.amount) || 0).toFixed(2)}"></div>
+      <div class="field"><label>金额（元）</label><input id="ed-amt" class="amt-input" type="number" step="0.01" value="${(Number(r.amount) || 0).toFixed(2)}"></div>
       <div class="field"><label>评分</label><div class="stars" id="ed-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '" class="' + (v <= rating ? 'on' : '') + '">★</button>').join('')}</div></div>
       <div class="field"><label>描述</label><input id="ed-note" type="text" value="${esc(r.note || '')}"></div>
       <div class="field"><label>备注</label><textarea id="ed-remark" rows="2">${esc(r.remark || '')}</textarea></div>
@@ -3668,7 +3668,7 @@ const App = {
     };
     document.getElementById('ed-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ed-amt').value);
-      if (!amount || amount <= 0) return this.toast('请输入正确金额', 'err');
+      if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
       const fav = document.getElementById('ed-fav').checked;
       const patch = {
         category: catSel.value, sub: subSel.value, amount,
