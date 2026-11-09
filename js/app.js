@@ -1914,7 +1914,7 @@ const App = {
           </div>
           <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
             ${imgs.length
-              ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+              ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
               : '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'}
           </div>
         </div>
@@ -2005,7 +2005,7 @@ const App = {
       if (!imgs.length) return;
       const cur = box.querySelector('img');
       if (cur && cur.getAttribute('src') === imgs[0]) return;
-      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
+      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
       box.title = '点击查看大图';
     });
   },
@@ -2042,7 +2042,7 @@ const App = {
     rec.images = next;
     const box = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="img"]');
     if (box) {
-      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
+      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
       box.title = '点击查看大图';
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
