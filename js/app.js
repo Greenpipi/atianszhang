@@ -1963,33 +1963,37 @@ const App = {
   },
   /* 图片按需加载：records 列表查询已排除 images（base64 单张 60–120KB），
      只有真的要展示图片的地方（好物仓库、编辑弹窗、大图灯箱）才补一次，按记录标记 _imgLoaded。
-     同一记录并发调用会复用同一个请求，避免「还在拉图时追加图片」把原图覆盖掉。 */
-  _imgJobs: new Map(),
+     同一记录并发调用复用同一个请求，避免「还在拉图时追加图片」把原图覆盖掉。
+     注意：请求进行中 loadData / 缓存渲染会整体替换 state.records 里的对象实例，
+     所以结果必须回填给所有等待中的记录，而不只是发起请求的那批对象，
+     否则新渲染出来的卡片会永远停在占位图（图拉回来了却没画到当前卡片上）。 */
+  _imgJobs: new Map(),     // id -> Promise<map|null>，null 表示本次取图失败，不标记已加载、下次重试
   async ensureImages(recs) {
     const need = (recs || []).filter(r => r && r.id && r._imgLoaded !== true);
     if (!need.length) return false;
-    const waits = [], fresh = [];
-    for (const r of need) {
-      const job = this._imgJobs.get(r.id);
-      if (job) waits.push(job); else fresh.push(r);
+    const ids = [...new Set(need.map(r => r.id))];
+    const missing = ids.filter(id => !this._imgJobs.has(id));
+    if (missing.length) {
+      const job = Store.fetchImages(missing)
+        .catch(e => { console.warn('图片加载失败', e); return null; });
+      const settled = job.then(map => {
+        missing.forEach(id => this._imgJobs.delete(id));
+        return map;
+      });
+      missing.forEach(id => this._imgJobs.set(id, settled));
     }
-    if (fresh.length) {
-      const job = (async () => {
-        let map = {};
-        try { map = await Store.fetchImages(fresh.map(r => r.id)); }
-        catch (e) { /* 图片失败不影响主体 */ }
-        for (const r of fresh) {
-          r._imgLoaded = true;
-          const imgs = map[r.id];
-          if (imgs && imgs.length) r.images = imgs;
-        }
-      })();
-      fresh.forEach(r => this._imgJobs.set(r.id, job));
-      job.then(() => fresh.forEach(r => this._imgJobs.delete(r.id)));
-      waits.push(job);
-    }
-    await Promise.all(waits);
-    return need.some(r => this.recImages(r).length > 0);
+    const maps = await Promise.all(ids.map(id => this._imgJobs.get(id)));
+    const byId = {};
+    ids.forEach((id, i) => { byId[id] = maps[i]; });
+    let got = false;
+    need.forEach(r => {
+      const map = byId[r.id];
+      if (!map) return;          // 请求失败：保持未加载，下次渲染自动重试
+      r._imgLoaded = true;
+      const imgs = map[r.id];
+      if (imgs && imgs.length) { r.images = imgs; got = true; }
+    });
+    return got;
   },
   /* 图片到位后原地补图：不重排、不闪烁、不打断滚动 */
   _paintWishImages() {
