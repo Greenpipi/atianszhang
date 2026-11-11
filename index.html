@@ -165,6 +165,26 @@
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 
+<script>
+/* 暖启动：本机登录过就先把应用外壳顶上来，避免每次打开都先闪一下登录页。
+   这里只做同步的 DOM 预切换、不发任何请求；会话校验与本地快照渲染由 js/app.js 紧接着完成。 */
+(function () {
+  try {
+    var saved = localStorage.getItem('fin_last_user');
+    if (!saved) {
+      var cfg = null;
+      try { cfg = JSON.parse(localStorage.getItem('fin_cfg') || 'null'); } catch (e) { cfg = null; }
+      var url = (cfg && cfg.url) || 'https://qcfmknjoldqirsgjhryx.supabase.co';
+      var ref = new URL(url).hostname.split('.')[0];
+      saved = localStorage.getItem('sb-' + ref + '-auth-token');
+    }
+    if (!saved) return;
+    document.getElementById('login-view').hidden = true;
+    document.getElementById('app-view').hidden = false;
+  } catch (e) { /* 异常时保持默认登录页 */ }
+})();
+</script>
+
 <script defer src="js/vendor/supabase.js"></script>
 <script defer src="js/data.js"></script>
 <script defer src="js/store.js"></script>

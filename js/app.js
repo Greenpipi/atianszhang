@@ -45,9 +45,13 @@ const App = {
     Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
 
+    // 暖启动：先按上次登录身份 + 本地快照把内容画出来，恢复会话（可能触发网络刷新 token）放到后面
+    const warmed = this.paintWarmStart();
+
     let user = null;
+    let sessionFailed = false;
     try { user = await Store.restoreSession(); }
-    catch (e) { console.warn(e); }
+    catch (e) { sessionFailed = true; console.warn(e); }
 
     window.addEventListener('hashchange', () => this.route());
     // 标签页重新可见时检测是否跨入新月份，触发季节自动切换（非实时轮询）
@@ -62,7 +66,36 @@ const App = {
     window.addEventListener('online', () => this.updateOnline());
     window.addEventListener('offline', () => this.updateOnline());
 
-    if (user) { await this.enterApp(); } else { this.showLogin(); }
+    if (user) { await this.enterApp(warmed); }
+    else {
+      // 会话确实失效才清掉暖启动标记；网络异常导致的失败保留标记，下次开页仍可秒开
+      if (!sessionFailed) Store._forgetUser();
+      Store.user = null;
+      this.showLogin();
+    }
+  },
+
+  /* ---------- 暖启动：不等任何网络，先用上次身份 + 本地快照出内容 ---------- */
+  paintWarmStart() {
+    if (Store.mode !== 'supabase') return false;
+    let email = '';
+    let raw = null;
+    try {
+      email = localStorage.getItem('fin_last_user') || '';
+      if (!email) return false;
+      raw = localStorage.getItem('fin_cache_' + email);
+    } catch (e) { return false; }
+    if (!raw) return false;
+    // 临时身份：仅用于读取该账号的快照并渲染顶栏；真实会话稍后由 restoreSession 覆盖
+    Store.user = { id: null, email };
+    document.getElementById('login-view').hidden = true;
+    document.getElementById('app-view').hidden = false;
+    this.primeRoute();
+    this.initNavToggle();
+    this.paintFromCache();
+    // 背景配置单独走网络，绝不能挡住内容
+    this.initHero().then(() => this.applyHero()).catch(e => console.warn('背景配置加载失败', e));
+    return true;
   },
 
   bindChrome() {
@@ -166,16 +199,19 @@ const App = {
   },
 
   /* ---------- 进入应用 ---------- */
-  async enterApp() {
+  async enterApp(warmed = false) {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
     // 先按地址栏定位页面：刷新后直接停在当前页，不再先闪一下记账本
     this.primeRoute();
     this.initNavToggle();
-    // banner 配置与本地迁移检查互相独立，并行发起省一个来回（弱网下登录后内容出现更快）
-    await Promise.all([this.initHero(), this.migrateLocalIfNeeded()]);
-    // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
-    this.paintFromCache();
+    // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等任何往返。
+    // 暖启动时 paintWarmStart 已经画过一遍，直接复用。
+    if (!warmed) this.paintFromCache();
+    // 背景配置走网络，放到首屏之后，不参与阻塞
+    if (!warmed) this.initHero().then(() => this.applyHero()).catch(e => console.warn('背景配置加载失败', e));
+    // 老数据一次性迁移（通常第二次启动就秒返回）；即便要跑，内容也已先渲染出来
+    await this.migrateLocalIfNeeded();
     await this.loadData();
     // 好物数据自动自愈：补定格快照 + 恢复被误重置的已陪伴天数（无需用户任何操作）
     this.autoRepairWishData().then(n => {
@@ -306,6 +342,8 @@ const App = {
     if (!hero || this._heroBound) return;
     this._heroBound = true;
     this.heroAdjusting = false;
+    // 先用本机保存的背景同步上屏（不读网络），云端配置到了再覆盖
+    this.applyLocalHero();
     // 载入每页配置（map：page -> {img,x,y}），并补齐所有页面默认项
     let map = null;
     try { map = await Store.getHeroMap(); } catch (e) { map = null; }
@@ -383,6 +421,22 @@ const App = {
     const endDrag = () => { drag = null; };
     hero.addEventListener('pointerup', endDrag);
     hero.addEventListener('pointercancel', endDrag);
+  },
+  /* 本机已保存的背景配置：同步读取并上屏，避免等云端 banners 往返才出图 */
+  applyLocalHero() {
+    let map = null;
+    try { map = JSON.parse(localStorage.getItem('fin_hero_v1') || 'null'); } catch (e) { return; }
+    if (!map || typeof map !== 'object') return;
+    this.heroes = {};
+    HERO_PAGES.forEach(p => {
+      const h = (map && map[p]) || {};
+      this.heroes[p] = {
+        img: typeof h.img === 'string' ? h.img : '',
+        x: h.x == null ? 50 : Math.max(0, Math.min(100, Number(h.x) || 50)),
+        y: h.y == null ? 50 : Math.max(0, Math.min(100, Number(h.y) || 50))
+      };
+    });
+    this.applyHero();
   },
   applyHero() {
     const hero = document.getElementById('page-hero');
