@@ -172,11 +172,17 @@ const App = {
     // 先按地址栏定位页面：刷新后直接停在当前页，不再先闪一下记账本
     this.primeRoute();
     this.initNavToggle();
-    // banner 配置与本地迁移检查互相独立，并行发起省一个来回（弱网下登录后内容出现更快）
-    await Promise.all([this.initHero(), this.migrateLocalIfNeeded()]);
-    // 离线优先：先用本地快照即时渲染（秒开），再后台拉云端刷新，不再等往返
-    this.paintFromCache();
+    // 首屏先用本地快照立即渲染，不再等待背景图请求 / 历史迁移 / 云端全量数据
+    const hadCache = this.paintFromCache();
+    if (!hadCache && this.state.route === 'home') this.renderHomePage(); // 先出骨架，避免白屏
+    // 背景配置放后台，晚到也没关系；主页本身不展示头图
+    this.initHero().catch(e => console.warn('背景配置加载失败', e));
+    // 云端数据（主路径）：其它初始化全部并行，不再串行卡首屏
     await this.loadData();
+    // 本地数据一次性上云：放到首屏之后，完成后自动补一次刷新
+    this.migrateLocalIfNeeded()
+      .then(n => { if (n) this.loadData(); })
+      .catch(e => console.warn('本地数据迁移失败', e));
     // 好物数据自动自愈：补定格快照 + 恢复被误重置的已陪伴天数（无需用户任何操作）
     this.autoRepairWishData().then(n => {
       if (n) {
@@ -428,6 +434,7 @@ const App = {
   async loadData(silent = false) {
     if (this.state.loading && silent) return;
     this.state.loading = true;
+    this._loadFailed = false;
     try {
       const [ledgers, categories, records, budgets, templates, bills] = await Promise.all([
         Store.list('ledgers'), Store.list('categories'), Store.list('records'), Store.list('budgets'), Store.list('templates'),
@@ -582,7 +589,10 @@ const App = {
       if (!silent) this.renderView();
       else if (!document.querySelector('.modal-mask')) this.renderView();
     } catch (e) {
+      this._loadFailed = true;
+      this._loadError = e;
       this.toast(e.message || '数据加载失败', 'err');
+      if (this.state.route === 'home') this.renderHomePage();
     } finally {
       this.state.loading = false;
     }
@@ -1087,7 +1097,47 @@ const App = {
     const el = document.getElementById('view-home');
     if (!el) return;
     const lid = this.state.currentLedgerId;
-    if (!lid) { el.innerHTML = ''; return; }
+    if (!lid) {
+      // 首屏骨架：数据还在路上时不再是一片空白
+      if (this.state.loading && !this._loadFailed) {
+        el.innerHTML = `
+        <div class="hp hp-skeleton">
+          <div class="hp-head">
+            <div><div class="hp-sk hp-sk-sm"></div><div class="hp-sk hp-sk-title"></div><div class="hp-sk hp-sk-sm" style="width:180px"></div></div>
+          </div>
+          <div class="hp-kpis">
+            ${'<div class="hp-sk-card"><div class="hp-sk hp-sk-sm"></div><div class="hp-sk hp-sk-num"></div><div class="hp-sk hp-sk-sm" style="width:56%"></div></div>'.repeat(3)}
+          </div>
+          <div class="hp-cols">
+            <div class="hp-main">
+              ${'<div class="hp-sk-card" style="height:190px"></div>'.repeat(3)}
+            </div>
+            <aside class="hp-side">
+              <div class="hp-sk-card" style="height:300px"></div>
+              <div class="hp-sk-card" style="height:160px"></div>
+            </aside>
+          </div>
+        </div>`;
+      } else {
+        const msg = (this._loadError && (this._loadError.message || this._loadError.code)) || '云端数据没有返回';
+        el.innerHTML = `
+        <div class="hp hp-loadfail">
+          <div class="hp-loadfail-ico">!</div>
+          <b>主页没能加载出来</b>
+          <p>${esc(msg)}</p>
+          <button type="button" class="hp-btn-primary" id="hp-retry">重新加载</button>
+        </div>`;
+        const btn = el.querySelector('#hp-retry');
+        if (btn) btn.onclick = () => {
+          this._loadFailed = false;
+          this._loadError = null;
+          this.state.loading = true;
+          this.renderHomePage();
+          this.loadData().catch(() => {});
+        };
+      }
+      return;
+    }
 
     const now = new Date();
     const today = todayStr();

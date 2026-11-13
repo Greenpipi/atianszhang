@@ -221,6 +221,11 @@ const Store = {
   RECORD_COLS: 'id,ledger_id,category,sub,amount,note,remark,favorite,tags,rental,'
     + 'purchase_platform,attribute,rating,date,kind,status,status_since,created_at',
 
+  /* 核心列兜底：云端 schema 缺 optional 列时只退到这一组，绝不再 select('*')。
+     select('*') 会把 records.images 的 base64 图片全部拉下来（每条几十上百 KB），
+     数据一多就是几十 MB，首页会长时间空白。 */
+  RECORD_COLS_CORE: 'id,ledger_id,category,sub,amount,note,favorite,date,kind,created_at',
+
   /* 按 id 批量取图片（records.images，缺列时回退老的单图 image） */
   async fetchImages(ids) {
     const out = {};
@@ -260,15 +265,17 @@ const Store = {
   async list(table) {
     if (this.mode === 'supabase') {
       try {
-        const cols = table === 'records' && this._recordColsOk !== false ? this.RECORD_COLS : null;
+        const cols = table === 'records'
+          ? (this._recordColsOk === false ? this.RECORD_COLS_CORE : this.RECORD_COLS)
+          : null;
         try {
           return await this._listPaged(table, cols);
         } catch (e2) {
-          // 轻量列集不被识别（库里缺某列）：退回全列，绝不因为取数优化把页面弄白
-          if (!cols || this._isTableErr(e2)) throw e2;
+          // 只有「列缺失」才降级；网络/超时错误直接抛出，避免用更重的查询再打一次
+          if (!cols || this._isTableErr(e2) || !this._isColErr(e2)) throw e2;
           this._recordColsOk = false;
-          console.warn('records 轻量列集不可用，退回 select(*)', e2);
-          return await this._listPaged(table, null);
+          console.warn('records 轻量列集不可用，改用核心列集', e2);
+          return await this._listPaged(table, this.RECORD_COLS_CORE);
         }
       } catch (e) {
         if (this._isTableErr(e)) this._fallbackToLocal();

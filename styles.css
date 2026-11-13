@@ -1,3 +1,21 @@
+/* ============ 本地字体（自托管 latin 子集，避免 Google Fonts 阻塞首屏） ============ */
+@font-face{
+  font-family:'DM Mono';font-style:normal;font-weight:400;font-display:swap;
+  src:url('assets/fonts/dm-mono-400-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'DM Mono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('assets/fonts/dm-mono-500-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'Fraunces';font-style:normal;font-weight:300 700;font-display:swap;
+  src:url('assets/fonts/fraunces-300-700-normal.woff2') format('woff2');
+}
+@font-face{
+  font-family:'Instrument Sans';font-style:normal;font-weight:400 700;font-display:swap;
+  src:url('assets/fonts/instrument-sans-400-700-normal.woff2') format('woff2');
+}
+
 /* ============ 基础（品牌：绿 #34D399 + 蓝 #3B82F6 · 白底） ============ */
 :root{
   --bg:#FFFFFF;
@@ -1598,3 +1616,34 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   #app-view .hp-amount input#hp-amount{font-size:25px!important}
   #app-view[data-route="home"] .content{padding-left:16px;padding-right:16px}
 }
+
+/* 主页加载骨架 / 失败态 */
+.hp-sk{
+  height:10px;border-radius:6px;
+  background:linear-gradient(100deg,rgba(88,82,72,.08) 20%,rgba(255,255,255,.65) 40%,rgba(88,82,72,.08) 60%);
+  background-size:220% 100%;animation:hpShimmer 1.5s linear infinite;
+}
+.hp-sk-sm{width:120px;height:9px}
+.hp-sk-title{width:min(340px,62%);height:34px;margin:12px 0;border-radius:10px}
+.hp-sk-num{width:58%;height:22px;margin:14px 0 10px}
+.hp-sk-card{
+  border-radius:18px;padding:18px;
+  background:rgba(255,253,249,.7);border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 14px 30px -26px rgba(64,60,52,.4);
+}
+.hp-skeleton .hp-kpis{margin-bottom:16px}
+.hp-skeleton .hp-cols{margin-top:0}
+@keyframes hpShimmer{to{background-position:-220% 0}}
+.hp-loadfail{
+  max-width:420px;margin:60px auto;padding:28px 26px;text-align:center;
+  background:linear-gradient(175deg,rgba(255,253,249,.95),rgba(250,246,239,.9));
+  border:1px solid rgba(255,255,255,.92);border-radius:20px;
+  box-shadow:0 20px 40px -30px rgba(64,60,52,.45);
+}
+.hp-loadfail-ico{
+  width:40px;height:40px;border-radius:12px;margin:0 auto 14px;display:grid;place-items:center;
+  background:#F3E8D8;color:#8E5C2B;font-family:"Fraunces",serif;font-size:20px;font-weight:600;
+}
+.hp-loadfail b{display:block;font-size:14px;color:#37342D}
+.hp-loadfail p{font-size:11.5px;color:#9F998F;line-height:1.7;margin:6px 0 16px;word-break:break-word}
+.hp-loadfail .hp-btn-primary{width:auto;min-width:132px;padding:0 18px}
