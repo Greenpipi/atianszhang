@@ -1666,6 +1666,51 @@ const App = {
     if (bar._qBindBtns) bar._qBindBtns();
     if (bar._qUpd) bar._qUpd();
   },
+  /* ---------- 统一页面标题 ---------- */
+  pageHeadHTML(route) {
+    const lid = this.state.currentLedgerId;
+    const month = thisMonth();
+    const recs = this.recsOf(lid).filter(r => monthOf(r.date) === month);
+    let eyebrow = '', title = '', sub = '', actions = '';
+    if (route === 'ledger') {
+      eyebrow = 'LEDGER · ' + month.replace('-', '.');
+      title = '记账本';
+      sub = '本月 ' + recs.length + ' 笔记录 · 支出 ' + fmtMoney(recs.filter(r => (r.kind || this.kindOf(lid, r.category)) !== 'income').reduce((s, r) => s + (Number(r.amount) || 0), 0));
+      actions = '<button class="btn btn-primary" id="ph-add">＋ 记一笔</button>';
+    } else if (route === 'wishlist') {
+      const all = this.state.records.filter(r => r.favorite);
+      const using = all.filter(r => this.wishStatusOf(r).key === '使用中').length;
+      eyebrow = 'WISHLIST · COLLECTION';
+      title = '好物仓库';
+      sub = '共 ' + all.length + ' 件心仪好物 · 使用中 ' + using + ' 件';
+    } else if (route === 'bills') {
+      const bills = this.state.bills || [];
+      eyebrow = 'RECURRING · BILLS';
+      title = '待办账单';
+      sub = '共 ' + bills.length + ' 条待办 · 周期性固定支出集中管理';
+    } else if (route === 'rental') {
+      eyebrow = 'RENTAL · ' + (this.state.rentalMonth || month).replace('-', '.');
+      title = '出租屋';
+      sub = '固定费用、装修与软装支出统一归档';
+    } else if (route === 'budget') {
+      eyebrow = 'BUDGET · ' + String(new Date().getFullYear());
+      title = '预算设置';
+      sub = '关注类目月度规划 · 年度总控';
+    } else if (route === 'stats') {
+      eyebrow = 'ANALYTICS · ' + (this.state.stats && this.state.stats.month ? this.state.stats.month.replace('-', '.') : month.replace('-', '.'));
+      title = '统计';
+      sub = '周期汇总、分类占比与收支趋势';
+    } else if (route === 'settings') {
+      eyebrow = 'PREFERENCES · WORKSPACE';
+      title = '设置';
+      sub = '账号、云端同步与数据管理';
+    } else if (route === 'home') {
+      return '';
+    }
+    return '<div class="page-head"><div><div class="eyebrow">' + eyebrow + '</div><h1>' + title + '</h1><div class="sub">' + sub + '</div></div>'
+      + (actions ? '<div class="actions">' + actions + '</div>' : '') + '</div>';
+  },
+
   renderLedgerHome() {
     const el = document.getElementById('view-ledger');
     const lid = this.state.currentLedgerId;
@@ -1682,36 +1727,47 @@ const App = {
     const quickHTML = qTpls.map(t => this.quickBtnHTML(t)).join('');
 
     const listRecs = showList ? this.filteredRecs() : [];
-    el.innerHTML = `
+    el.innerHTML = this.pageHeadHTML('ledger') + `
       <div class="home-summary">
         <div class="hs-item"><span>本月支出</span><b class="expense">${fmtMoney(s.expense)}</b></div>
         <div class="hs-item"><span>本月收入</span><b class="income">${fmtMoney(s.income)}</b></div>
         <div class="hs-item"><span>本月结余</span><b style="color:${s.balance >= 0 ? 'var(--purple)' : 'var(--danger)'}">${fmtMoney(s.balance)}</b></div>
       </div>
-      ${qTpls.length ? `<div class="qwrap" id="qwrap">
-        <button type="button" class="qnav qnav-l" id="qnav-l" aria-label="上一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-        <div class="qbar" id="qbar">${quickHTML}</div>
-        <button type="button" class="qnav qnav-r" id="qnav-r" aria-label="下一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
-      </div>` : ''}
-      <div class="home-view-bar">
-        <div class="seg">
-          <button data-lm="calendar" class="${showList ? '' : 'on'}">日历</button>
-          <button data-lm="list" class="${showList ? 'on' : ''}">列表</button>
+      ${qTpls.length ? `<section class="card ledger-quick">
+        <div class="card-head">
+          <div class="card-title">快捷记一笔</div>
+          <span class="badge badge-gray">常用 ${qTpls.length} 个</span>
         </div>
-        ${showList ? '<span class="hvb-count">共 ' + listRecs.length + ' 条' + (searching ? '（搜索结果）' : '') + '</span>' : ''}
-      </div>
-      <section class="cal-pane">
-        <div class="pane-search-row">
-          <div class="search-box" id="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
-            <input id="search-input" type="text" placeholder="搜索账单（备注 / 大类 / 小类 / 金额 / 日期）" autocomplete="off" value="${esc(this.state.search.q)}">
-            <button type="button" class="ts-clear" id="search-clear"${this.state.search.q ? '' : ' hidden'} title="清空">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-            <span class="ts-div"></span>
-            <button type="button" class="ts-filter${this.hasFilters() ? ' on' : ''}" id="filter-btn" title="筛选（大类 / 账本 / 日期范围）">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
-            </button>
+        <div class="qwrap" id="qwrap">
+          <button type="button" class="qnav qnav-l" id="qnav-l" aria-label="上一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div class="qbar" id="qbar">${quickHTML}</div>
+          <button type="button" class="qnav qnav-r" id="qnav-r" aria-label="下一页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
+        </div>
+      </section>` : ''}
+      <section class="cal-pane ledger-pane">
+        <div class="ledger-top">
+          <div class="home-view-bar">
+            <div class="home-tabs">
+              <button data-lm="calendar" class="${showList ? '' : 'on'}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>日历
+              </button>
+              <button data-lm="list" class="${showList ? 'on' : ''}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>列表
+              </button>
+            </div>
+          </div>
+          <div class="pane-search-row">
+            <div class="search-box" id="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+              <input id="search-input" type="text" placeholder="搜索账单（备注 / 大类 / 小类 / 金额 / 日期）" autocomplete="off" value="${esc(this.state.search.q)}">
+              <button type="button" class="ts-clear" id="search-clear"${this.state.search.q ? '' : ' hidden'} title="清空">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
+              <span class="ts-div"></span>
+              <button type="button" class="ts-filter${this.hasFilters() ? ' on' : ''}" id="filter-btn" title="筛选（大类 / 账本 / 日期范围）">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         <div id="search-banner-slot">${this.searchBannerHTML()}</div>
@@ -1723,7 +1779,7 @@ const App = {
           </div>
           <div class="cal-pane-nav">
             <button class="btn btn-ghost btn-sm" data-hnav="-1">‹</button>
-            <b id="hp-title" style="min-width:120px;text-align:center;font-size:15px"></b>
+            <b id="hp-title" style="min-width:120px;text-align:center;font-size:13px"></b>
             <button class="btn btn-ghost btn-sm" data-hnav="1">›</button>
             <button class="btn btn-ghost btn-sm" data-htoday>今天</button>
           </div>
@@ -1731,6 +1787,9 @@ const App = {
         <div id="home-calendar"${showList ? ' hidden' : ''}></div>
         <div id="home-list"${showList ? '' : ' hidden'}></div>
       </section>`;
+
+    const phAdd = el.querySelector('#ph-add');
+    if (phAdd) phAdd.onclick = () => this.addRecordModal(lid, todayStr(), this._hpCat || null, null);
 
     // 快捷按钮 → 带出分类记账；点击即置顶，溢出翻页箭头一并绑定
     this.bindQuickBar(lid);
@@ -1907,58 +1966,74 @@ const App = {
     const total = recs.length;
     const shown = Math.min(total, st.page * LIST_PAGE_SIZE);
     const multiLedger = this.state.ledgers.length > 1;
-    const colspan = multiLedger ? 6 : 5;
-    const arrow = k => '<span class="sort-arrow' + (st.sortKey === k ? ' on' : '') + '">' + (st.sortKey === k ? (st.sortDir === 'asc' ? '▲' : '▼') : '⇅') + '</span>';
-    host.innerHTML = `
-      <div class="rt-scroll">
-        <table class="rec-table">
-          <thead><tr>
-            <th data-sort="date" class="c-date">日期${arrow('date')}</th>
-            <th data-sort="category">大类${arrow('category')}</th>
-            <th>小类</th>
-            <th data-sort="amount" class="c-amt">金额${arrow('amount')}</th>
-            <th class="c-note">备注</th>
-            ${multiLedger ? '<th>账本</th>' : ''}
-          </tr></thead>
-          <tbody>
-            ${recs.slice(0, shown).map(r => {
-      const inc = (r.kind || this.kindOf(r.ledger_id, r.category)) === 'income';
-      const amt = Number(r.amount) || 0;
-      const sign = amt < 0 ? '-' : (inc ? '+' : '-');
-      const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
-      return '<tr data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
-        + '<td class="c-date">' + hlKw(r.date, kw) + '</td>'
-        + '<td><span class="rt-cat">' + catEmoji(r.category) + ' ' + hlKw(r.category, kw) + '</span></td>'
-        + '<td class="c-sub">' + (r.sub ? hlKw(r.sub, kw) : '<span class="rt-dim">—</span>') + '</td>'
-        + '<td class="c-amt' + (inc ? ' income' : '') + '">' + sign + hlKw(fmtMoney(Math.abs(amt)), kw) + '</td>'
-        + '<td class="c-note" title="' + esc(r.note || '') + '">' + (r.note ? hlKw(r.note, kw) : '<span class="rt-dim">—</span>') + '</td>'
-        + (multiLedger ? '<td class="c-ledger">' + esc(lg ? lg.name : '') + '</td>' : '')
-        + '</tr>';
-    }).join('') || '<tr><td colspan="' + colspan + '" class="rt-empty">' + (this.searchActive() ? '没有匹配的账单，换个关键词或放宽筛选试试' : '还没有账单记录，记一笔吧') + '</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-      ${total > shown
-        ? '<div class="rt-foot"><button class="btn btn-ghost" data-more>加载更多（还有 ' + (total - shown) + ' 条）</button></div>'
-        : '<div class="rt-foot rt-count">共 ' + total + ' 条' + (total > LIST_PAGE_SIZE ? ' · 已全部加载' : '') + '</div>'}`;
+    const shownRecs = recs.slice(0, shown);
+    const incRec = r => (r.kind || this.kindOf(r.ledger_id, r.category)) === 'income';
+    const sum = (list, income) => list.reduce((s, r) => s + (incRec(r) === income ? Math.abs(Number(r.amount) || 0) : 0), 0);
+    const expTotal = sum(recs, false), incTotal = sum(recs, true);
+    const today = todayStr();
+    const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+    const wdOf = d => { const x = new Date(d + 'T00:00:00'); return isNaN(x) ? '' : WD[x.getDay()]; };
+    const arrow = k => st.sortKey === k ? (st.sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
-    // 表头点击排序（再点反向）
-    host.querySelectorAll('th[data-sort]').forEach(th => {
-      th.onclick = () => {
-        const k = th.dataset.sort;
+    // 按日期分组，组内保持当前排序
+    const groups = [];
+    const index = new Map();
+    shownRecs.forEach(r => {
+      if (!index.has(r.date)) { index.set(r.date, groups.length); groups.push({ date: r.date, rows: [] }); }
+      groups[index.get(r.date)].rows.push(r);
+    });
+
+    const groupHTML = groups.map(g => {
+      const gExp = sum(g.rows, false), gInc = sum(g.rows, true);
+      const isToday = g.date === today;
+      const rowsHTML = g.rows.map(r => {
+        const inc = incRec(r);
+        const amt = Math.abs(Number(r.amount) || 0);
+        const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
+        const title = r.sub || r.category || '未分类';
+        const meta = [r.category, r.note, multiLedger && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        return '<div class="lrow" data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
+          + '<span class="rec-ico">' + catEmoji(r.category) + '</span>'
+          + '<div class="rec-main"><b>' + hlKw(title, kw) + '</b><span>' + hlKw(meta, kw) + '</span></div>'
+          + '<span class="rec-amt' + (inc ? ' income' : ' val-expense') + '">' + (inc ? '+' : '−') + hlKw(fmtMoney(amt), kw) + '</span>'
+          + '</div>';
+      }).join('');
+      return '<div class="list-group">'
+        + '<div class="list-group-head"><span class="lg-date"><b>' + esc(g.date.slice(5, 7)) + '月' + esc(g.date.slice(8, 10)) + '日</b>'
+        + '<small>' + wdOf(g.date) + (isToday ? ' · 今天' : '') + '</small></span>'
+        + '<span class="lg-total">' + (gExp ? '支出 ' + fmtMoney(gExp) : '收入 ' + fmtMoney(gInc)) + '</span></div>'
+        + rowsHTML + '</div>';
+    }).join('');
+
+    host.innerHTML = `
+      <div class="ledger-list">
+        <div class="list-sum">
+          <span>共 <b>${total}</b> 笔</span>
+          <span>支出 <b>¥${fmtMoney(expTotal)}</b></span>
+          <span>收入 <b>¥${fmtMoney(incTotal)}</b></span>
+        </div>
+        <div class="list-sort">
+          <span>排序</span>
+          <button type="button" data-sort="date" class="${st.sortKey === 'date' ? 'on' : ''}">日期${arrow('date')}</button>
+          <button type="button" data-sort="amount" class="${st.sortKey === 'amount' ? 'on' : ''}">金额${arrow('amount')}</button>
+          <button type="button" data-sort="category" class="${st.sortKey === 'category' ? 'on' : ''}">大类${arrow('category')}</button>
+        </div>
+        ${groups.length ? groupHTML : '<div class="empty" style="padding:38px 0"><p>' + (this.searchActive() ? '没有匹配的账单，换个关键词或放宽筛选试试' : '还没有账单记录，记一笔吧') + '</p></div>'}
+        ${total > shown ? '<div class="list-more"><button class="btn btn-ghost" data-more>加载更多（还有 ' + (total - shown) + ' 条）</button></div>' : ''}
+      </div>`;
+
+    host.querySelectorAll('[data-sort]').forEach(b => {
+      b.onclick = () => {
+        const k = b.dataset.sort;
         if (st.sortKey === k) st.sortDir = st.sortDir === 'asc' ? 'desc' : 'asc';
         else { st.sortKey = k; st.sortDir = 'desc'; }
         st.page = 1;
         this.renderRecTable(host, this.filteredRecs(), { kw: this.state.search.q });
-        const cnt = document.querySelector('#view-ledger .hvb-count');
-        if (cnt) cnt.textContent = '共 ' + this.filteredRecs().length + ' 条' + (this.searchActive() ? '（搜索结果）' : '');
       };
     });
-    // 行点击 → 编辑弹窗
-    host.querySelectorAll('tbody tr[data-rid]').forEach(tr => {
-      tr.onclick = () => this.editRecord(tr.dataset.rid, tr.dataset.lid);
+    host.querySelectorAll('.lrow[data-rid]').forEach(row => {
+      row.onclick = () => this.editRecord(row.dataset.rid, row.dataset.lid);
     });
-    // 加载更多
     const more = host.querySelector('[data-more]');
     if (more) more.onclick = () => { st.page++; this.renderRecTable(host, this.filteredRecs(), { kw: this.state.search.q }); };
   },
@@ -2195,6 +2270,7 @@ const App = {
               </div>`;
             }).join('') : '<div class="wk-empty">无记录</div>'}
           </div>
+          ${(() => { const exp = recs.reduce((n, r) => n + (kindOfR(r) === 'income' ? 0 : (Number(r.amount) || 0)), 0); const inc = recs.reduce((n, r) => n + (kindOfR(r) === 'income' ? (Number(r.amount) || 0) : 0), 0); const net = inc - exp; return net ? '<div class="wk-day-foot">' + (net > 0 ? '<span class="in">+' + fmtMoney(net) + '</span>' : '−' + fmtMoney(Math.abs(net))) + '</div>' : ''; })()}
         </div>`;
       }).join('') + '</div>';
       // 移动端周视图横向滚动：本周自动定位到今日（居中），非本周停周一
@@ -2218,30 +2294,23 @@ const App = {
         const dt = new Date(yy, mm - 1, dd);
         return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
       };
+      if (home.sel.slice(0, 7) !== home.anchor.slice(0, 7)) home.sel = home.anchor.slice(0, 7) + '-01';
       const recsByDate = {};
       this.recsOf(lid).forEach(r => { (recsByDate[r.date] = recsByDate[r.date] || []).push(r); });
       const mkCell = (dd, key, out) => {
         const recs = out ? [] : (recsByDate[key] || []);
         const tdy = key === todayStr();
         const sel = !out && key === home.sel;
+        const exp = out ? 0 : recs.reduce((n, r) => n + (kindOfR(r) === 'income' ? 0 : (Number(r.amount) || 0)), 0);
+        const inc = out ? 0 : recs.reduce((n, r) => n + (kindOfR(r) === 'income' ? (Number(r.amount) || 0) : 0), 0);
         return `
         <div class="m2cell${out ? ' out' : ''}${tdy ? ' today' : ''}${sel ? ' sel' : ''}" data-date="${key}">
           <div class="m2-top">
             <span class="m2-num">${dd}</span>
-            ${recs.length ? '<span class="m2-badge">' + recs.length + '</span>' : ''}
             ${out ? '' : '<button type="button" class="m2-plus" data-add="' + key + '" title="记一笔">+</button>'}
           </div>
-          <div class="m2-body">
-            ${recs.slice(0, 2).map(r => {
-              const inc = kindOfR(r) === 'income';
-              return '<div class="m2-rec' + (inc ? ' income' : '') + '" data-rid="' + r.id + '" title="' + esc(r.category) + '｜' + fmtMoney(r.amount) + (r.note ? '｜' + esc(r.note) : '') + '">' +
-                '<div class="m2-rec-cat">' + catEmoji(r.category) + ' ' + esc(r.category) + '</div>' +
-                (r.sub ? '<div class="m2-rec-sub">' + subEmoji(r.sub) + ' ' + esc(r.sub) + '</div>' : '') +
-                (r.note ? '<div class="m2-rec-note">' + esc(r.note) + '</div>' : '') +
-                '<div class="m2-rec-amt">' + (inc ? '+' : '') + fmtMoney(r.amount) + '</div></div>';
-            }).join('')}
-            ${recs.length > 2 ? '<div class="m2-more">+' + (recs.length - 2) + ' 笔</div>' : ''}
-          </div>
+          ${exp ? '<div class="m2-amt">−' + fmtMoney(exp) + '</div>' : (inc ? '<div class="m2-amt in">+' + fmtMoney(inc) + '</div>' : '')}
+          ${recs.length ? '<div class="m2-dots">' + '<i></i>'.repeat(Math.min(recs.length, 4)) + '</div>' : ''}
         </div>`;
       };
       let cells = '';
@@ -2250,7 +2319,22 @@ const App = {
       const tail = (7 - (startDow + dim) % 7) % 7;
       for (let i = 1; i <= tail; i++) cells += mkCell(i, mk(y, m + 1, i), true);
       const wdHead = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map(w => '<div class="m2-wd">' + w + '</div>').join('');
-      host.innerHTML = '<div class="m2-head">' + wdHead + '</div><div class="m2-grid">' + cells + '</div>';
+      const selRecs = (recsByDate[home.sel] || []).slice();
+      const selExp = selRecs.reduce((n, r) => n + (kindOfR(r) === 'income' ? 0 : (Number(r.amount) || 0)), 0);
+      const selInc = selRecs.reduce((n, r) => n + (kindOfR(r) === 'income' ? (Number(r.amount) || 0) : 0), 0);
+      const selD = new Date(home.sel + 'T00:00:00');
+      const selWd = isNaN(selD) ? '' : ['周日','周一','周二','周三','周四','周五','周六'][selD.getDay()];
+      const detailHead = '<div class="m2-detail-head"><b>' + home.sel.slice(5, 7) + '月' + home.sel.slice(8, 10) + '日 · ' + selWd + '</b><span>' + (selExp ? '支出 ' + fmtMoney(selExp) : '') + (selExp && selInc ? ' · ' : '') + (selInc ? '收入 ' + fmtMoney(selInc) : '') + (selRecs.length ? '' : '暂无记录') + '</span></div>';
+      const detailRows = selRecs.map(r => {
+        const inc = kindOfR(r) === 'income';
+        const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
+        const meta = [r.category, r.note, this.state.ledgers.length > 1 && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        return '<div class="lrow" data-rid="' + r.id + '"><span class="rec-ico">' + catEmoji(r.category) + '</span>'
+          + '<div class="rec-main"><b>' + esc(r.sub || r.category) + '</b><span>' + esc(meta) + '</span></div>'
+          + '<span class="rec-amt' + (inc ? ' income' : '') + '">' + (inc ? '+' : '−') + fmtMoney(Math.abs(Number(r.amount) || 0)) + '</span></div>';
+      }).join('');
+      host.innerHTML = '<div class="m2-head">' + wdHead + '</div><div class="m2-grid">' + cells + '</div>'
+        + '<div class="m2-detail">' + detailHead + (detailRows || '<div class="m2-detail-empty">这一天还没有记录</div>') + '</div>';
     } else {
       const y = Number(home.anchor.slice(0, 4));
       titleEl.textContent = y + ' 年';
@@ -2262,16 +2346,21 @@ const App = {
         exp += ss.expense;
         months.push({ mm, ...ss });
       }
+      const maxExp = Math.max(1, ...months.map(o => o.expense));
       host.innerHTML = '<div class="y2-grid">' + months.map(o => `
         <button class="y2-card" data-ym="${y}-${String(o.mm).padStart(2, '0')}-01">
-          <div class="y2-m">${o.mm} 月</div>
-          <div class="y2-row"><span>总支出</span><b class="expense">${fmtMoney(o.expense, { plain: true })}</b></div>
+          <div class="y2-m">${o.mm} 月<small>${o.count ? o.count + ' 笔' : '—'}</small></div>
+          <div class="y2-row"><b class="expense${o.count ? '' : ' dim'}">${o.count ? fmtMoney(o.expense) : '—'}</b></div>
+          <div class="y2-bar"><i style="width:${o.expense ? Math.max(6, o.expense / maxExp * 100) : 0}%"></i></div>
         </button>`).join('') + '</div>';
     }
 
     // 事件绑定
     host.querySelectorAll('[data-add]').forEach(b => {
       b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add, null, null, false, true); };
+    });
+    host.querySelectorAll('.m2-detail .lrow[data-rid]').forEach(row => {
+      row.onclick = () => this.editRecord(row.dataset.rid, lid);
     });
     host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
       item.onclick = () => {
@@ -2291,7 +2380,7 @@ const App = {
       col.onclick = (e) => {
         if (e.target.closest('.wk-rec, .m2-rec, [data-add]')) return;
         if (col.classList.contains('out')) return;
-        if (col.classList.contains('m2cell')) home.sel = col.dataset.date;
+        if (col.classList.contains('m2cell')) { home.sel = col.dataset.date; this.renderHomeCalendar(); return; }
         this.addRecordModal(lid, col.dataset.date);
       };
     });
@@ -2309,6 +2398,56 @@ const App = {
     if (over.length) parts.push('<b>' + over.length + ' 个小类已超支：</b>' + over.map(a => esc(a.sub)).join('、'));
     if (warn.length) parts.push('<b>' + warn.length + ' 个小类接近限额：</b>' + warn.map(a => esc(a.sub) + '（' + Math.round(a.pct * 100) + '%）').join('、'));
     return '<div class="alert-strip ' + cls + '">' + icon + '<span>' + parts.join('；') + '</span></div>';
+  },
+
+  /* 好物无图时的线稿插画（按名称/标签自动匹配） */
+  goodsArtHTML(r) {
+    const t = [r.note, r.category, r.sub].concat(recTags(r)).join(' ');
+    const bg = '#F2E9D8', line = '#8B6B3F', fill = '#E4D3B4', sage = '#8A9A8C', pale = '#FBF6EC';
+    let art = '';
+    if (/咖啡|coffee/i.test(t)) {
+      art = '<rect x="300" y="206" width="300" height="260" rx="26" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
+        + '<rect x="338" y="244" width="224" height="44" rx="10" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<rect x="356" y="312" width="150" height="54" rx="10" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M506 330h52a18 18 0 0 1 0 36h-52" fill="'+line+'"/>'
+        + '<path d="M396 420h108l-12 58h-84z" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M368 500h164M386 524h128" stroke="'+line+'" stroke-width="4" stroke-linecap="round"/>'
+        + '<path d="M612 300c22-20 22-44 0-64M646 320c30-28 30-64 0-92" stroke="'+sage+'" stroke-width="5" stroke-linecap="round" opacity=".75"/>';
+    } else if (/耳机|键盘|数码|电子|headphone|keyboard/i.test(t)) {
+      art = '<path d="M330 380v-44c0-86 68-154 150-154s150 68 150 154v44" stroke="'+line+'" stroke-width="12" stroke-linecap="round"/>'
+        + '<rect x="286" y="356" width="82" height="140" rx="40" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
+        + '<rect x="592" y="356" width="82" height="140" rx="40" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
+        + '<rect x="306" y="384" width="42" height="84" rx="21" fill="'+pale+'"/>'
+        + '<rect x="612" y="384" width="42" height="84" rx="21" fill="'+pale+'"/>';
+    } else if (/猫|宠物|cat/i.test(t)) {
+      art = '<rect x="330" y="470" width="300" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<rect x="360" y="360" width="220" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<rect x="300" y="250" width="180" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M392 494v78M570 494v78M470 384v86" stroke="'+line+'" stroke-width="7" stroke-linecap="round"/>'
+        + '<path d="M592 360h52l-18 26h-34z" fill="'+sage+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M560 214c-26 0-42 20-42 46 0 30 22 50 48 50s48-20 48-50c0-26-16-46-42-46z" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M532 236l-8-30 26 16M596 236l8-30-26 16" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<circle cx="548" cy="258" r="3" fill="'+line+'"/><circle cx="578" cy="258" r="3" fill="'+line+'"/>';
+    } else if (/大衣|外套|衣|服|coat/i.test(t)) {
+      art = '<path d="M480 180v42" stroke="'+line+'" stroke-width="5" stroke-linecap="round"/>'
+        + '<path d="M480 222c-54 0-96 22-112 64l-42 112 66 26 30-74v220h116V350l30 74 66-26-42-112c-16-42-58-64-112-64z" fill="'+fill+'" stroke="'+line+'" stroke-width="4" stroke-linejoin="round"/>'
+        + '<path d="M480 224v350M438 224l42 70 42-70" stroke="'+line+'" stroke-width="3"/>'
+        + '<circle cx="470" cy="330" r="5" fill="'+line+'"/><circle cx="470" cy="382" r="5" fill="'+line+'"/>';
+    } else if (/灯|台灯|lamp/i.test(t)) {
+      art = '<path d="M382 320c0-64 44-112 98-112s98 48 98 112z" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
+        + '<path d="M480 320v168" stroke="'+line+'" stroke-width="8" stroke-linecap="round"/>'
+        + '<path d="M410 500h140" stroke="'+line+'" stroke-width="8" stroke-linecap="round"/>'
+        + '<circle cx="480" cy="242" r="10" fill="#F6D9A0"/>'
+        + '<path d="M414 298h132" stroke="'+line+'" stroke-width="3" opacity=".5"/>';
+    } else {
+      art = '<path d="M420 470h120l-14 70h-92z" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
+        + '<path d="M480 470V290" stroke="'+line+'" stroke-width="5" stroke-linecap="round"/>'
+        + '<path d="M480 366c-40 0-66-26-66-60 36 0 66 24 66 60z" fill="'+sage+'" opacity=".8"/>'
+        + '<path d="M480 330c38-2 60-28 58-62-34 2-58 26-58 62z" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
+        + '<path d="M452 540h56" stroke="'+line+'" stroke-width="4" stroke-linecap="round"/>';
+    }
+    return '<svg class="goods-art" viewBox="0 0 960 720" fill="none" aria-hidden="true"><rect width="960" height="720" fill="'+bg+'"/>'
+      + '<circle cx="480" cy="360" r="230" fill="#FFFDF8" opacity=".55"/>' + art + '</svg>';
   },
 
   /* ---------- 视图：好物仓库（多标签） ---------- */
@@ -2353,11 +2492,21 @@ const App = {
       return sec(a, b);
     });
 
-    el.innerHTML = `
+    const usingN = all.filter(r => this.wishStatusOf(r).key === '使用中').length;
+    const idleN = all.filter(r => this.wishStatusOf(r).key === '闲置中').length;
+    const totalValue = all.reduce((n, r) => n + (Number(r.amount) || 0), 0);
+
+    el.innerHTML = this.pageHeadHTML('wishlist') + `
+      <div class="home-summary wish-summary">
+        <div class="hs-item"><span>全部好物</span><b>${all.length}</b></div>
+        <div class="hs-item"><span>使用中</span><b>${usingN}</b></div>
+        <div class="hs-item"><span>闲置中</span><b>${idleN}</b></div>
+        <div class="hs-item"><span>累计价值</span><b>${fmtMoney(totalValue)}</b></div>
+      </div>
       <div class="card">
         <div class="card-head">
           <div>
-            <div class="card-title">好物仓库</div>
+            <div class="card-title">分类与筛选</div>
             <div class="card-sub">${f.tag ? '标签 · ' + this.tagEmoHTML(f.tag) + esc(goodsTagShort(f.tag)) + '　' : cats.length ? '分类 · ' + cats.map(esc).join('、') + '　' : ''}共 ${items.length} 件 · 记账时勾选「心仪物品」并选择标签即可收入这里</div>
           </div>
         </div>
@@ -2427,23 +2576,21 @@ const App = {
       const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
-        <div class="wish-top">
-          <div class="wish-info">
+        <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
+          ${imgs.length
+            ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+            : this.goodsArtHTML(r) + '<span class="wi-add">＋ 图片</span>'}
+        </div>
+        <div class="wish-body">
+          <div class="wish-top-line">
             <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
-            ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
-            <div class="wish-amount">${fmtMoney(r.amount)}</div>
+            <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
           </div>
-          <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
-            ${imgs.length
-              ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
-              : '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'}
-          </div>
+          <div class="wish-amount">¥${fmtMoney(r.amount)}</div>
+          ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
+          <div class="wish-meta">${this.wishMetaHTML(r)}</div>
+          <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
         </div>
-        <div class="wish-status">
-          <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
-        </div>
-        <div class="wish-meta">${this.wishMetaHTML(r)}</div>
-        <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
       </div>`;
     }).join('');
 
@@ -2950,11 +3097,11 @@ const App = {
 
     const nowYear = new Date().getFullYear();
 
-    el.innerHTML = `
+    el.innerHTML = this.pageHeadHTML('stats') + `
       <div class="card">
         <div class="card-head">
           <div>
-            <div class="card-title">统计分析</div>
+            <div class="card-title">收支汇总</div>
             <div class="card-sub">按周期查看收支汇总、分类占比与趋势</div>
           </div>
         </div>
@@ -3356,7 +3503,7 @@ const App = {
     }
     const trendTitle = scope === 'all' ? '历史支出趋势' : scope === 'year' ? '本年支出趋势' : '近 6 个月趋势';
 
-    el.innerHTML = `
+    el.innerHTML = this.pageHeadHTML('rental') + `
       <div class="rental-head">
         <div class="scope-seg" id="rental-scope">
           <button type="button" data-scope="month" class="${scope === 'month' ? 'on' : ''}">本月</button>
@@ -3486,7 +3633,7 @@ const App = {
     const monthLimitSum = rows.reduce((s, r) => s + r.limit, 0);
     const monthUsedSum = rows.reduce((s, r) => s + r.used, 0);
 
-    el.innerHTML = `
+    el.innerHTML = this.pageHeadHTML('budget') + `
       <div class="card">
         <div class="card-head">
           <div>
@@ -3651,7 +3798,7 @@ const App = {
   renderSettings() {
     const el = document.getElementById('view-settings');
     const mode = Store.mode;
-    el.innerHTML = `
+    el.innerHTML = this.pageHeadHTML('settings') + `
       <div class="grid grid-2" style="margin-bottom:20px">
         <div class="stat-card">
           <div class="stat-label">当前账号</div>

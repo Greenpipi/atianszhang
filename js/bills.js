@@ -31,7 +31,7 @@
       const yearTotal = yearRows.reduce((s, x) => s + x.amount, 0);
       const missing = Store.mode === 'supabase' && Store.billsMissing;
 
-      el.innerHTML = `
+      el.innerHTML = this.pageHeadHTML('bills') + `
         <div class="bills-head">
           <div class="scope-seg" id="bills-tabs">
             <button type="button" data-tab="due" class="${tab === 'due' ? 'on' : ''}">本月待付</button>
