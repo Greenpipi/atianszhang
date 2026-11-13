@@ -2164,6 +2164,14 @@ input,select,textarea{font-family:inherit}
 }
 .wish-imgbox .goods-art{width:100%;height:100%;display:block}
 .wi-add{position:absolute;right:9px;bottom:9px;z-index:2;padding:2px 8px;border-radius:6px;background:rgba(255,253,249,.86);border:1px solid rgba(165,130,76,.22);color:#7B5D2E;font-size:9px;font-weight:600;letter-spacing:.02em}
+.wi-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-size:9.5px;letter-spacing:.08em;color:#B3A995}
+.wi-loading i{width:22px;height:22px;border-radius:50%;border:2px solid rgba(165,130,76,.18);border-top-color:#A5824C;animation:wiSpin .9s linear infinite}
+@keyframes wiSpin{to{transform:rotate(360deg)}}
+
+/* 自定义下拉：打开时抬升所在卡片，避免被后面的卡片盖住 */
+.card:has(.csel.open){position:relative;z-index:80}
+.csel.open{z-index:81}
+.csel-pop{z-index:82}
 .wish-imgbox:hover{background:#F2E9D8;border-color:transparent}
 .wish-body{padding:13px 15px 15px;display:flex;flex-direction:column}
 .wish-top-line{display:flex;align-items:flex-start;justify-content:space-between;gap:9px}

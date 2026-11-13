@@ -2009,8 +2009,8 @@ const App = {
       <div class="ledger-list">
         <div class="list-sum">
           <span>共 <b>${total}</b> 笔</span>
-          <span>支出 <b>¥${fmtMoney(expTotal)}</b></span>
-          <span>收入 <b>¥${fmtMoney(incTotal)}</b></span>
+          <span>支出 <b>${fmtMoney(expTotal)}</b></span>
+          <span>收入 <b>${fmtMoney(incTotal)}</b></span>
         </div>
         <div class="list-sort">
           <span>排序</span>
@@ -2579,14 +2579,16 @@ const App = {
         <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
           ${imgs.length
             ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
-            : this.goodsArtHTML(r) + '<span class="wi-add">＋ 图片</span>'}
+            : (r._imgLoaded === true
+                ? this.goodsArtHTML(r) + '<span class="wi-add">＋ 图片</span>'
+                : '<span class="wi-loading"><i></i>图片加载中</span>')}
         </div>
         <div class="wish-body">
           <div class="wish-top-line">
             <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
             <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
           </div>
-          <div class="wish-amount">¥${fmtMoney(r.amount)}</div>
+          <div class="wish-amount">${fmtMoney(r.amount)}</div>
           ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
           <div class="wish-meta">${this.wishMetaHTML(r)}</div>
           <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
@@ -2620,14 +2622,24 @@ const App = {
       });
     });
     // 图片按需加载：卡片先用占位图成型（打开即见），图片到位后原地补图
-    this.ensureImages(items).then(got => { if (got) this._paintWishImages(); });
+    this.ensureImages(items).then(() => { this._paintWishImages(); this._paintWishArt(); });
   },
 
   /* ---------- 好物卡片：图片/状态/标签辅助与浮层 ---------- */
   /* 有效图片列表（images 多图列权威；缺列时回退老数据单图 image） */
   recImages(r) {
-    if (Array.isArray(r && r.images)) return r.images.filter(x => typeof x === 'string' && x);
-    return r && r.image ? [r.image] : [];
+    if (!r) return [];
+    let imgs = r.images;
+    if (typeof imgs === 'string') {
+      try { const p = JSON.parse(imgs); imgs = Array.isArray(p) ? p : [imgs]; }
+      catch (e) { imgs = [imgs]; }
+    }
+    if (Array.isArray(imgs)) {
+      const list = imgs.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim());
+      if (list.length) return list;
+    }
+    const one = r.image || r.image_url || r.img || '';
+    return typeof one === 'string' && one.trim() ? [one.trim()] : [];
   },
   /* 图片按需加载：records 列表查询已排除 images（base64 单张 60–120KB），
      只有真的要展示图片的地方（好物仓库、编辑弹窗、大图灯箱）才补一次，按记录标记 _imgLoaded。
@@ -2711,6 +2723,19 @@ const App = {
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
   },
+  /* 确认无图后，把加载占位补成线稿，避免误以为图片被删除 */
+  _paintWishArt() {
+    document.querySelectorAll('.wish-card').forEach(card => {
+      const rec = this.state.records.find(r => r.id === card.dataset.wid);
+      const box = card.querySelector('.wish-imgbox');
+      if (!rec || !box || box.querySelector('img')) return;
+      if (this.recImages(rec).length) return;
+      if (!box.querySelector('.wi-loading')) return;
+      box.innerHTML = this.goodsArtHTML(rec) + '<span class="wi-add">＋ 图片</span>';
+      box.title = '点击添加图片';
+    });
+  },
+
   /* 合法图片链接（http/https；拒绝 javascript: 等伪协议） */
   isImgUrl(s) {
     try { const u = new URL(String(s || '').trim()); return u.protocol === 'http:' || u.protocol === 'https:'; }
