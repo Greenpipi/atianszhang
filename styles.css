@@ -2068,7 +2068,8 @@ input,select,textarea{font-family:inherit}
 .wk-wd{font-size:12.5px;font-weight:600;color:var(--ink2)}
 .wk-date{font-family:"DM Mono",monospace;font-size:10px;color:var(--faint)}
 .wk-plus{width:17px;height:17px;background:rgba(255,255,255,.65);border-color:rgba(165,130,76,.2);font-size:13px}
-.wk-body{padding:5px;gap:5px;overflow:auto}
+.wk-body{padding:5px;gap:5px;overflow:auto;scrollbar-width:none;-ms-overflow-style:none}
+.wk-body::-webkit-scrollbar{width:0;height:0;display:none}
 .wk-rec{background:#FFFDF9;border-color:rgba(88,82,72,.09);border-radius:8px;padding:6px 7px;min-height:0;gap:1px}
 .wk-rec:hover{border-color:#D8C6AA}
 .wk-rec-cat{font-size:10.5px;font-weight:500;color:var(--faint)}
