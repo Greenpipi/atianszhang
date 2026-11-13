@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>财务管家 · UI Kit — 暖奶油玻璃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   0. Design tokens
+   ============================================================ */
+:root{
+  --oat-25:#FDFBF8;
+  --oat-50:#FAF5EE;
+  --oat-100:#F5EDE2;
+  --oat-150:#F1E7DA;
+  --oat-200:#EADECE;
+  --oat-300:#DDCBB6;
+  --sand-400:#CBB59D;
+  --sand-500:#B29A80;
+
+  --ink-900:#2B2520;
+  --ink-800:#3B342D;
+  --ink-700:#514940;
+  --ink-600:#6C6257;
+  --ink-500:#867B6E;
+  --ink-400:#A2978A;
+  --ink-300:#C4B9AB;
+
+  --line:rgba(118,92,64,.13);
+  --line-strong:rgba(118,92,64,.22);
+  --paper:#FFFCF7;
+  --paper-2:#FBF6EE;
+
+  --coral-700:#B5431F;
+  --coral-600:#D1562C;
+  --coral-500:#E76A3E;
+  --coral-400:#F1875E;
+  --coral-200:#F8CFBE;
+  --coral-100:#FBE5D9;
+  --coral-50:#FDF3EC;
+
+  --sage-600:#5D8060;
+  --sage-500:#7A9B79;
+  --sage-200:#DBE7D8;
+  --sage-100:#ECF3E8;
+
+  --sky-500:#5B92CD;
+  --sky-200:#D4E3F2;
+  --sky-100:#EAF2FA;
+
+  --butter-500:#D6A041;
+  --butter-600:#B98523;
+  --butter-200:#F5E4BF;
+  --butter-100:#FBF1DA;
+
+  --plum-500:#8A79B5;
+  --plum-100:#EDE9F6;
+
+  --r-xs:8px;
+  --r-sm:12px;
+  --r-md:16px;
+  --r-lg:22px;
+  --r-xl:30px;
+  --r-full:999px;
+
+  --sh-xs:0 1px 2px rgba(84,60,38,.06);
+  --sh-sm:0 2px 6px rgba(84,60,38,.05),0 1px 2px rgba(84,60,38,.05);
+  --sh-md:0 12px 28px -16px rgba(84,60,38,.30),0 2px 6px rgba(84,60,38,.05);
+  --sh-lg:0 30px 60px -30px rgba(84,60,38,.42),0 2px 8px rgba(84,60,38,.06);
+  --sh-window:0 50px 90px -44px rgba(76,51,28,.50),0 0 0 1px rgba(255,255,255,.55),inset 0 1px 0 rgba(255,255,255,.85);
+
+  --glass:rgba(255,251,245,.62);
+  --glass-strong:rgba(255,252,247,.82);
+
+  --font-display:"Fraunces","PingFang SC","Hiragino Sans GB",Georgia,serif;
+  --font-ui:"Instrument Sans","PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,sans-serif;
+  --font-mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+
+/* ============================================================
+   1. Base
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:var(--font-ui);
+  font-size:15px;
+  line-height:1.65;
+  color:var(--ink-800);
+  background:
+    radial-gradient(1100px 680px at 8% -8%, #F8EBDA 0%, rgba(248,235,218,0) 62%),
+    radial-gradient(900px 620px at 100% 2%, #F5E4D1 0%, rgba(245,228,209,0) 58%),
+    radial-gradient(1000px 760px at 46% 118%, #E9D9C4 0%, rgba(233,217,196,0) 64%),
+    linear-gradient(158deg,#F4EADC 0%,#EDE2D3 48%,#E5D7C4 100%);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:var(--coral-200);color:var(--coral-700)}
+h1,h2,h3,h4,p{margin:0}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+img,svg{display:block}
+
+/* 纸张颗粒 */
+.grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E");
+  mix-blend-mode:multiply;
+}
+/* 背景光斑 */
+.orb{position:fixed;border-radius:50%;filter:blur(70px);pointer-events:none;z-index:0;opacity:.55}
+.orb-a{width:420px;height:420px;left:-140px;top:24%;background:radial-gradient(circle,#F6D9C0,transparent 68%)}
+.orb-b{width:520px;height:520px;right:-180px;top:56%;background:radial-gradient(circle,#E7DCC6,transparent 68%)}
+.orb-c{width:360px;height:360px;left:38%;top:-120px;background:radial-gradient(circle,#FBE7D5,transparent 70%)}
+
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ico-sm{width:15px;height:15px}
+.ico-lg{width:22px;height:22px}
+
+/* ============================================================
+   2. Page chrome
+   ============================================================ */
+.kit-top{
+  position:sticky;top:0;z-index:60;
+  backdrop-filter:blur(20px) saturate(1.2);
+  -webkit-backdrop-filter:blur(20px) saturate(1.2);
+  background:linear-gradient(180deg,rgba(251,246,239,.86),rgba(251,246,239,.62));
+  border-bottom:1px solid rgba(255,255,255,.55);
+  box-shadow:0 1px 0 rgba(118,92,64,.07);
+}
+.kit-top-in{
+  max-width:1280px;margin:0 auto;padding:0 28px;height:64px;
+  display:flex;align-items:center;gap:16px;
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em}
+.brand-mark{
+  width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(155deg,#F0845C,#DE5C31 70%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 6px 14px -8px rgba(190,70,35,.8);
+}
+.brand-mark .ico{width:17px;height:17px;stroke-width:1.8}
+.brand small{display:block;font-size:11px;font-weight:500;color:var(--ink-400);letter-spacing:.06em;text-transform:uppercase;line-height:1.2}
+.top-tag{
+  margin-left:6px;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;
+  padding:5px 10px;border-radius:var(--r-full);color:var(--coral-700);
+  background:rgba(255,255,255,.55);border:1px solid var(--coral-200);
+}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.top-note{font-size:12px;color:var(--ink-500)}
+.top-note b{color:var(--ink-700);font-weight:600}
+
+.kit-wrap{max-width:1280px;margin:0 auto;padding:0 28px 96px;position:relative;z-index:2}
+.kit-layout{display:grid;grid-template-columns:186px minmax(0,1fr);gap:48px;align-items:start}
+.kit-layout > main{min-width:0}
+
+/* 目录 */
+.kit-nav{position:sticky;top:92px;padding-top:34px}
+.kit-nav-title{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;color:var(--ink-400);
+  text-transform:uppercase;margin-bottom:14px;padding-left:12px;
+}
+.kit-nav a{
+  display:flex;align-items:baseline;gap:9px;padding:7px 12px;border-radius:9px;
+  font-size:13px;color:var(--ink-500);transition:color .2s var(--ease),background .2s var(--ease);
+}
+.kit-nav a i{font-family:var(--font-mono);font-style:normal;font-size:10px;color:var(--ink-300);transition:color .2s}
+.kit-nav a:hover{color:var(--ink-800);background:rgba(255,255,255,.45)}
+.kit-nav a.is-active{color:var(--coral-700);background:rgba(255,255,255,.62);box-shadow:var(--sh-xs)}
+.kit-nav a.is-active i{color:var(--coral-400)}
+
+/* ============================================================
+   3. Hero
+   ============================================================ */
+.hero{padding:56px 0 22px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);gap:40px;align-items:center}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--coral-700);
+  padding:6px 12px 6px 10px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.55);border:1px solid rgba(230,120,80,.28);
+}
+.eyebrow::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--coral-500);box-shadow:0 0 0 3px var(--coral-100)}
+.hero h1{
+  font-family:var(--font-display);
+  font-size:clamp(40px,5.2vw,62px);
+  line-height:1.05;font-weight:400;letter-spacing:-.02em;color:var(--ink-900);
+  margin:20px 0 6px;
+}
+.hero h1 em{font-style:italic;color:var(--coral-600);font-weight:300}
+.hero h1 .cn{display:block;font-family:var(--font-ui);font-size:.58em;font-weight:600;letter-spacing:-.01em;color:var(--ink-800);margin-top:6px}
+.hero-desc{max-width:470px;font-size:14.5px;line-height:1.85;color:var(--ink-600);margin-top:14px}
+.chip-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:22px}
+.chip{
+  font-size:12px;padding:5px 11px;border-radius:var(--r-full);color:var(--ink-600);
+  background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.75);box-shadow:var(--sh-xs);
+}
+.chip.solid{background:var(--ink-900);border-color:transparent;color:#F7EFE4}
+.hero-facts{display:flex;gap:26px;margin-top:30px;padding-top:22px;border-top:1px solid var(--line)}
+.fact b{display:block;font-family:var(--font-display);font-size:23px;font-weight:500;color:var(--ink-900);line-height:1.1}
+.fact span{font-size:11.5px;color:var(--ink-400);letter-spacing:.03em}
+
+/* Hero 小窗 */
+.hero-stage{position:relative;padding:16px 6px 22px;display:flex;justify-content:center}
+.hero-glow{
+  position:absolute;inset:6% 2% 4% 6%;border-radius:50%;
+  background:radial-gradient(circle at 40% 40%,#F7C9A9 0%,rgba(247,201,169,0) 66%);
+  filter:blur(26px);opacity:.75;
+}
+.mini-win{
+  position:relative;width:100%;max-width:440px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,253,249,.9),rgba(250,244,236,.82));
+  backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);
+  border:1px solid rgba(255,255,255,.8);
+  box-shadow:var(--sh-window);
+  transform:rotate(-1.6deg);
+}
+.mini-bar{display:flex;align-items:center;gap:5px;padding:11px 14px 0}
+.tl{width:7px;height:7px;border-radius:50%}
+.tl.r{background:#E7A79B}.tl.y{background:#E9C894}.tl.g{background:#A9C8A2}
+.mini-bar span{font-family:var(--font-mono);font-size:8.5px;color:var(--ink-400);margin-left:auto;letter-spacing:.08em}
+.mini-body{display:grid;grid-template-columns:116px 1fr;gap:10px;padding:12px}
+.mini-side{border-right:1px solid var(--line);padding-right:10px}
+.mini-brand{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:700;margin-bottom:12px}
+.mini-brand em{width:16px;height:16px;border-radius:5px;background:linear-gradient(150deg,#F0845C,#DE5C31);display:block}
+.mini-nav{display:grid;gap:3px}
+.mini-nav span{display:flex;align-items:center;gap:5px;font-size:8.5px;color:var(--ink-500);padding:5px 7px;border-radius:6px}
+.mini-nav span::before{content:"";width:9px;height:9px;border-radius:3px;border:1px solid var(--ink-300)}
+.mini-nav span.on{background:var(--coral-100);color:var(--coral-700);font-weight:600}
+.mini-nav span.on::before{background:var(--coral-400);border-color:transparent}
+.mini-main{padding:2px 4px}
+.mini-main h4{font-family:var(--font-display);font-size:14px;font-weight:500;letter-spacing:-.01em}
+.mini-main p{font-size:8px;color:var(--ink-400);margin-top:1px}
+.mini-kpis{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:9px 0}
+.mini-kpi{background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.8);border-radius:8px;padding:6px 7px;box-shadow:var(--sh-xs)}
+.mini-kpi em{display:block;font-style:normal;font-size:7px;color:var(--ink-400)}
+.mini-kpi b{font-family:var(--font-display);font-size:12.5px;font-weight:500;color:var(--ink-900)}
+.mini-kpi b i{font-style:normal;font-size:7px;color:var(--sage-600);margin-left:2px}
+.mini-ring{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.55);border-radius:9px;padding:8px 9px;margin-bottom:7px;border:1px solid rgba(255,255,255,.8)}
+.mini-ring .ring{width:42px;height:42px;flex:none}
+.mini-ring div b{display:block;font-size:8px;color:var(--ink-400);font-weight:500}
+.mini-ring div strong{font-family:var(--font-display);font-size:13px;font-weight:500;color:var(--ink-900)}
+.mini-list{display:grid;gap:4px}
+.mini-row{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.52);border-radius:7px;padding:5px 7px;border:1px solid rgba(255,255,255,.7)}
+.mini-row i{width:16px;height:16px;border-radius:5px;background:var(--sky-100);display:block;flex:none;position:relative}
+.mini-row i::after{content:"";position:absolute;inset:4px;border-radius:2px;border:1px solid var(--sky-500);opacity:.55}
+.mini-row span{font-size:8px;color:var(--ink-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-row b{margin-left:auto;font-family:var(--font-mono);font-size:8px;font-weight:500;color:var(--ink-800)}
+.float-tag{
+  position:absolute;right:-4px;bottom:34px;transform:rotate(3deg);
+  background:rgba(255,252,247,.9);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.9);border-radius:10px;padding:7px 11px;
+  box-shadow:var(--sh-md);font-size:10px;color:var(--ink-600);display:flex;gap:7px;align-items:center;
+}
+.float-tag b{color:var(--coral-700);font-family:var(--font-mono);font-size:10px}
+
+/* ============================================================
+   4. Sections
+   ============================================================ */
+.section{padding-top:66px;scroll-margin-top:80px}
+.sec-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:22px}
+.sec-no{
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--coral-500);
+  border:1px solid var(--coral-200);background:rgba(255,255,255,.45);
+  border-radius:7px;padding:4px 7px;flex:none;margin-bottom:6px;
+}
+.sec-head h2{font-family:var(--font-display);font-size:29px;font-weight:400;letter-spacing:-.015em;line-height:1.2;color:var(--ink-900)}
+.sec-head h2 span{font-family:var(--font-ui);font-size:14px;font-weight:500;color:var(--ink-400);margin-left:10px;letter-spacing:0}
+.sec-head p{margin-left:auto;max-width:340px;font-size:12.5px;line-height:1.7;color:var(--ink-500);text-align:right}
+.sec-rule{height:1px;background:linear-gradient(90deg,var(--line-strong),rgba(118,92,64,.03));margin-bottom:22px}
+
+.panel{
+  border-radius:var(--r-lg);
+  background:linear-gradient(180deg,rgba(255,253,249,.88),rgba(252,247,240,.8));
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:var(--sh-md),inset 0 1px 0 rgba(255,255,255,.9);
+  padding:26px;
+  position:relative;
+}
+.panel.plain{background:rgba(255,253,249,.6)}
+.panel-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--ink-500);text-transform:uppercase;margin-bottom:18px}
+.panel-title::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--coral-400)}
+.panel-note{font-size:12px;color:var(--ink-400);line-height:1.7}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.stack{display:grid;gap:18px}
+
+/* ============================================================
+   5. Color
+   ============================================================ */
+.swatch-groups{display:grid;gap:20px}
+.swatch-group-label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-400);margin-bottom:10px}
+.swatches{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.swatch{
+  text-align:left;border-radius:14px;padding:0;overflow:hidden;
+  background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);
+  box-shadow:var(--sh-xs);transition:transform .25s var(--ease),box-shadow .25s var(--ease);
+}
+.swatch:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
+.swatch:active{transform:translateY(0) scale(.99)}
+.swatch-chip{display:block;height:66px;border-radius:13px 13px 0 0;position:relative}
+.swatch-chip::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 45%)}
+.swatch-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px 9px}
+.swatch-name{font-size:11px;font-weight:600;color:var(--ink-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swatch-hex{font-family:var(--font-mono);font-size:9.5px;color:var(--ink-400);white-space:nowrap}
+.token-table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}
+.token-table th{text-align:left;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);font-weight:400;padding:0 10px 8px;border-bottom:1px solid var(--line)}
+.token-table td{padding:9px 10px;border-bottom:1px solid rgba(118,92,64,.07);color:var(--ink-600);vertical-align:middle}
+.token-table tr:last-child td{border-bottom:0}
+.token-table code{font-family:var(--font-mono);font-size:10.5px;color:var(--coral-700);background:var(--coral-50);padding:2px 6px;border-radius:5px;border:1px solid var(--coral-100)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:0}
+
+/* ============================================================
+   6. Typography
+   ============================================================ */
+.type-spec{padding:26px 28px;background:linear-gradient(160deg,#FFFDF9,#FBF4EA);border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.8);box-shadow:var(--sh-sm)}
+.type-spec .label{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-400)}
+.type-spec h3{font-family:var(--font-display);font-weight:400;font-size:32px;line-height:1.28;letter-spacing:-.015em;margin:12px 0 10px;color:var(--ink-900)}
+.type-spec h3 em{font-style:italic;color:var(--coral-600)}
+.type-spec p{font-size:13px;color:var(--ink-500);max-width:420px;line-height:1.8}
+.type-scale{display:grid;grid-template-columns:minmax(0,1fr)}
+.type-row{display:flex;align-items:baseline;gap:16px;padding:13px 2px;border-bottom:1px dashed rgba(118,92,64,.16);min-width:0}
+.type-row:last-child{border-bottom:0}
+.type-row .spec{flex:none;width:88px;font-family:var(--font-mono);font-size:9.5px;color:var(--ink-400);letter-spacing:.04em}
+.type-row .sample{flex:1;min-width:0;color:var(--ink-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s-display{font-family:var(--font-display);font-size:34px;font-weight:400;letter-spacing:-.02em;line-height:1.1}
+.s-h1{font-family:var(--font-display);font-size:24px;font-weight:400;letter-spacing:-.015em}
+.s-h2{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.s-body{font-size:14px}
+.s-caption{font-size:11.5px;color:var(--ink-500)}
+.s-mono{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500)}
+.num-showcase{
+  display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;
+  padding:22px 24px;border-radius:var(--r-md);
+  background:linear-gradient(140deg,var(--coral-50),#FCF6EE 60%);
+  border:1px solid rgba(233,170,140,.28);
+}
+.num-showcase .big{font-family:var(--font-display);font-size:46px;line-height:1;letter-spacing:-.02em;color:var(--ink-900);font-variant-numeric:tabular-nums}
+.num-showcase .big small{font-size:18px;color:var(--ink-400);margin-right:4px;font-family:var(--font-ui);font-weight:500}
+.num-showcase .meta{font-size:11.5px;color:var(--ink-500);line-height:1.7;padding-bottom:4px}
+.delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:var(--r-full);background:var(--sage-100);color:var(--sage-600);border:1px solid var(--sage-200)}
+.delta.down{background:var(--coral-50);color:var(--coral-700);border-color:var(--coral-200)}
+
+/* ============================================================
+   7. Shape / surface
+   ============================================================ */
+.radius-row{display:flex;flex-wrap:wrap;gap:14px}
+.radius-item{text-align:center}
+.radius-box{
+  width:72px;height:72px;background:linear-gradient(155deg,#FFFDF9,#F6EDDF);
+  border:1px solid rgba(255,255,255,.9);box-shadow:var(--sh-sm),inset 0 0 0 1px rgba(118,92,64,.06);
+  display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;color:var(--ink-400);
+}
+.radius-item span{display:block;font-size:10px;color:var(--ink-400);margin-top:6px;font-family:var(--font-mono)}
+.shadow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.shadow-card{height:84px;border-radius:14px;background:#FFFCF7;display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;color:var(--ink-400);border:1px solid rgba(255,255,255,.9)}
+.shadow-card.xs{box-shadow:var(--sh-xs)}
+.shadow-card.sm{box-shadow:var(--sh-sm)}
+.shadow-card.md{box-shadow:var(--sh-md)}
+.shadow-card.lg{box-shadow:var(--sh-lg)}
+.spacing-row{display:grid;gap:9px}
+.spacing-item{display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:10px;color:var(--ink-400)}
+.spacing-bar{height:9px;border-radius:3px;background:linear-gradient(90deg,var(--coral-400),var(--coral-200));flex:none}
+.glass-stage{
+  position:relative;border-radius:var(--r-lg);overflow:hidden;min-height:190px;
+  background:
+    radial-gradient(260px 160px at 18% 18%,#F6C5A3,transparent 70%),
+    radial-gradient(240px 200px at 84% 76%,#CBDCC4,transparent 72%),
+    linear-gradient(150deg,#F3E5D3,#E8D8C2);
+  display:flex;align-items:center;justify-content:center;gap:16px;padding:24px;
+}
+.glass-card{
+  position:relative;z-index:1;flex:1;max-width:230px;padding:16px 18px;border-radius:14px;
+  background:rgba(255,252,248,.55);border:1px solid rgba(255,255,255,.75);
+  backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);
+  box-shadow:0 18px 40px -22px rgba(84,60,38,.45),inset 0 1px 0 rgba(255,255,255,.8);
+}
+.glass-card b{display:block;font-size:12px;color:var(--ink-800)}
+.glass-card p{font-size:10.5px;color:var(--ink-500);line-height:1.6;margin-top:4px}
+.glass-card .swatches-mini{display:flex;gap:5px;margin-top:10px}
+.glass-card .swatches-mini i{width:18px;height:18px;border-radius:6px;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+
+/* ============================================================
+   8. Buttons
+   ============================================================ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:40px;padding:0 17px;border-radius:11px;
+  font-size:13.5px;font-weight:600;letter-spacing:.002em;white-space:nowrap;
+  transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .2s var(--ease),border-color .2s var(--ease),opacity .2s;
+  user-select:none;
+}
+.btn:active{transform:translateY(1px) scale(.995)}
+.btn .ico{width:16px;height:16px}
+.btn-primary{
+  color:#fff;
+  background:linear-gradient(180deg,#F0875F 0%,#E5663B 58%,#DA5B30 100%);
+  border:1px solid rgba(160,58,22,.28);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 16px -8px rgba(200,82,40,.75);
+}
+.btn-primary:hover{background:linear-gradient(180deg,#F39068,#E96E42 58%,#DC5F33);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 12px 22px -10px rgba(200,82,40,.8)}
+.btn-secondary{
+  color:var(--ink-800);
+  background:linear-gradient(180deg,#FFFDFA,#FAF3E9);
+  border:1px solid rgba(118,92,64,.2);
+  box-shadow:var(--sh-xs),inset 0 1px 0 #fff;
+}
+.btn-secondary:hover{background:#fff;border-color:rgba(118,92,64,.3);transform:translateY(-1px);box-shadow:var(--sh-sm)}
+.btn-ghost{color:var(--ink-600);background:transparent;border:1px solid transparent}
+.btn-ghost:hover{background:rgba(255,255,255,.55);color:var(--ink-800)}
+.btn-soft{color:var(--coral-700);background:var(--coral-50);border:1px solid var(--coral-200)}
+.btn-soft:hover{background:var(--coral-100)}
+.btn-danger{color:#fff;background:linear-gradient(180deg,#D96A4B,#C2472B);border:1px solid rgba(140,40,20,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 16px -9px rgba(180,55,30,.7)}
+.btn-danger:hover{transform:translateY(-1px);background:linear-gradient(180deg,#E07354,#C94D31)}
+.btn[disabled],.btn.is-disabled{opacity:.45;pointer-events:none;box-shadow:none}
+.btn-sm{height:32px;padding:0 12px;font-size:12px;border-radius:9px}
+.btn-sm .ico{width:14px;height:14px}
+.btn-lg{height:48px;padding:0 22px;font-size:14.5px;border-radius:13px}
+.btn-block{width:100%}
+.btn.is-loading{color:transparent;position:relative;pointer-events:none}
+.btn.is-loading::after{
+  content:"";position:absolute;width:15px;height:15px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--ink-500);
+  border:1px solid transparent;transition:all .2s var(--ease);
+}
+.icon-btn:hover{background:rgba(255,255,255,.72);color:var(--ink-800);border-color:rgba(255,255,255,.9);box-shadow:var(--sh-xs)}
+.icon-btn.solid{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.9);color:var(--ink-700);box-shadow:var(--sh-xs)}
+.icon-btn.coral{color:var(--coral-600)}
+.link-btn{
+  display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--coral-700);
+  border-bottom:1px solid transparent;transition:border-color .2s;
+}
+.link-btn:hover{border-color:var(--coral-300,var(--coral-200))}
+.segmented{
+  display:inline-flex;padding:3px;border-radius:11px;gap:2px;
+  background:rgba(118,92,64,.08);border:1px solid rgba(118,92,64,.06);
+  box-shadow:inset 0 1px 3px rgba(84,60,38,.05);
+}
+.segmented button{
+  height:30px;padding:0 13px;border-radius:8px;font-size:12px;font-weight:600;color:var(--ink-500);
+  display:inline-flex;align-items:center;gap:5px;transition:all .2s var(--ease);
+}
+.segmented button:hover{color:var(--ink-800)}
+.segmented button.is-active{background:#FFFDF9;color:var(--ink-900);box-shadow:0 1px 2px rgba(84,60,38,.12),0 3px 8px -4px rgba(84,60,38,.25)}
+.demo-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.demo-label{width:100%;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);margin-top:6px}
+.demo-label:first-child{margin-top:0}
+
+/* ============================================================
+   9. Forms
+   ============================================================ */
+.field{display:grid;gap:6px}
+.field > label{font-size:11.5px;font-weight:600;color:var(--ink-600);letter-spacing:.02em}
+.field-row{display:flex;gap:8px;align-items:center}
+.input,.select,.textarea{
+  width:100%;height:42px;padding:0 13px;border-radius:11px;
+  background:rgba(255,255,255,.68);
+  border:1px solid rgba(118,92,64,.18);
+  box-shadow:inset 0 1px 2px rgba(84,60,38,.04);
+  font-size:13.5px;color:var(--ink-800);
+  transition:border-color .2s,box-shadow .2s,background .2s;
+  outline:none;
+}
+.input::placeholder,.textarea::placeholder{color:var(--ink-400)}
+.input:hover,.select:hover,.textarea:hover{border-color:rgba(118,92,64,.3);background:rgba(255,255,255,.85)}
+.input:focus,.select:focus,.textarea:focus{
+  background:#fff;border-color:var(--coral-400);
+  box-shadow:0 0 0 4px rgba(231,106,62,.12),inset 0 1px 2px rgba(84,60,38,.02);
+}
+.textarea{height:auto;min-height:86px;padding:11px 13px;resize:vertical;line-height:1.7}
+.select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23867B6E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9.5 12 15.5 18 9.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+.input-icon{position:relative}
+.input-icon > .ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-400);width:16px;height:16px;pointer-events:none}
+.input-icon .input{padding-left:36px}
+.field.is-focus .input{border-color:var(--coral-400);background:#fff;box-shadow:0 0 0 4px rgba(231,106,62,.12)}
+.field.is-error .input{border-color:var(--coral-500);background:#FFF9F5;box-shadow:0 0 0 4px rgba(231,106,62,.09)}
+.field.is-error .hint{color:var(--coral-700)}
+.field .hint{font-size:11px;color:var(--ink-400);line-height:1.5}
+.input[disabled]{opacity:.55;background:rgba(241,231,218,.6);cursor:not-allowed}
+.amount-input{display:flex;align-items:center;gap:10px;padding:0 16px;height:64px;border-radius:14px;background:rgba(255,255,255,.7);border:1px solid rgba(118,92,64,.16);box-shadow:inset 0 1px 2px rgba(84,60,38,.04)}
+.amount-input em{font-family:var(--font-display);font-style:normal;font-size:22px;color:var(--ink-400)}
+.amount-input input{border:0;outline:0;background:transparent;width:100%;font-family:var(--font-display);font-size:32px;color:var(--ink-900);letter-spacing:-.02em}
+.amount-input input::placeholder{color:var(--ink-300)}
+.checks{display:grid;gap:12px}
+.check{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-700);cursor:pointer;user-select:none}
+.check input{appearance:none;-webkit-appearance:none;width:19px;height:19px;flex:none;border-radius:6px;border:1.5px solid var(--ink-300);background:#fff;cursor:pointer;position:relative;transition:all .18s var(--ease);margin:0}
+.check input:hover{border-color:var(--coral-400)}
+.check input:checked{background:linear-gradient(160deg,#F0845C,#DE5C31);border-color:transparent;box-shadow:0 3px 8px -3px rgba(200,82,40,.6)}
+.check input:checked::after{content:"";position:absolute;left:5.5px;top:2.5px;width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.check input[type=radio]{border-radius:50%}
+.check input[type=radio]:checked::after{left:4px;top:4px;width:7px;height:7px;border:0;background:#fff;border-radius:50%;transform:none}
+.check small{color:var(--ink-400);font-size:11.5px}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:13px;color:var(--ink-700)}
+.switch input{appearance:none;-webkit-appearance:none;width:42px;height:25px;border-radius:999px;background:var(--oat-200);position:relative;cursor:pointer;transition:background .25s var(--ease);box-shadow:inset 0 1px 3px rgba(84,60,38,.14);margin:0;flex:none;border:1px solid rgba(118,92,64,.08)}
+.switch input::after{content:"";position:absolute;width:19px;height:19px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .28s var(--ease);box-shadow:0 1px 3px rgba(84,60,38,.28),0 3px 6px -2px rgba(84,60,38,.18)}
+.switch input:checked{background:linear-gradient(160deg,#F0845C,#DE5C31)}
+.switch input:checked::after{transform:translateX(17px)}
+.slider{display:flex;align-items:center;gap:12px}
+.slider input[type=range]{appearance:none;-webkit-appearance:none;flex:1;height:6px;border-radius:999px;background:linear-gradient(90deg,var(--coral-400) 0%,var(--coral-400) 62%,var(--oat-200) 62%,var(--oat-200) 100%);outline:none}
+.slider input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--coral-500);box-shadow:0 2px 6px rgba(84,60,38,.25);cursor:pointer;transition:transform .15s}
+.slider input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.1)}
+.slider output{font-family:var(--font-mono);font-size:11px;color:var(--ink-600);min-width:44px;text-align:right}
+.stepper{display:inline-flex;align-items:center;border-radius:11px;border:1px solid rgba(118,92,64,.18);background:#fff;overflow:hidden;box-shadow:var(--sh-xs)}
+.stepper button{width:34px;height:36px;display:grid;place-items:center;color:var(--ink-500);transition:background .15s}
+.stepper button:hover{background:var(--oat-100);color:var(--ink-800)}
+.stepper span{width:52px;text-align:center;font-family:var(--font-mono);font-size:13px;color:var(--ink-800);border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:36px}
+.tag-input{display:flex;flex-wrap:wrap;gap:6px;padding:7px;border-radius:11px;border:1px solid rgba(118,92,64,.18);background:rgba(255,255,255,.68);min-height:42px;align-items:center}
+.tchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 8px;border-radius:7px;background:var(--oat-100);color:var(--ink-700);border:1px solid var(--oat-200)}
+.tchip button{display:grid;place-items:center;color:var(--ink-400)}
+.tchip button:hover{color:var(--coral-600)}
+.tag-input input{border:0;outline:0;background:transparent;flex:1;min-width:70px;font-size:12.5px;height:24px}
+.dropzone{
+  border:1.5px dashed rgba(118,92,64,.26);border-radius:14px;padding:22px;display:flex;gap:12px;align-items:center;
+  background:rgba(255,255,255,.36);transition:all .2s var(--ease);cursor:pointer;
+}
+.dropzone:hover{border-color:var(--coral-400);background:rgba(253,243,236,.6)}
+.dropzone .dz-ico{width:40px;height:40px;border-radius:11px;background:#fff;display:grid;place-items:center;color:var(--coral-600);box-shadow:var(--sh-xs);flex:none}
+.dropzone b{display:block;font-size:12.5px;color:var(--ink-800)}
+.dropzone p{font-size:11px;color:var(--ink-400);margin-top:2px}
+
+/* ============================================================
+   10. Data display
+   ============================================================ */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  padding:3px 8px;border-radius:var(--r-full);border:1px solid transparent;white-space:nowrap;
+}
+.badge .bd{width:5px;height:5px;border-radius:50%;background:currentColor}
+.badge-coral{background:var(--coral-50);color:var(--coral-700);border-color:var(--coral-100)}
+.badge-sage{background:var(--sage-100);color:var(--sage-600);border-color:var(--sage-200)}
+.badge-butter{background:var(--butter-100);color:var(--butter-600);border-color:var(--butter-200)}
+.badge-sky{background:var(--sky-100);color:#4179B4;border-color:var(--sky-200)}
+.badge-plum{background:var(--plum-100);color:#6F5E9C;border-color:#E0DAF1}
+.badge-ink{background:var(--ink-900);color:#F8F0E4;border-color:transparent}
+.badge-ghost{background:rgba(255,255,255,.6);color:var(--ink-500);border-color:rgba(118,92,64,.16)}
+
+.kpi{display:grid;gap:9px;padding:18px;border-radius:var(--r-md);background:linear-gradient(165deg,rgba(255,253,249,.92),rgba(250,244,236,.8));border:1px solid rgba(255,255,255,.85);box-shadow:var(--sh-sm)}
+.kpi .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.kpi .kpi-label{font-size:11px;color:var(--ink-500);display:flex;align-items:center;gap:6px}
+.kpi .kpi-ico{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--coral-100);color:var(--coral-600)}
+.kpi .kpi-ico.sage{background:var(--sage-100);color:var(--sage-600)}
+.kpi .kpi-ico.sky{background:var(--sky-100);color:#4179B4}
+.kpi .kpi-value{font-family:var(--font-display);font-size:29px;line-height:1.05;letter-spacing:-.02em;color:var(--ink-900);font-variant-numeric:tabular-nums}
+.kpi .kpi-value small{font-size:15px;color:var(--ink-400);font-family:var(--font-ui);font-weight:500;margin-right:2px}
+.kpi .kpi-foot{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-400)}
+.kpi.accent{background:linear-gradient(165deg,#FFF6F0,#FBEADF);border-color:rgba(255,255,255,.9)}
+.kpi.dark{background:linear-gradient(165deg,#3A322B,#2C2520);border-color:rgba(255,255,255,.1);box-shadow:var(--sh-md)}
+.kpi.dark .kpi-label,.kpi.dark .kpi-foot{color:rgba(248,240,228,.6)}
+.kpi.dark .kpi-value{color:#FBF3E7}
+.kpi.dark .kpi-value small{color:rgba(255,255,255,.42)}
+.kpi.dark .kpi-ico{background:rgba(255,255,255,.12);color:#F7B79A}
+
+.progress-wrap{display:grid;gap:7px}
+.progress-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-500)}
+.progress-head b{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--ink-700)}
+.track{height:8px;border-radius:999px;background:rgba(118,92,64,.1);overflow:hidden;position:relative}
+.track > i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#8FB18C,#6F946E);transition:width .8s var(--ease-out)}
+.track > i.warn{background:linear-gradient(90deg,#E8C06A,#D6A041)}
+.track > i.over{background:linear-gradient(90deg,#F09070,#D1562C)}
+.track.thin{height:6px}
+.budget-card{padding:19px;border-radius:var(--r-md);background:rgba(255,253,249,.72);border:1px solid rgba(255,255,255,.8);box-shadow:var(--sh-xs)}
+.budget-card h5{margin:0 0 3px;font-size:13px;font-weight:600;color:var(--ink-800)}
+.budget-card .sub{font-size:11px;color:var(--ink-400);margin-bottom:12px}
+
+.donut-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.donut{width:150px;height:150px;flex:none}
+.donut circle{fill:none;stroke-linecap:round}
+.donut-legend{display:grid;gap:9px;flex:1;min-width:150px}
+.dl-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-600)}
+.dl-row i{width:8px;height:8px;border-radius:3px;flex:none}
+.dl-row b{margin-left:auto;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--ink-800)}
+.dl-row span{color:var(--ink-400);font-size:10.5px}
+.chart-card{padding:18px 20px;border-radius:var(--r-md);background:rgba(255,253,249,.7);border:1px solid rgba(255,255,255,.8);box-shadow:var(--sh-xs)}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.chart-head h5{margin:0;font-size:12.5px;font-weight:600;color:var(--ink-800)}
+.chart-head p{font-size:10.5px;color:var(--ink-400);margin-top:2px}
+.line-chart{width:100%;height:auto;display:block;overflow:visible}
+.axis{font-family:var(--font-mono);font-size:8px;fill:var(--ink-300)}
+.mini-bars{display:flex;align-items:flex-end;gap:8px;height:110px;padding-top:8px}
+.mini-bars .bar-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%}
+.mini-bars .bar{width:100%;max-width:26px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#F3B392,#E97C51);transition:opacity .2s}
+.mini-bars .bar-col:hover .bar{opacity:.8}
+.mini-bars .bar-col.today .bar{background:linear-gradient(180deg,#7F9E7C,#5D8060)}
+.mini-bars .bar-col span{font-family:var(--font-mono);font-size:8.5px;color:var(--ink-400)}
+
+table.data{width:100%;border-collapse:collapse;font-size:12.5px}
+table.data th{
+  text-align:left;padding:0 12px 9px;font-family:var(--font-mono);font-size:9.5px;font-weight:400;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);border-bottom:1px solid var(--line);
+}
+table.data td{padding:11px 12px;border-bottom:1px solid rgba(118,92,64,.07);color:var(--ink-700)}
+table.data tr:last-child td{border-bottom:0}
+table.data tbody tr{transition:background .15s}
+table.data tbody tr:hover{background:rgba(255,255,255,.5)}
+table.data .num{text-align:right;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-800);font-variant-numeric:tabular-nums}
+table.data .muted{color:var(--ink-400)}
+
+.rec-list{display:grid;gap:2px}
+.rec{
+  display:flex;align-items:center;gap:12px;padding:10px 10px;border-radius:11px;
+  transition:background .18s var(--ease);
+}
+.rec:hover{background:rgba(255,255,255,.6)}
+.rec-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;background:var(--coral-100);color:var(--coral-600)}
+.rec-ico .ico{width:17px;height:17px}
+.rec-ico.sky{background:var(--sky-100);color:#4179B4}
+.rec-ico.sage{background:var(--sage-100);color:var(--sage-600)}
+.rec-ico.plum{background:var(--plum-100);color:#6F5E9C}
+.rec-ico.butter{background:var(--butter-100);color:var(--butter-600)}
+.rec-main{min-width:0;flex:1}
+.rec-main b{display:block;font-size:13px;font-weight:600;color:var(--ink-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-main span{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--ink-400);margin-top:1px}
+.rec-amt{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-900);font-variant-numeric:tabular-nums;text-align:right}
+.rec-amt.in{color:var(--sage-600)}
+.rec-act{display:flex;gap:2px;opacity:0;transition:opacity .18s}
+.rec:hover .rec-act{opacity:1}
+.rec-day{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-400);padding:12px 10px 5px}
+
+.bill-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.75);transition:all .2s}
+.bill-row:hover{background:rgba(255,255,255,.8);box-shadow:var(--sh-xs)}
+.bill-check{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--ink-300);flex:none;display:grid;place-items:center;color:transparent;transition:all .2s}
+.bill-check:hover{border-color:var(--sage-500)}
+.bill-row.paid .bill-check{background:var(--sage-500);border-color:var(--sage-500);color:#fff}
+.bill-row.paid .bill-check .ico{width:11px;height:11px;stroke-width:2.6}
+.bill-row.paid .bill-main b{color:var(--ink-500);text-decoration:line-through;text-decoration-color:rgba(118,92,64,.35)}
+.bill-main{flex:1;min-width:0}
+.bill-main b{display:block;font-size:12.5px;color:var(--ink-800);font-weight:600}
+.bill-main span{font-size:10.5px;color:var(--ink-400)}
+.bill-amt{font-family:var(--font-mono);font-size:12px;color:var(--ink-800)}
+
+.wish-card{border-radius:var(--r-md);overflow:hidden;background:rgba(255,253,249,.8);border:1px solid rgba(255,255,255,.85);box-shadow:var(--sh-sm);transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+.wish-card:hover{transform:translateY(-3px);box-shadow:var(--sh-md)}
+.wish-thumb{height:112px;position:relative;display:grid;place-items:center;background:linear-gradient(150deg,#F4E6D5,#E9D6BF)}
+.wish-thumb .ico{width:30px;height:30px;color:rgba(120,90,60,.4);stroke-width:1.3}
+.wish-thumb .badge{position:absolute;left:10px;top:10px;background:rgba(255,252,247,.88);backdrop-filter:blur(6px)}
+.wish-body{padding:12px 14px 14px}
+.wish-body b{display:block;font-size:12.5px;font-weight:600;color:var(--ink-800)}
+.wish-body .wish-meta{display:flex;align-items:center;justify-content:space-between;margin-top:7px}
+.wish-body .wish-meta em{font-style:normal;font-family:var(--font-display);font-size:17px;color:var(--ink-900)}
+.wish-body .wish-meta span{font-size:10px;color:var(--ink-400)}
+.wish-body .track{margin-top:9px}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tab{padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--ink-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;display:inline-flex;gap:6px;align-items:center}
+.tab:hover{color:var(--ink-800)}
+.tab.is-active{color:var(--coral-700);border-bottom-color:var(--coral-500)}
+.tab .badge{padding:1px 6px;font-size:9px}
+.breadcrumb{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-400)}
+.breadcrumb b{color:var(--ink-700);font-weight:600}
+.breadcrumb .ico{width:12px;height:12px;color:var(--ink-300)}
+.pagination{display:flex;align-items:center;gap:4px}
+.page-btn{min-width:29px;height:29px;padding:0 7px;border-radius:8px;display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-500);transition:all .15s}
+.page-btn:hover{background:rgba(255,255,255,.7);color:var(--ink-800)}
+.page-btn.is-active{background:var(--ink-900);color:#F8F0E4;box-shadow:var(--sh-xs)}
+.page-btn[disabled]{opacity:.35;pointer-events:none}
+
+/* ============================================================
+   11. Navigation mock
+   ============================================================ */
+.side-mock{
+  width:230px;border-radius:16px;padding:14px 12px;display:grid;gap:14px;
+  background:linear-gradient(180deg,rgba(255,252,247,.92),rgba(249,242,232,.86));
+  border:1px solid rgba(255,255,255,.9);box-shadow:var(--sh-md);
+}
+.side-brand{display:flex;align-items:center;gap:9px;padding:2px 4px 10px;border-bottom:1px solid var(--line)}
+.side-brand .brand-mark{width:29px;height:29px;border-radius:9px}
+.side-brand b{font-size:13px;letter-spacing:-.01em}
+.side-brand small{display:block;font-size:9px;color:var(--ink-400);letter-spacing:.05em}
+.side-group{display:grid;gap:2px}
+.side-label{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-400);padding:0 9px 5px}
+.side-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;font-size:12px;color:var(--ink-600);transition:all .18s var(--ease)}
+.side-item .ico{width:15px;height:15px;color:var(--ink-400);transition:color .18s}
+.side-item:hover{background:rgba(255,255,255,.6);color:var(--ink-900)}
+.side-item.is-active{background:var(--coral-100);color:var(--coral-700);font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+.side-item.is-active .ico{color:var(--coral-600)}
+.side-item .count{margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--ink-400);background:rgba(255,255,255,.6);padding:0 5px;border-radius:5px;line-height:15px}
+.side-item.is-active .count{background:rgba(255,255,255,.7);color:var(--coral-700)}
+.side-user{display:flex;align-items:center;gap:8px;padding:9px;border-radius:11px;background:rgba(255,255,255,.58);border:1px solid rgba(255,255,255,.8)}
+.side-user .avatar{width:26px;height:26px;font-size:10px}
+.side-user b{display:block;font-size:10.5px}
+.side-user span{font-size:9px;color:var(--ink-400)}
+.avatar{
+  width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;
+  background:linear-gradient(150deg,#F1C9AC,#DDA07C);color:#5A3823;font-size:12px;font-weight:600;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),0 2px 6px -2px rgba(120,80,50,.4);
+}
+.topbar-mock{
+  display:flex;align-items:center;gap:14px;padding:11px 16px;border-radius:14px;
+  background:rgba(255,252,247,.72);border:1px solid rgba(255,255,255,.85);
+  box-shadow:var(--sh-sm);backdrop-filter:blur(14px);
+}
+.topbar-mock h4{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.topbar-mock h4 small{display:block;font-family:var(--font-mono);font-size:8.5px;color:var(--ink-400);letter-spacing:.08em;font-weight:400;margin-top:1px}
+.topbar-tools{margin-left:auto;display:flex;align-items:center;gap:7px}
+.search-mini{display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9px;background:rgba(255,255,255,.7);border:1px solid rgba(118,92,64,.14);font-size:11px;color:var(--ink-400);width:158px}
+.search-mini .ico{width:13px;height:13px}
+.sync-chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--sage-600);background:var(--sage-100);border:1px solid var(--sage-200);padding:3px 8px;border-radius:999px}
+.sync-chip .ico{width:11px;height:11px}
+.kbd{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);background:#fff;border:1px solid rgba(118,92,64,.2);border-bottom-width:2px;border-radius:5px;padding:1px 5px;line-height:1.5}
+
+/* ============================================================
+   12. Feedback
+   ============================================================ */
+.alert{display:flex;gap:10px;padding:12px 14px;border-radius:12px;font-size:12px;line-height:1.65;border:1px solid transparent}
+.alert .ico{width:16px;height:16px;margin-top:1px}
+.alert b{font-weight:600}
+.alert-info{background:var(--sky-100);border-color:var(--sky-200);color:#3E6E9E}
+.alert-warn{background:var(--butter-100);border-color:var(--butter-200);color:#8A6420}
+.alert-danger{background:var(--coral-50);border-color:var(--coral-200);color:var(--coral-700)}
+.alert-sage{background:var(--sage-100);border-color:var(--sage-200);color:var(--sage-600)}
+.empty{
+  padding:34px 22px;text-align:center;border-radius:14px;
+  border:1.5px dashed rgba(118,92,64,.22);background:rgba(255,255,255,.32);
+}
+.empty .e-ico{width:48px;height:48px;border-radius:15px;margin:0 auto 12px;display:grid;place-items:center;background:rgba(255,255,255,.7);color:var(--ink-400);box-shadow:var(--sh-xs)}
+.empty b{display:block;font-size:13px;color:var(--ink-800)}
+.empty p{font-size:11.5px;color:var(--ink-400);max-width:240px;margin:4px auto 14px;line-height:1.7}
+.skeleton{background:linear-gradient(100deg,var(--oat-150) 20%,#FBF6EE 40%,var(--oat-150) 60%);background-size:200% 100%;animation:shimmer 1.5s infinite linear;border-radius:7px}
+@keyframes shimmer{to{background-position:-200% 0}}
+.sk-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.sk-line{height:9px;border-radius:5px}
+.tooltip-demo{position:relative;display:inline-flex}
+.tooltip{
+  position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(4px);
+  background:var(--ink-900);color:#F8F0E4;font-size:10.5px;padding:5px 9px;border-radius:7px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:all .18s var(--ease);box-shadow:var(--sh-md);
+}
+.tooltip::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--ink-900)}
+.tooltip-demo:hover .tooltip{opacity:1;transform:translateX(-50%) translateY(0)}
+.dialog-preview{
+  border-radius:16px;padding:22px;background:linear-gradient(170deg,rgba(255,253,249,.95),rgba(250,244,236,.9));
+  border:1px solid rgba(255,255,255,.9);box-shadow:var(--sh-lg);max-width:340px;
+}
+.dialog-preview h5{margin:0 0 4px;font-family:var(--font-display);font-size:19px;font-weight:500;letter-spacing:-.01em}
+.dialog-preview p{font-size:12px;color:var(--ink-500);line-height:1.7}
+.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.toast{
+  display:flex;align-items:center;gap:9px;padding:10px 14px;border-radius:12px;
+  background:rgba(255,252,247,.95);border:1px solid rgba(255,255,255,.9);
+  box-shadow:var(--sh-md);font-size:12px;color:var(--ink-800);max-width:290px;
+}
+.toast .t-ico{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none;background:var(--sage-100);color:var(--sage-600)}
+.toast .ico{width:13px;height:13px}
+.toast.coral .t-ico{background:var(--coral-100);color:var(--coral-600)}
+#toasts{position:fixed;right:22px;bottom:22px;z-index:200;display:grid;gap:8px;justify-items:end}
+#toasts .toast{animation:toastIn .35s var(--ease-out)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   13. App window preview
+   ============================================================ */
+.screen-scroll{overflow-x:auto;padding:6px 6px 18px;margin:0 -6px}
+.app-window{
+  min-width:900px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,253,249,.94),rgba(250,244,235,.9));
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:var(--sh-window);
+}
+.win-bar{display:flex;align-items:center;gap:6px;padding:12px 16px 10px;border-bottom:1px solid rgba(118,92,64,.08)}
+.win-bar .tl{width:9px;height:9px}
+.win-bar em{font-family:var(--font-mono);font-style:normal;font-size:9px;letter-spacing:.1em;color:var(--ink-300);margin-left:10px;text-transform:uppercase}
+.win-bar .bar-tools{margin-left:auto;display:flex;gap:8px;align-items:center}
+.app-body{display:grid;grid-template-columns:212px minmax(0,1fr);min-height:700px}
+.app-side{
+  padding:16px 13px;border-right:1px solid rgba(118,92,64,.1);
+  background:linear-gradient(180deg,rgba(252,247,240,.7),rgba(247,239,229,.55));
+  display:flex;flex-direction:column;gap:16px;
+}
+.app-side .side-item{padding:8px 10px;font-size:12.5px}
+.app-main{display:flex;flex-direction:column;min-width:0}
+.app-top{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid rgba(118,92,64,.08)}
+.app-top h3{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.app-top p{font-family:var(--font-mono);font-size:9px;color:var(--ink-400);letter-spacing:.07em;margin-top:2px}
+.app-top-tools{margin-left:auto;display:flex;align-items:center;gap:8px}
+.app-scroll{padding:22px 24px 28px;overflow:auto}
+.greet{font-family:var(--font-display);font-size:25px;font-weight:400;letter-spacing:-.015em;color:var(--ink-900);margin-bottom:16px}
+.greet span{font-family:var(--font-ui);font-size:12px;font-weight:400;color:var(--ink-400);letter-spacing:0;margin-left:8px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.app-cols{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px;align-items:start}
+.card{background:rgba(255,253,249,.76);border:1px solid rgba(255,255,255,.85);border-radius:16px;box-shadow:var(--sh-sm)}
+.card-head{display:flex;align-items:center;gap:8px;padding:14px 16px 0}
+.card-head h5{margin:0;font-size:12px;font-weight:600;color:var(--ink-800);letter-spacing:.01em}
+.card-head .badge{margin-left:auto}
+.card-body{padding:13px 16px 16px}
+.quick-card .amount-input{height:58px;border-radius:12px}
+.quick-card .amount-input input{font-size:29px}
+.cat-chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 10px}
+.cat-chip{
+  display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:8px;
+  font-size:11px;color:var(--ink-600);background:rgba(255,255,255,.65);
+  border:1px solid rgba(118,92,64,.13);transition:all .18s var(--ease);
+}
+.cat-chip .ico{width:12px;height:12px;color:var(--ink-400)}
+.cat-chip:hover{border-color:var(--coral-300,var(--coral-200));color:var(--ink-900)}
+.cat-chip.on{background:var(--coral-100);border-color:var(--coral-200);color:var(--coral-700);font-weight:600}
+.cat-chip.on .ico{color:var(--coral-600)}
+.quick-actions{display:flex;gap:8px;margin-top:12px}
+.quick-actions .btn-primary{flex:1}
+.tpl-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}
+.tpl{font-size:10.5px;color:var(--ink-500);background:rgba(255,255,255,.55);border:1px solid rgba(118,92,64,.1);border-radius:7px;padding:3px 8px}
+.tpl:hover{color:var(--ink-800);border-color:rgba(118,92,64,.25)}
+.ring-card .ring-big{width:150px;height:150px;margin:2px auto 10px}
+.ring-legend{display:flex;justify-content:center;gap:16px;font-size:10.5px;color:var(--ink-500)}
+.ring-legend i{width:7px;height:7px;border-radius:2px;display:inline-block;margin-right:5px}
+.bar-list{display:grid;gap:11px;margin-top:14px}
+.bar-item{display:grid;gap:5px}
+.bar-item .bl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-500)}
+.bar-item .bl b{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--ink-700)}
+.bill-mini{display:grid;gap:6px;margin-top:4px}
+.bill-mini .bill-row{padding:8px 10px;border-radius:9px}
+.bill-mini .bill-main b{font-size:11.5px}
+.bill-mini .bill-main span{font-size:9.5px}
+.bill-mini .bill-amt{font-size:11px}
+.mini-section{margin-top:14px}
+.mini-section-title{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--ink-400);margin-bottom:7px}
+.mini-section-title b{font-size:11.5px;color:var(--ink-700);font-weight:600}
+
+/* ============================================================
+   14. Phone preview
+   ============================================================ */
+.phone-stage{display:flex;justify-content:center;padding:10px 0}
+.phone{
+  width:310px;flex:none;border-radius:44px;padding:9px;position:relative;
+  background:linear-gradient(160deg,#4A423A,#2E2823 60%,#3D342C);
+  box-shadow:0 40px 70px -30px rgba(76,51,28,.6),inset 0 0 0 1px rgba(255,255,255,.18),inset 0 2px 6px rgba(255,255,255,.12);
+}
+.phone-screen{
+  border-radius:36px;overflow:hidden;background:linear-gradient(175deg,#FBF5EC,#F4EADB 60%,#EFE2CF);
+  height:642px;position:relative;display:flex;flex-direction:column;
+}
+.phone-notch{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:86px;height:22px;border-radius:999px;background:#2A2420;z-index:5;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.statusbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px;font-family:var(--font-mono);font-size:9.5px;color:var(--ink-700);position:relative;z-index:4}
+.statusbar .sb-right{display:flex;gap:4px;align-items:center}
+.statusbar .sb-right i{display:block;width:12px;height:7px;border:1px solid var(--ink-600);border-radius:2px;position:relative}
+.statusbar .sb-right i::after{content:"";position:absolute;inset:1px;right:3px;background:var(--ink-600);border-radius:1px}
+.ph-head{display:flex;align-items:center;gap:8px;padding:12px 20px 8px}
+.ph-head h4{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.ph-head .ph-date{font-family:var(--font-mono);font-size:8px;color:var(--ink-400);letter-spacing:.06em}
+.ph-head .avatar{margin-left:auto;width:28px;height:28px;font-size:10px}
+.ph-body{padding:4px 16px 0;display:grid;gap:12px;overflow:hidden}
+.ph-balance{
+  border-radius:18px;padding:16px;color:#FFF8F0;position:relative;overflow:hidden;
+  background:linear-gradient(150deg,#EE8055,#DC5B31 62%,#C94C27);
+  box-shadow:0 16px 26px -16px rgba(190,70,35,.8),inset 0 1px 0 rgba(255,255,255,.32);
+}
+.ph-balance::after{content:"";position:absolute;width:150px;height:150px;border-radius:50%;right:-50px;top:-60px;background:rgba(255,255,255,.13)}
+.ph-balance .pb-label{font-size:9.5px;opacity:.8;letter-spacing:.05em}
+.ph-balance .pb-value{font-family:var(--font-display);font-size:30px;line-height:1.15;margin-top:2px;font-variant-numeric:tabular-nums}
+.ph-balance .pb-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:9px;opacity:.92}
+.ph-balance .pb-bar{height:5px;border-radius:999px;background:rgba(255,255,255,.24);margin-top:9px;overflow:hidden}
+.ph-balance .pb-bar i{display:block;height:100%;width:57%;border-radius:inherit;background:rgba(255,255,255,.9)}
+.ph-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ph-quick button{display:grid;justify-items:center;gap:5px;padding:9px 2px;border-radius:12px;background:rgba(255,255,255,.62);border:1px solid rgba(255,255,255,.8);font-size:9px;color:var(--ink-600);box-shadow:var(--sh-xs)}
+.ph-quick .ico{width:16px;height:16px;color:var(--coral-600)}
+.ph-quick button:nth-child(2) .ico{color:var(--sky-500)}
+.ph-quick button:nth-child(3) .ico{color:var(--sage-600)}
+.ph-quick button:nth-child(4) .ico{color:var(--plum-500)}
+.ph-list{background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.75);border-radius:14px;padding:5px 7px}
+.ph-list .rec{padding:7px 6px;gap:8px}
+.ph-list .rec-ico{width:27px;height:27px;border-radius:8px}
+.ph-list .rec-ico .ico{width:13px;height:13px}
+.ph-list .rec-main b{font-size:11px}
+.ph-list .rec-main span{font-size:8.5px}
+.ph-list .rec-amt{font-size:10.5px}
+.ph-list-title{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ink-400);padding:0 4px 3px}
+.ph-list-title b{font-size:10.5px;color:var(--ink-700)}
+.phone-tabs{
+  margin-top:auto;display:grid;grid-template-columns:repeat(4,1fr);padding:9px 12px 16px;
+  background:rgba(255,252,247,.72);backdrop-filter:blur(16px);
+  border-top:1px solid rgba(255,255,255,.7);
+}
+.phone-tabs button{display:grid;justify-items:center;gap:3px;font-size:8px;color:var(--ink-400)}
+.phone-tabs .ico{width:17px;height:17px}
+.phone-tabs button.on{color:var(--coral-700)}
+.phone-tabs button.on .ico{color:var(--coral-600)}
+
+/* ============================================================
+   15. Real dialog & misc
+   ============================================================ */
+dialog.sheet{
+  border:0;padding:0;background:transparent;width:min(380px,calc(100vw - 40px));
+  margin:auto;
+}
+dialog.sheet::backdrop{background:rgba(58,45,32,.34);backdrop-filter:blur(5px)}
+dialog.sheet .dialog-preview{max-width:none}
+dialog.sheet[open]{animation:dialogIn .3s var(--ease-out)}
+@keyframes dialogIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+
+.note-box{
+  display:flex;gap:12px;padding:16px 18px;border-radius:14px;
+  background:rgba(255,250,242,.6);border:1px solid rgba(255,255,255,.8);
+  font-size:12px;line-height:1.8;color:var(--ink-600);
+}
+.note-box .ico{width:17px;height:17px;color:var(--coral-500);margin-top:2px}
+.note-box b{color:var(--ink-800)}
+
+.kit-foot{margin-top:70px;padding-top:22px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;font-size:11px;color:var(--ink-400)}
+.kit-foot .f-brand{display:flex;align-items:center;gap:8px}
+.kit-foot .f-brand .brand-mark{width:24px;height:24px;border-radius:7px}
+.kit-foot .f-brand .brand-mark .ico{width:13px;height:13px}
+
+/* Reveal */
+[data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .7s var(--ease-out),transform .7s var(--ease-out)}
+[data-reveal].in{opacity:1;transform:none}
+
+/* ============================================================
+   16. Responsive
+   ============================================================ */
+@media (max-width:1120px){
+  .kit-layout{grid-template-columns:minmax(0,1fr);gap:0}
+  .kit-nav{display:none}
+  .hero{grid-template-columns:1fr;gap:28px}
+  .hero-stage{justify-content:flex-start;padding-left:6%}
+  .sec-head p{display:none}
+}
+@media (max-width:900px){
+  .app-cols{grid-template-columns:1fr}
+  .swatches{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .shadow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .kit-wrap{padding:0 18px 70px}
+  .kit-top-in{padding:0 18px;height:58px}
+  .top-tag,.top-note{display:none}
+  .hero{padding-top:36px}
+  .hero h1{font-size:clamp(34px,9vw,46px)}
+  .hero-facts{gap:18px;flex-wrap:wrap}
+  .grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}
+  .swatches{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panel{padding:18px;border-radius:18px}
+  .section{padding-top:50px}
+  .sec-head h2{font-size:23px}
+  .sec-head h2 span{display:block;margin:4px 0 0}
+  .shadow-grid{grid-template-columns:1fr 1fr}
+  .num-showcase .big{font-size:36px}
+  .hero-stage{justify-content:center;padding-left:0}
+  .float-tag{right:4px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="orb orb-a"></div>
+<div class="orb orb-b"></div>
+<div class="orb orb-c"></div>
+
+<!-- 图标库 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24" fill="none"><path d="M20.4 8.7a5.2 5.2 0 0 0-8.8-2.3l-.4.5-.4-.5a5.2 5.2 0 0 0-8.8 5.9l8 8.5a1.7 1.7 0 0 0 2.5 0l8-8.6a5.2 5.2 0 0 0-.1-3.5Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5.5" width="17" height="15" rx="3"/><path d="M8 3.5v4M16 3.5v4M3.5 10.5h17"/><path d="M8 14h2M14 14h2M8 17.5h2"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none"><path d="M3.5 10.6 12 3.5l8.5 7.1"/><path d="M5.5 9.8V20a.8.8 0 0 0 .8.8h11.4a.8.8 0 0 0 .8-.8V9.8"/><path d="M9.7 20.8v-5.5h4.6v5.5"/></symbol>
+  <symbol id="i-pie" viewBox="0 0 24 24" fill="none"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none"><path d="M4 20V10M10 20V4.5M16 20v-6.5M21.5 20h-19"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.6a1.6 1.6 0 0 0 .32 1.77l.06.06a1.9 1.9 0 1 1-2.7 2.7l-.06-.06a1.6 1.6 0 0 0-1.77-.32 1.6 1.6 0 0 0-.97 1.47V21a1.9 1.9 0 1 1-3.8 0v-.1a1.6 1.6 0 0 0-1.05-1.47 1.6 1.6 0 0 0-1.77.32l-.06.06a1.9 1.9 0 1 1-2.7-2.7l.06-.06a1.6 1.6 0 0 0 .33-1.77 1.6 1.6 0 0 0-1.48-.97H3.1a1.9 1.9 0 1 1 0-3.8h.1a1.6 1.6 0 0 0 1.47-1.05 1.6 1.6 0 0 0-.33-1.77l-.06-.06a1.9 1.9 0 1 1 2.7-2.7l.06.06a1.6 1.6 0 0 0 1.77.33h.08a1.6 1.6 0 0 0 .97-1.48V3.1a1.9 1.9 0 1 1 3.8 0v.1a1.6 1.6 0 0 0 .97 1.47 1.6 1.6 0 0 0 1.77-.33l.06-.06a1.9 1.9 0 1 1 2.7 2.7l-.06.06a1.6 1.6 0 0 0-.32 1.77v.08a1.6 1.6 0 0 0 1.47.97h.1a1.9 1.9 0 1 1 0 3.8h-.1a1.6 1.6 0 0 0-1.47.97Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.3"/><path d="M15.4 15.4 20 20"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none"><path d="M4.5 12h14M13 6.5l5.5 5.5L13 17.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none"><path d="M4.8 12.6 9.6 17.4 19.2 6.8"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none"><path d="M18.3 16.4V11a6.3 6.3 0 1 0-12.6 0v5.4L4 18.5h16l-1.7-2.1Z"/><path d="M9.8 18.5a2.3 2.3 0 0 0 4.4 0"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24" fill="none"><path d="M4 5.5h16l-6.2 7.4v5.6L10.2 21v-8.1L4 5.5Z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none"><path d="M12 3.5v11.5M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5v-2a2.5 2.5 0 0 0-2.5-2.5H6a2.5 2.5 0 0 0-2.5 2.5V13A2.5 2.5 0 0 0 6 15.5h2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none"><path d="M4.5 6.5h15M9.5 3.5h5l.7 3H8.8l.7-3Z"/><path d="M6.5 6.5 7.4 20a1 1 0 0 0 1 .9h7.2a1 1 0 0 0 1-.9l.9-13.5"/><path d="M10.5 10.5v6M13.5 10.5v6"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none"><path d="m14.8 4.9 4.3 4.3"/><path d="M4 20l1-4.9L16.4 3.7a1.8 1.8 0 0 1 2.6 0l1.3 1.3a1.8 1.8 0 0 1 0 2.6L8.9 19 4 20Z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none"><path d="M6.5 9.5 12 15l5.5-5.5"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none"><path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.8l5.9-.9L12 3.6Z"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24" fill="none"><path d="M20.5 3.5C13 3.5 5.5 6.5 5.5 13.2a5.3 5.3 0 0 0 5.3 5.3c6.7 0 9.7-7.5 9.7-15Z"/><path d="M4 20.5c2.2-5.8 5.6-8.9 10.5-11"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24" fill="none"><path d="M7.4 18.5h9.9a4 4 0 0 0 .5-8 5.7 5.7 0 0 0-11-1.3 4.7 4.7 0 0 0 .6 9.3Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none"><path d="M12 3.2 13.9 9l5.8 1.9-5.8 1.9L12 18.6l-1.9-5.8L4.3 10.9 10.1 9 12 3.2Z"/><path d="M19 3v3M17.5 4.5h3"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24" fill="none"><path d="M12.6 3.5H20v7.4l-8.4 8.4a1.8 1.8 0 0 1-2.5 0l-5-5a1.8 1.8 0 0 1 0-2.5l8.5-8.3Z"/><circle cx="16.4" cy="7.2" r="1.2"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24" fill="none"><rect x="2.8" y="5" width="18.4" height="14" rx="3"/><path d="M2.8 9.8h18.4"/><path d="M6.5 14.8h3.4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.4v5l3.2 1.9"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24" fill="none"><path d="M5 21V4.5L8 6l2-1.5L12 6l2-1.5L16 6l3-1.5V21l-3-1.5-2 1.5-2-1.5L8 21l-3-1.5L5 21Z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20.3a7.4 7.4 0 0 1 14.4 0"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none"><path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11"/><circle cx="4.4" cy="6.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="4.4" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="4.4" cy="17.5" r="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24" fill="none"><rect x="3.2" y="4.5" width="17.6" height="15" rx="3"/><circle cx="9" cy="10" r="1.7"/><path d="m4.5 17.5 4.6-4.2 3.3 3 2.6-2.2 4.4 4"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24" fill="none"><circle cx="5.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none"><rect x="4.8" y="10.2" width="14.4" height="10.3" rx="3"/><path d="M8.4 10.2V7.6a3.6 3.6 0 0 1 7.2 0v2.6"/><path d="M12 14.2v2.2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M18.6 5.4l-1.4 1.4M6.8 17.2l-1.4 1.4"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24" fill="none"><path d="M9 9H6.5a2.5 2.5 0 1 1 2.5-2.5V9Zm0 0v6m0-6h6m-6 6H6.5A2.5 2.5 0 1 0 9 17.5V15Zm6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h2.5a2.5 2.5 0 1 1-2.5 2.5V15Z"/></symbol>
+  <symbol id="i-utensils" viewBox="0 0 24 24" fill="none"><path d="M7 3.5v6.4a2.3 2.3 0 0 1-2.3 2.3h-.2A2.3 2.3 0 0 1 2.2 9.9V3.5"/><path d="M4.6 3.5v17"/><path d="M17.5 3.5c-1.9 1.5-3 4-3 6.9 0 1.9 1.2 3.1 3 3.1s3-1.2 3-3.1c0-2.9-1.1-5.4-3-6.9Z"/><path d="M17.5 13.5v7"/></symbol>
+  <symbol id="i-bus" viewBox="0 0 24 24" fill="none"><rect x="4.5" y="3.5" width="15" height="13.5" rx="3"/><path d="M4.5 11h15"/><circle cx="8" cy="19" r="1.6"/><circle cx="16" cy="19" r="1.6"/><path d="M7.5 6.5h9"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24" fill="none"><path d="M5.2 7.5h13.6l1.2 12.2a1.3 1.3 0 0 1-1.3 1.4H5.3A1.3 1.3 0 0 1 4 19.7L5.2 7.5Z"/><path d="M8.7 9.5V6.2a3.3 3.3 0 0 1 6.6 0v3.3"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none"><path d="M4 5a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v18l-4-2.6L12.4 22 8.8 19.4 5.6 22V5Z"/><path d="M8 7h8M8 11h5"/></symbol>
+</svg>
+
+<!-- ================= Top bar ================= -->
+<header class="kit-top">
+  <div class="kit-top-in">
+    <div class="brand">
+      <span class="brand-mark"><svg class="ico"><use href="#i-wallet"/></svg></span>
+      <div>财务管家<small>Design System</small></div>
+    </div>
+    <span class="top-tag">WARM CREAM GLASS · v1.0</span>
+    <div class="top-right">
+      <span class="top-note">风格样稿 · <b>未接入正式页面</b></span>
+      <button class="btn btn-secondary btn-sm" data-open-modal><svg class="ico"><use href="#i-sparkle"/></svg>交互演示</button>
+    </div>
+  </div>
+</header>
+
+<div class="kit-wrap">
+<div class="kit-layout">
+
+  <!-- 目录 -->
+  <nav class="kit-nav" aria-label="目录">
+    <div class="kit-nav-title">Contents</div>
+    <a href="#c-color"><i>01</i>色彩</a>
+    <a href="#c-type"><i>02</i>字体</a>
+    <a href="#c-shape"><i>03</i>形状与材质</a>
+    <a href="#c-btn"><i>04</i>按钮</a>
+    <a href="#c-form"><i>05</i>表单</a>
+    <a href="#c-data"><i>06</i>数据展示</a>
+    <a href="#c-nav"><i>07</i>导航</a>
+    <a href="#c-feedback"><i>08</i>反馈</a>
+    <a href="#c-app"><i>09</i>界面预览</a>
+  </nav>
+
+  <main>
+    <!-- ================= Hero ================= -->
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Style Analysis · 风格解析</span>
+        <h1>Warm Cream Glass<em>.</em><span class="cn">暖奶油玻璃</span></h1>
+        <p class="hero-desc">源自 macOS 原生应用的柔光质感：燕麦奶油底色、磨砂玻璃层、暖灰投影，只保留一枚珊瑚橙作为行动色。它比纯白更温柔，比暗色更亲和，适合每天都要打开的记账工具。</p>
+        <div class="chip-row">
+          <span class="chip solid">macOS Native</span>
+          <span class="chip">Glassmorphism</span>
+          <span class="chip">Soft UI</span>
+          <span class="chip">燕麦奶油调</span>
+          <span class="chip">暖灰阴影</span>
+          <span class="chip">大圆角 · 细线图标</span>
+        </div>
+        <div class="hero-facts">
+          <div class="fact"><b>01</b><span>暖色基底层</span></div>
+          <div class="fact"><b>72%</b><span>玻璃透明度</span></div>
+          <div class="fact"><b>1</b><span>高饱和强调色</span></div>
+          <div class="fact"><b>4</b><span>级阴影体系</span></div>
+        </div>
+      </div>
+
+      <div class="hero-stage">
+        <div class="hero-glow"></div>
+        <div class="mini-win">
+          <div class="mini-bar"><i class="tl r"></i><i class="tl y"></i><i class="tl g"></i><span>FINANCE · 财务管家</span></div>
+          <div class="mini-body">
+            <div class="mini-side">
+              <div class="mini-brand"><em></em>财务管家</div>
+              <div class="mini-nav">
+                <span class="on">记账本</span>
+                <span>好物仓库</span>
+                <span>待办账单</span>
+                <span>出租屋</span>
+                <span>预算设置</span>
+                <span>统计</span>
+              </div>
+            </div>
+            <div class="mini-main">
+              <h4>记账本</h4>
+              <p>2026 年 11 月 · 晚上好</p>
+              <div class="mini-kpis">
+                <div class="mini-kpi"><em>本月支出</em><b>¥8,420<i>+12%</i></b></div>
+                <div class="mini-kpi"><em>预算剩余</em><b>¥3,580</b></div>
+              </div>
+              <div class="mini-ring">
+                <svg class="ring" viewBox="0 0 44 44">
+                  <circle cx="22" cy="22" r="17" fill="none" stroke="#EFE4D6" stroke-width="5"/>
+                  <circle cx="22" cy="22" r="17" fill="none" stroke="#E76A3E" stroke-width="5" stroke-linecap="round" stroke-dasharray="73 107" transform="rotate(-90 22 22)"/>
+                </svg>
+                <div><b>本月预算</b><strong>已用 68%</strong></div>
+              </div>
+              <div class="mini-list">
+                <div class="mini-row"><i></i><span>楼下咖啡 · 早餐</span><b>-28.00</b></div>
+                <div class="mini-row"><i style="background:var(--sage-100)"></i><span>地铁通勤</span><b>-6.00</b></div>
+                <div class="mini-row"><i style="background:var(--butter-100)"></i><span>超市采购</span><b>-132.40</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="float-tag"><svg class="ico ico-sm" style="color:var(--coral-500)"><use href="#i-sparkle"/></svg>玻璃层 <b>blur 22px</b></div>
+      </div>
+    </section>
+
+    <!-- ================= 01 色彩 ================= -->
+    <section class="section" id="c-color" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">01</span>
+        <h2>色彩<span>Color</span></h2>
+        <p>暖色底 + 一枚珊瑚橙。所有中性色都带一点黄，避免出现冷灰造成的廉价感。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="panel">
+        <div class="swatch-groups">
+          <div>
+            <div class="swatch-group-label">Base · 基底</div>
+            <div class="swatches">
+              <button class="swatch" data-hex="#F4EADC"><span class="swatch-chip" style="background:#F4EADC"></span><span class="swatch-meta"><span class="swatch-name">燕麦 Oat</span><span class="swatch-hex">#F4EADC</span></span></button>
+              <button class="swatch" data-hex="#EADECE"><span class="swatch-chip" style="background:#EADECE"></span><span class="swatch-meta"><span class="swatch-name">暖沙 Sand</span><span class="swatch-hex">#EADECE</span></span></button>
+              <button class="swatch" data-hex="#FFFCF7"><span class="swatch-chip" style="background:#FFFCF7"></span><span class="swatch-meta"><span class="swatch-name">纸白 Paper</span><span class="swatch-hex">#FFFCF7</span></span></button>
+              <button class="swatch" data-hex="#F5EDE2"><span class="swatch-chip" style="background:#F5EDE2"></span><span class="swatch-meta"><span class="swatch-name">奶霜 Cream</span><span class="swatch-hex">#F5EDE2</span></span></button>
+            </div>
+          </div>
+          <div>
+            <div class="swatch-group-label">Accent · 强调</div>
+            <div class="swatches">
+              <button class="swatch" data-hex="#E76A3E"><span class="swatch-chip" style="background:#E76A3E"></span><span class="swatch-meta"><span class="swatch-name">珊瑚 Coral</span><span class="swatch-hex">#E76A3E</span></span></button>
+              <button class="swatch" data-hex="#F1875E"><span class="swatch-chip" style="background:#F1875E"></span><span class="swatch-meta"><span class="swatch-name">浅珊瑚</span><span class="swatch-hex">#F1875E</span></span></button>
+              <button class="swatch" data-hex="#FBE5D9"><span class="swatch-chip" style="background:#FBE5D9"></span><span class="swatch-meta"><span class="swatch-name">珊瑚淡彩</span><span class="swatch-hex">#FBE5D9</span></span></button>
+              <button class="swatch" data-hex="#D1562C"><span class="swatch-chip" style="background:#D1562C"></span><span class="swatch-meta"><span class="swatch-name">深珊瑚</span><span class="swatch-hex">#D1562C</span></span></button>
+            </div>
+          </div>
+          <div>
+            <div class="swatch-group-label">Functional · 功能</div>
+            <div class="swatches">
+              <button class="swatch" data-hex="#7A9B79"><span class="swatch-chip" style="background:#7A9B79"></span><span class="swatch-meta"><span class="swatch-name">鼠尾草</span><span class="swatch-hex">#7A9B79</span></span></button>
+              <button class="swatch" data-hex="#D6A041"><span class="swatch-chip" style="background:#D6A041"></span><span class="swatch-meta"><span class="swatch-name">奶油黄</span><span class="swatch-hex">#D6A041</span></span></button>
+              <button class="swatch" data-hex="#5B92CD"><span class="swatch-chip" style="background:#5B92CD"></span><span class="swatch-meta"><span class="swatch-name">雾蓝</span><span class="swatch-hex">#5B92CD</span></span></button>
+              <button class="swatch" data-hex="#8A79B5"><span class="swatch-chip" style="background:#8A79B5"></span><span class="swatch-meta"><span class="swatch-name">灰紫</span><span class="swatch-hex">#8A79B5</span></span></button>
+            </div>
+          </div>
+          <div>
+            <div class="swatch-group-label">Ink · 文字</div>
+            <div class="swatches">
+              <button class="swatch" data-hex="#2B2520"><span class="swatch-chip" style="background:#2B2520"></span><span class="swatch-meta"><span class="swatch-name">墨 900</span><span class="swatch-hex">#2B2520</span></span></button>
+              <button class="swatch" data-hex="#514940"><span class="swatch-chip" style="background:#514940"></span><span class="swatch-meta"><span class="swatch-name">墨 700</span><span class="swatch-hex">#514940</span></span></button>
+              <button class="swatch" data-hex="#867B6E"><span class="swatch-chip" style="background:#867B6E"></span><span class="swatch-meta"><span class="swatch-name">墨 500</span><span class="swatch-hex">#867B6E</span></span></button>
+              <button class="swatch" data-hex="#A2978A"><span class="swatch-chip" style="background:#A2978A"></span><span class="swatch-meta"><span class="swatch-name">墨 400</span><span class="swatch-hex">#A2978A</span></span></button>
+            </div>
+          </div>
+        </div>
+
+        <table class="token-table">
+          <thead><tr><th>Token</th><th>值</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>--paper</code></td><td><span class="dot" style="background:#FFFCF7;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)"></span>#FFFCF7</td><td>卡片、弹窗、浮层表面</td></tr>
+            <tr><td><code>--coral-500</code></td><td><span class="dot" style="background:#E76A3E"></span>#E76A3E</td><td>主按钮、选中态、关键数字</td></tr>
+            <tr><td><code>--coral-100</code></td><td><span class="dot" style="background:#FBE5D9"></span>#FBE5D9</td><td>侧栏选中底、标签底色</td></tr>
+            <tr><td><code>--sage-500</code></td><td><span class="dot" style="background:#7A9B79"></span>#7A9B79</td><td>收入、预算健康、成功</td></tr>
+            <tr><td><code>--butter-500</code></td><td><span class="dot" style="background:#D6A041"></span>#D6A041</td><td>预算预警、待处理</td></tr>
+            <tr><td><code>--line</code></td><td><span class="dot" style="background:rgba(118,92,64,.13)"></span>rgba(118,92,64,.13)</td><td>分隔线、卡片描边</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= 02 字体 ================= -->
+    <section class="section" id="c-type" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">02</span>
+        <h2>字体<span>Typography</span></h2>
+        <p>Fraunces 衬线负责“温度”和大数字，Instrument Sans 负责界面信息，DM Mono 只用于标签与金额对齐。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="grid-2">
+        <div class="type-spec">
+          <div class="label">Display · Fraunces + PingFang SC</div>
+          <h3>把每一笔，<br>都记得<em>温柔</em>一点。</h3>
+          <p>记账不应该是冷冰冰的数字堆叠。衬线字用于问候和大额数字，让页面有一点杂志感；正文则保持中性、克制。</p>
+          <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+            <span class="badge badge-coral">Fraunces 300–600</span>
+            <span class="badge badge-ghost">Instrument Sans 400–700</span>
+            <span class="badge badge-ghost">DM Mono 400/500</span>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:20px 22px">
+          <div class="panel-title">Type scale</div>
+          <div class="type-scale">
+            <div class="type-row"><span class="spec">Display / 34</span><span class="sample s-display">本月结余 ¥3,580</span></div>
+            <div class="type-row"><span class="spec">H1 / 24</span><span class="sample s-h1">记账本</span></div>
+            <div class="type-row"><span class="spec">H2 / 17</span><span class="sample s-h2">最近记录</span></div>
+            <div class="type-row"><span class="spec">Body / 14</span><span class="sample s-body">今天也要好好记账，小满。</span></div>
+            <div class="type-row"><span class="spec">Caption / 11.5</span><span class="sample s-caption">数据已同步至云端 · 2 分钟前</span></div>
+            <div class="type-row"><span class="spec">Label / 11</span><span class="sample s-mono">Monthly Overview</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px">
+        <div class="num-showcase">
+          <div class="big"><small>¥</small>8,420<span style="font-size:20px;color:var(--ink-400)">.00</span></div>
+          <div class="meta">
+            <span class="delta">↑ 12.4%</span><br>
+            本月支出 · 较上月增加 ¥928
+          </div>
+        </div>
+        <div class="panel" style="padding:20px 22px">
+          <div class="panel-title">Numeric rules</div>
+          <div class="panel-note" style="margin-bottom:14px">金额一律 <b style="color:var(--ink-700)">等宽数字（tabular-nums）</b>，保证多行右对齐；大额展示用衬线，表格内用无衬线。</div>
+          <div style="display:grid;gap:9px">
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--ink-600)">餐饮 · 4 笔</span><b style="font-family:var(--font-mono);font-size:12px">¥1,286.00</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--ink-600)">居住 · 1 笔</span><b style="font-family:var(--font-mono);font-size:12px">¥3,200.00</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--ink-600)">交通 · 12 笔</span><b style="font-family:var(--font-mono);font-size:12px">¥428.50</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 03 形状与材质 ================= -->
+    <section class="section" id="c-shape" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">03</span>
+        <h2>形状与材质<span>Shape &amp; Surface</span></h2>
+        <p>圆角要“软”但不“圆胖”；阴影必须带暖棕，不能用纯黑，否则会立刻失去奶油感。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Radius · 圆角</div>
+          <div class="radius-row">
+            <div class="radius-item"><div class="radius-box" style="border-radius:8px">8</div><span>r-xs</span></div>
+            <div class="radius-item"><div class="radius-box" style="border-radius:12px">12</div><span>r-sm</span></div>
+            <div class="radius-item"><div class="radius-box" style="border-radius:16px">16</div><span>r-md</span></div>
+            <div class="radius-item"><div class="radius-box" style="border-radius:22px">22</div><span>r-lg</span></div>
+            <div class="radius-item"><div class="radius-box" style="border-radius:30px">30</div><span>r-xl</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:18px">输入框 11 · 按钮 11 · 卡片 16–22 · 应用窗口 20 · 弹窗 18</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Shadow · 暖灰阴影</div>
+          <div class="shadow-grid">
+            <div class="shadow-card xs">xs</div>
+            <div class="shadow-card sm">sm</div>
+            <div class="shadow-card md">md</div>
+            <div class="shadow-card lg">lg</div>
+          </div>
+          <div class="panel-note" style="margin-top:16px">统一使用 <code style="font-family:var(--font-mono);font-size:10.5px;color:var(--coral-700)">rgba(84,60,38,·)</code> 作为阴影色，透明度随层级递减、模糊随层级递增。</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px">
+        <div class="glass-stage">
+          <div class="glass-card">
+            <b>Glass · 磨砂表面</b>
+            <p>底色 55% 不透明，blur 16–22px，叠 1px 白色高光描边。</p>
+            <div class="swatches-mini">
+              <i style="background:#E76A3E"></i><i style="background:#7A9B79"></i><i style="background:#D6A041"></i><i style="background:#FFFCF7"></i>
+            </div>
+          </div>
+          <div class="glass-card" style="max-width:180px;transform:translateY(14px)">
+            <b>Layered</b>
+            <p>一层底 + 一层浮起卡片 + 一层高光，形成纵深。</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Spacing · 间距刻度</div>
+          <div class="spacing-row">
+            <div class="spacing-item"><span class="spacing-bar" style="width:4px"></span>4 · 图标与文字</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:8px"></span>8 · 紧凑元素</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:12px"></span>12 · 表单内距</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:16px"></span>16 · 卡片内距</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:24px"></span>24 · 区块间距</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:32px"></span>32 · 页面留白</div>
+            <div class="spacing-item"><span class="spacing-bar" style="width:48px"></span>48 · 大区块</div>
+          </div>
+          <div class="panel-note" style="margin-top:16px">基础单位 4px。卡片之间保持 14–18px，页面左右留白 24px。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 04 按钮 ================= -->
+    <section class="section" id="c-btn" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">04</span>
+        <h2>按钮<span>Buttons</span></h2>
+        <p>主按钮使用“上亮下暗”的珊瑚渐变 + 内高光，像一颗被光照到的糖果；其余按钮一律低对比。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="panel">
+        <div class="demo-row">
+          <span class="demo-label">Variants</span>
+          <button class="btn btn-primary"><svg class="ico"><use href="#i-plus"/></svg>记一笔</button>
+          <button class="btn btn-secondary">次要操作</button>
+          <button class="btn btn-ghost">幽灵按钮</button>
+          <button class="btn btn-soft">已选分类</button>
+          <button class="btn btn-danger"><svg class="ico"><use href="#i-trash"/></svg>删除</button>
+          <button class="btn btn-primary is-loading">保存中</button>
+          <button class="btn btn-secondary" disabled>不可用</button>
+        </div>
+        <div class="demo-row" style="margin-top:20px">
+          <span class="demo-label">Sizes &amp; states</span>
+          <button class="btn btn-primary btn-sm">小号</button>
+          <button class="btn btn-primary">默认 40</button>
+          <button class="btn btn-primary btn-lg"><svg class="ico"><use href="#i-wallet"/></svg>大号 48</button>
+          <button class="icon-btn solid"><svg class="ico"><use href="#i-bell"/></svg></button>
+          <button class="icon-btn"><svg class="ico"><use href="#i-search"/></svg></button>
+          <button class="icon-btn coral"><svg class="ico"><use href="#i-heart"/></svg></button>
+          <div class="segmented" data-seg>
+            <button class="is-active">支出</button>
+            <button>收入</button>
+            <button>转账</button>
+          </div>
+          <button class="link-btn">查看全部<svg class="ico ico-sm"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 05 表单 ================= -->
+    <section class="section" id="c-form" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">05</span>
+        <h2>表单<span>Forms</span></h2>
+        <p>输入框是“半透明白纸”而不是纯白块；聚焦时用 4px 珊瑚光晕代替生硬的蓝色描边。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Inputs</div>
+          <div class="stack">
+            <div class="field">
+              <label>备注</label>
+              <input class="input" placeholder="例如：楼下咖啡 · 早餐">
+            </div>
+            <div class="field is-focus">
+              <label>聚焦状态</label>
+              <input class="input" value="超市采购">
+            </div>
+            <div class="field is-error">
+              <label>金额</label>
+              <input class="input" value="- 0.00">
+              <span class="hint">金额需要大于 0</span>
+            </div>
+            <div class="field">
+              <label>搜索</label>
+              <div class="input-icon">
+                <svg class="ico"><use href="#i-search"/></svg>
+                <input class="input" placeholder="搜索记录、分类或金额…">
+              </div>
+            </div>
+            <div class="field">
+              <label>账本</label>
+              <select class="select"><option>日常账本</option><option>出租屋账本</option><option>旅行账本</option></select>
+            </div>
+            <div class="field">
+              <label>日期</label>
+              <input class="input" value="2026 / 11 / 13" readonly>
+            </div>
+            <div class="field">
+              <label>禁用</label>
+              <input class="input" value="系统自动生成" disabled>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Controls</div>
+          <div class="stack">
+            <div class="field">
+              <label>快速记账金额</label>
+              <div class="amount-input"><em>¥</em><input value="128.00" aria-label="金额"></div>
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" checked> 同步到云端账本 <small>实时</small></label>
+              <label class="check"><input type="checkbox"> 标记为心仪物品</label>
+              <label class="check"><input type="radio" name="kind" checked> 支出</label>
+              <label class="check"><input type="radio" name="kind"> 收入</label>
+            </div>
+            <div style="display:flex;gap:22px;flex-wrap:wrap">
+              <label class="switch"><input type="checkbox" checked> 自动付</label>
+              <label class="switch"><input type="checkbox"> 预算提醒</label>
+            </div>
+            <div class="field">
+              <label>预算使用比例</label>
+              <div class="slider"><input type="range" min="0" max="100" value="62" data-range><output>62%</output></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div class="stepper"><button type="button">−</button><span>3</span><button type="button">+</button></div>
+              <span style="font-size:11.5px;color:var(--ink-400)">分期期数</span>
+            </div>
+            <div class="field">
+              <label>标签</label>
+              <div class="tag-input">
+                <span class="tchip">餐饮<button type="button"><svg class="ico" style="width:11px;height:11px"><use href="#i-x"/></svg></button></span>
+                <span class="tchip">日常<button type="button"><svg class="ico" style="width:11px;height:11px"><use href="#i-x"/></svg></button></span>
+                <input placeholder="添加标签…">
+              </div>
+            </div>
+            <div class="field">
+              <label>上传凭证</label>
+              <div class="dropzone">
+                <span class="dz-ico"><svg class="ico"><use href="#i-image"/></svg></span>
+                <div><b>拖拽图片到这里</b><p>支持 JPG / PNG，最长边压缩至 720px</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 06 数据展示 ================= -->
+    <section class="section" id="c-data" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">06</span>
+        <h2>数据展示<span>Data Display</span></h2>
+        <p>财务组件的核心：金额要一眼看清，状态要一眼看穿。用色彩表达健康度，而不是堆图标。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <div class="panel-title">Badges &amp; tags</div>
+        <div class="demo-row">
+          <span class="badge badge-coral"><i class="bd"></i>本月待付</span>
+          <span class="badge badge-sage"><i class="bd"></i>已同步</span>
+          <span class="badge badge-butter">即将超支</span>
+          <span class="badge badge-sky">自动付</span>
+          <span class="badge badge-plum">出租屋</span>
+          <span class="badge badge-ink">2026</span>
+          <span class="badge badge-ghost">已归档</span>
+          <span class="badge badge-coral">已超支 12%</span>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:18px">
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">本月支出</span><span class="kpi-ico"><svg class="ico ico-sm"><use href="#i-receipt"/></svg></span></div>
+          <div class="kpi-value"><small>¥</small>8,420.00</div>
+          <div class="kpi-foot"><span class="delta down">↑ 12.4%</span> 较上月</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-top"><span class="kpi-label">本月收入</span><span class="kpi-ico sage"><svg class="ico ico-sm"><use href="#i-wallet"/></svg></span></div>
+          <div class="kpi-value"><small>¥</small>15,600.00</div>
+          <div class="kpi-foot"><span class="delta">↑ 2.1%</span> 较上月</div>
+        </div>
+        <div class="kpi dark">
+          <div class="kpi-top"><span class="kpi-label">预算剩余</span><span class="kpi-ico"><svg class="ico ico-sm"><use href="#i-pie"/></svg></span></div>
+          <div class="kpi-value"><small>¥</small>3,580.00</div>
+          <div class="kpi-foot">还剩 43% · 19 天</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="panel">
+          <div class="panel-title">Budget health · 预算预警</div>
+          <div class="stack">
+            <div class="budget-card">
+              <h5>餐饮</h5>
+              <div class="sub">¥1,286 / ¥2,000</div>
+              <div class="progress-wrap">
+                <div class="track"><i style="width:64%"></i></div>
+                <div class="progress-head"><span>健康</span><b>64%</b></div>
+              </div>
+            </div>
+            <div class="budget-card">
+              <h5>购物</h5>
+              <div class="sub">¥1,780 / ¥2,000</div>
+              <div class="progress-wrap">
+                <div class="track"><i class="warn" style="width:89%"></i></div>
+                <div class="progress-head"><span style="color:var(--butter-600)">接近上限</span><b>89%</b></div>
+              </div>
+            </div>
+            <div class="budget-card">
+              <h5>娱乐</h5>
+              <div class="sub">¥1,240 / ¥1,000</div>
+              <div class="progress-wrap">
+                <div class="track"><i class="over" style="width:100%"></i></div>
+                <div class="progress-head"><span style="color:var(--coral-700)">已超支 ¥240</span><b>124%</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Category share · 分类占比</div>
+          <div class="donut-wrap">
+            <svg class="donut" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="46" stroke="#EFE4D6" stroke-width="13"/>
+              <circle cx="60" cy="60" r="46" stroke="#E76A3E" stroke-width="13" stroke-dasharray="112 289" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="46" stroke="#7A9B79" stroke-width="13" stroke-dasharray="72 289" stroke-dashoffset="-112" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="46" stroke="#D6A041" stroke-width="13" stroke-dasharray="58 289" stroke-dashoffset="-184" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="46" stroke="#8A79B5" stroke-width="13" stroke-dasharray="35 289" stroke-dashoffset="-242" transform="rotate(-90 60 60)"/>
+              <circle cx="60" cy="60" r="46" stroke="#5B92CD" stroke-width="13" stroke-dasharray="12 289" stroke-dashoffset="-277" transform="rotate(-90 60 60)"/>
+            </svg>
+            <div class="donut-legend">
+              <div class="dl-row"><i style="background:#E76A3E"></i>餐饮 <span>39%</span><b>¥3,286</b></div>
+              <div class="dl-row"><i style="background:#7A9B79"></i>居住 <span>25%</span><b>¥2,100</b></div>
+              <div class="dl-row"><i style="background:#D6A041"></i>购物 <span>20%</span><b>¥1,684</b></div>
+              <div class="dl-row"><i style="background:#8A79B5"></i>娱乐 <span>12%</span><b>¥1,010</b></div>
+              <div class="dl-row"><i style="background:#5B92CD"></i>其他 <span>4%</span><b>¥340</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h5>近 7 日支出</h5><p>日均 ¥ 412.60</p></div>
+            <span class="badge badge-ghost">本周</span>
+          </div>
+          <div class="mini-bars">
+            <div class="bar-col"><div class="bar" style="height:38%"></div><span>周一</span></div>
+            <div class="bar-col"><div class="bar" style="height:62%"></div><span>周二</span></div>
+            <div class="bar-col"><div class="bar" style="height:44%"></div><span>周三</span></div>
+            <div class="bar-col"><div class="bar" style="height:78%"></div><span>周四</span></div>
+            <div class="bar-col"><div class="bar" style="height:52%"></div><span>周五</span></div>
+            <div class="bar-col"><div class="bar" style="height:88%"></div><span>周六</span></div>
+            <div class="bar-col today"><div class="bar" style="height:64%"></div><span>今天</span></div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h5>收支趋势</h5><p>2026 年 6 月 — 11 月</p></div>
+            <span class="badge badge-sage"><i class="bd"></i>收入 &gt; 支出</span>
+          </div>
+          <svg class="line-chart" viewBox="0 0 420 150" aria-label="收支趋势折线图">
+            <defs>
+              <linearGradient id="areaCoral" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#E76A3E" stop-opacity=".28"/>
+                <stop offset="100%" stop-color="#E76A3E" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <g stroke="rgba(118,92,64,.12)" stroke-width="1">
+              <line x1="10" y1="30" x2="410" y2="30"/>
+              <line x1="10" y1="70" x2="410" y2="70"/>
+              <line x1="10" y1="110" x2="410" y2="110"/>
+            </g>
+            <path d="M10 96 L80 78 L150 88 L220 52 L290 66 L360 44 L410 38 L410 130 L10 130 Z" fill="url(#areaCoral)"/>
+            <path d="M10 96 L80 78 L150 88 L220 52 L290 66 L360 44 L410 38" fill="none" stroke="#E76A3E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 112 L80 104 L150 108 L220 96 L290 100 L360 92 L410 88" fill="none" stroke="#7A9B79" stroke-width="1.8" stroke-dasharray="4 4" stroke-linecap="round"/>
+            <circle cx="410" cy="38" r="3.4" fill="#fff" stroke="#E76A3E" stroke-width="2"/>
+            <circle cx="410" cy="88" r="3" fill="#fff" stroke="#7A9B79" stroke-width="1.8"/>
+            <text x="10" y="146" class="axis">6月</text><text x="146" y="146" class="axis">8月</text><text x="286" y="146" class="axis">10月</text><text x="384" y="146" class="axis">11月</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <div class="panel-title">Table · 明细表</div>
+        <table class="data">
+          <thead><tr><th>日期</th><th>分类</th><th>备注</th><th style="text-align:right">金额</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">11 / 13</td><td><span class="badge badge-coral">餐饮</span></td><td>楼下咖啡 · 早餐</td><td class="num">−28.00</td><td><span class="badge badge-sage"><i class="bd"></i>已同步</span></td></tr>
+            <tr><td class="muted">11 / 12</td><td><span class="badge badge-sky">交通</span></td><td>地铁通勤</td><td class="num">−6.00</td><td><span class="badge badge-sage"><i class="bd"></i>已同步</span></td></tr>
+            <tr><td class="muted">11 / 12</td><td><span class="badge badge-butter">购物</span></td><td>超市采购</td><td class="num">−132.40</td><td><span class="badge badge-ghost">待分类</span></td></tr>
+            <tr><td class="muted">11 / 11</td><td><span class="badge badge-sage">收入</span></td><td>项目尾款</td><td class="num" style="color:var(--sage-600)">+4,500.00</td><td><span class="badge badge-sage"><i class="bd"></i>已入账</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Record rows · 记录列表</div>
+          <div class="rec-list">
+            <div class="rec-day">今天 · 3 笔</div>
+            <div class="rec">
+              <span class="rec-ico"><svg class="ico"><use href="#i-utensils"/></svg></span>
+              <div class="rec-main"><b>楼下咖啡 · 早餐</b><span>餐饮 · 08:42 · 微信</span></div>
+              <div class="rec-amt">−28.00</div>
+              <div class="rec-act"><button class="icon-btn" style="width:28px;height:28px"><svg class="ico ico-sm"><use href="#i-edit"/></svg></button><button class="icon-btn" style="width:28px;height:28px"><svg class="ico ico-sm"><use href="#i-trash"/></svg></button></div>
+            </div>
+            <div class="rec">
+              <span class="rec-ico sage"><svg class="ico"><use href="#i-bus"/></svg></span>
+              <div class="rec-main"><b>地铁通勤</b><span>交通 · 08:15 · 支付宝</span></div>
+              <div class="rec-amt">−6.00</div>
+            </div>
+            <div class="rec">
+              <span class="rec-ico butter"><svg class="ico"><use href="#i-bag"/></svg></span>
+              <div class="rec-main"><b>超市采购</b><span>购物 · 昨天 · 信用卡</span></div>
+              <div class="rec-amt">−132.40</div>
+            </div>
+            <div class="rec">
+              <span class="rec-ico plum"><svg class="ico"><use href="#i-wallet"/></svg></span>
+              <div class="rec-main"><b>项目尾款</b><span>收入 · 11 / 11 · 银行卡</span></div>
+              <div class="rec-amt in">+4,500.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Bills · 待办账单</div>
+          <div class="stack" style="gap:8px">
+            <div class="bill-row">
+              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+              <div class="bill-main"><b>房租</b><span>11 月 15 日 · 自动付</span></div>
+              <div class="bill-amt">¥3,200</div>
+              <span class="badge badge-coral">3 天后</span>
+            </div>
+            <div class="bill-row paid">
+              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+              <div class="bill-main"><b>宽带续费</b><span>11 月 10 日 · 已付</span></div>
+              <div class="bill-amt">¥120</div>
+              <span class="badge badge-sage">已付</span>
+            </div>
+            <div class="bill-row">
+              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+              <div class="bill-main"><b>水电费</b><span>11 月 20 日 · 手动付</span></div>
+              <div class="bill-amt">¥286</div>
+              <span class="badge badge-butter">待付</span>
+            </div>
+          </div>
+          <div class="panel-title" style="margin-top:20px">Wishlist · 好物仓库</div>
+          <div class="grid-2" style="gap:12px">
+            <div class="wish-card">
+              <div class="wish-thumb"><svg class="ico"><use href="#i-sun"/></svg><span class="badge badge-plum">已陪伴</span></div>
+              <div class="wish-body">
+                <b>桌面台灯</b>
+                <div class="wish-meta"><em>¥ 399</em><span>已用 128 天</span></div>
+                <div class="progress-wrap"><div class="track thin"><i style="width:72%"></i></div><div class="progress-head"><span>每日成本 ¥3.12</span><b>回本 72%</b></div></div>
+              </div>
+            </div>
+            <div class="wish-card">
+              <div class="wish-thumb" style="background:linear-gradient(150deg,#EEF2E9,#DFE7D9)"><svg class="ico"><use href="#i-leaf"/></svg><span class="badge badge-butter">想买</span></div>
+              <div class="wish-body">
+                <b>羊绒围巾</b>
+                <div class="wish-meta"><em>¥ 680</em><span>已存 ¥240</span></div>
+                <div class="progress-wrap"><div class="track thin"><i class="warn" style="width:35%"></i></div><div class="progress-head"><span>心愿进度</span><b>35%</b></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 07 导航 ================= -->
+    <section class="section" id="c-nav" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">07</span>
+        <h2>导航<span>Navigation</span></h2>
+        <p>侧栏选中态不是色块，而是一层“被灯照亮的奶油”；顶栏保持玻璃感，让内容自然透出来。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="panel" style="display:flex;justify-content:center">
+          <div class="side-mock">
+            <div class="side-brand">
+              <span class="brand-mark"><svg class="ico"><use href="#i-wallet"/></svg></span>
+              <div><b>财务管家</b><small>PERSONAL FINANCE</small></div>
+            </div>
+            <div class="side-group">
+              <div class="side-label">日常</div>
+              <a class="side-item is-active"><svg class="ico"><use href="#i-book"/></svg>记账本<span class="count">本月</span></a>
+              <a class="side-item"><svg class="ico"><use href="#i-heart"/></svg>好物仓库</a>
+              <a class="side-item"><svg class="ico"><use href="#i-calendar"/></svg>待办账单<span class="count">2</span></a>
+              <a class="side-item"><svg class="ico"><use href="#i-home"/></svg>出租屋</a>
+            </div>
+            <div class="side-group">
+              <div class="side-label">分析</div>
+              <a class="side-item"><svg class="ico"><use href="#i-pie"/></svg>预算设置</a>
+              <a class="side-item"><svg class="ico"><use href="#i-chart"/></svg>统计</a>
+              <a class="side-item"><svg class="ico"><use href="#i-settings"/></svg>设置</a>
+            </div>
+            <div class="side-user">
+              <span class="avatar">满</span>
+              <div><b>小满</b><span>个人账本 · 已同步</span></div>
+              <svg class="ico ico-sm" style="margin-left:auto;color:var(--sage-500)"><use href="#i-cloud"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="topbar-mock">
+            <div><h4>记账本<small>NOV 2026 · WEDNESDAY</small></h4></div>
+            <div class="topbar-tools">
+              <div class="search-mini"><svg class="ico"><use href="#i-search"/></svg>搜索记录…<span class="kbd" style="margin-left:auto">⌘K</span></div>
+              <span class="sync-chip"><svg class="ico"><use href="#i-cloud"/></svg>已同步</span>
+              <span class="avatar">满</span>
+            </div>
+          </div>
+
+          <div class="panel" style="padding:0;overflow:hidden">
+            <div class="tabs" style="padding:0 16px">
+              <button class="tab is-active">本月<span class="badge badge-coral">24</span></button>
+              <button class="tab">上月</button>
+              <button class="tab">全部</button>
+              <button class="tab" style="margin-left:auto"><svg class="ico ico-sm"><use href="#i-filter"/></svg>筛选</button>
+            </div>
+            <div style="padding:14px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div class="breadcrumb"><span>财务管家</span><svg class="ico"><use href="#i-chevron"/></svg><span>账本</span><svg class="ico"><use href="#i-chevron"/></svg><b>11 月</b></div>
+              <div class="pagination" style="margin-left:auto">
+                <button class="page-btn" disabled><svg class="ico ico-sm" style="width:12px;height:12px;transform:rotate(90deg)"><use href="#i-chevron"/></svg></button>
+                <button class="page-btn is-active">1</button>
+                <button class="page-btn">2</button>
+                <button class="page-btn">3</button>
+                <button class="page-btn"><svg class="ico ico-sm" style="width:12px;height:12px;transform:rotate(-90deg)"><use href="#i-chevron"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="note-box">
+            <svg class="ico"><use href="#i-sparkle"/></svg>
+            <div><b>细节：</b>顶栏与侧栏都使用玻璃材质，但透明度相差 15%，让侧栏更像“实体面板”，内容区更像“纸”。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 08 反馈 ================= -->
+    <section class="section" id="c-feedback" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">08</span>
+        <h2>反馈<span>Feedback</span></h2>
+        <p>提示信息也用奶油底 + 功能色描边，绝不出现高饱和整块色条。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="grid-3" style="margin-bottom:18px">
+        <div class="alert alert-info"><svg class="ico"><use href="#i-cloud"/></svg><div><b>同步完成。</b> 12 条记录已更新至云端。</div></div>
+        <div class="alert alert-warn"><svg class="ico"><use href="#i-bell"/></svg><div><b>预算接近上限。</b> 「购物」已使用 89%。</div></div>
+        <div class="alert alert-danger"><svg class="ico"><use href="#i-bell"/></svg><div><b>「娱乐」已超支。</b> 本月超出 ¥240。</div></div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="panel">
+          <div class="panel-title">Empty state</div>
+          <div class="empty">
+            <span class="e-ico"><svg class="ico ico-lg"><use href="#i-receipt"/></svg></span>
+            <b>今天还没有记账</b>
+            <p>从一杯咖啡开始，或者使用下面的快捷模板。</p>
+            <button class="btn btn-primary btn-sm"><svg class="ico"><use href="#i-plus"/></svg>记第一笔</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Loading · 骨架屏</div>
+          <div style="display:grid;gap:14px">
+            <div class="sk-row"><div class="skeleton" style="width:36px;height:36px;border-radius:11px"></div><div style="flex:1"><div class="skeleton sk-line" style="width:46%"></div><div class="skeleton sk-line" style="width:28%;margin-top:6px;height:7px"></div></div><div class="skeleton" style="width:56px;height:10px"></div></div>
+            <div class="sk-row"><div class="skeleton" style="width:36px;height:36px;border-radius:11px"></div><div style="flex:1"><div class="skeleton sk-line" style="width:62%"></div><div class="skeleton sk-line" style="width:34%;margin-top:6px;height:7px"></div></div><div class="skeleton" style="width:44px;height:10px"></div></div>
+            <div class="sk-row"><div class="skeleton" style="width:36px;height:36px;border-radius:11px"></div><div style="flex:1"><div class="skeleton sk-line" style="width:52%"></div><div class="skeleton sk-line" style="width:24%;margin-top:6px;height:7px"></div></div><div class="skeleton" style="width:60px;height:10px"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="panel">
+          <div class="panel-title">Dialog</div>
+          <div class="dialog-preview">
+            <h5>删除这条记录？</h5>
+            <p>「超市采购 −132.40」将被移入回收站，30 天内可恢复。</p>
+            <div class="dialog-actions">
+              <button class="btn btn-ghost btn-sm" data-close-modal>取消</button>
+              <button class="btn btn-danger btn-sm">删除</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Toast</div>
+          <div class="stack" style="gap:9px">
+            <div class="toast"><span class="t-ico"><svg class="ico"><use href="#i-check"/></svg></span>已记一笔 · ¥128.00</div>
+            <div class="toast coral"><span class="t-ico"><svg class="ico"><use href="#i-bell"/></svg></span>网络已断开，已切换本地模式</div>
+            <button class="btn btn-secondary btn-sm" data-toast>触发一条 Toast</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Tooltip &amp; misc</div>
+          <div class="demo-row">
+            <span class="tooltip-demo"><button class="icon-btn solid"><svg class="ico"><use href="#i-copy"/></svg></button><span class="tooltip">复制记录</span></span>
+            <span class="tooltip-demo"><button class="icon-btn solid"><svg class="ico"><use href="#i-download"/></svg></button><span class="tooltip">导出 CSV</span></span>
+            <button class="btn btn-primary btn-sm" data-open-modal>打开真实弹窗</button>
+          </div>
+          <div class="note-box" style="margin-top:16px;padding:12px 14px;font-size:11px">
+            <svg class="ico" style="width:14px;height:14px"><use href="#i-lock"/></svg>
+            <div>所有浮层统一 12–18px 圆角、<b>暖灰阴影</b>与 1px 白色高光边。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 09 界面预览 ================= -->
+    <section class="section" id="c-app" data-reveal>
+      <div class="sec-head">
+        <span class="sec-no">09</span>
+        <h2>界面预览<span>Applied to 财务管家</span></h2>
+        <p>把上面的组件装进真实页面：同样的信息结构，只替换视觉语言。</p>
+      </div>
+      <div class="sec-rule"></div>
+
+      <div class="panel" style="padding:18px">
+        <div class="panel-title">Desktop · 记账本</div>
+        <div class="screen-scroll">
+          <div class="app-window">
+            <div class="win-bar">
+              <i class="tl r"></i><i class="tl y"></i><i class="tl g"></i>
+              <em>财务管家 — 记账本</em>
+              <div class="bar-tools">
+                <span class="sync-chip"><svg class="ico"><use href="#i-cloud"/></svg>已同步</span>
+                <button class="icon-btn" style="width:28px;height:28px"><svg class="ico ico-sm"><use href="#i-bell"/></svg></button>
+              </div>
+            </div>
+            <div class="app-body">
+              <aside class="app-side">
+                <div class="side-brand" style="padding-bottom:12px">
+                  <span class="brand-mark"><svg class="ico"><use href="#i-wallet"/></svg></span>
+                  <div><b>财务管家</b><small>PERSONAL FINANCE</small></div>
+                </div>
+                <div class="side-group">
+                  <div class="side-label">日常</div>
+                  <a class="side-item is-active"><svg class="ico"><use href="#i-book"/></svg>记账本<span class="count">本月</span></a>
+                  <a class="side-item"><svg class="ico"><use href="#i-heart"/></svg>好物仓库</a>
+                  <a class="side-item"><svg class="ico"><use href="#i-calendar"/></svg>待办账单<span class="count">2</span></a>
+                  <a class="side-item"><svg class="ico"><use href="#i-home"/></svg>出租屋</a>
+                </div>
+                <div class="side-group">
+                  <div class="side-label">分析</div>
+                  <a class="side-item"><svg class="ico"><use href="#i-pie"/></svg>预算设置</a>
+                  <a class="side-item"><svg class="ico"><use href="#i-chart"/></svg>统计</a>
+                  <a class="side-item"><svg class="ico"><use href="#i-settings"/></svg>设置</a>
+                </div>
+                <div class="side-user" style="margin-top:auto">
+                  <span class="avatar">满</span>
+                  <div><b>小满</b><span>个人账本</span></div>
+                  <svg class="ico ico-sm" style="margin-left:auto;color:var(--sage-500)"><use href="#i-cloud"/></svg>
+                </div>
+              </aside>
+
+              <div class="app-main">
+                <div class="app-top">
+                  <div><h3>记账本</h3><p>2026 · 11 · 13　周三　晚上好</p></div>
+                  <div class="app-top-tools">
+                    <div class="search-mini"><svg class="ico"><use href="#i-search"/></svg>搜索记录…<span class="kbd" style="margin-left:auto">⌘K</span></div>
+                    <button class="icon-btn solid"><svg class="ico"><use href="#i-filter"/></svg></button>
+                    <span class="avatar">满</span>
+                  </div>
+                </div>
+
+                <div class="app-scroll">
+                  <div class="greet">晚上好，小满<span>今天也有认真记录生活。</span></div>
+
+                  <div class="kpi-row">
+                    <div class="kpi">
+                      <div class="kpi-top"><span class="kpi-label">本月支出</span><span class="kpi-ico"><svg class="ico ico-sm"><use href="#i-receipt"/></svg></span></div>
+                      <div class="kpi-value"><small>¥</small>8,420.00</div>
+                      <div class="kpi-foot"><span class="delta down">↑ 12.4%</span> 较上月</div>
+                    </div>
+                    <div class="kpi">
+                      <div class="kpi-top"><span class="kpi-label">本月收入</span><span class="kpi-ico sage"><svg class="ico ico-sm"><use href="#i-wallet"/></svg></span></div>
+                      <div class="kpi-value"><small>¥</small>15,600.00</div>
+                      <div class="kpi-foot"><span class="delta">↑ 2.1%</span> 较上月</div>
+                    </div>
+                    <div class="kpi accent">
+                      <div class="kpi-top"><span class="kpi-label">预算剩余</span><span class="kpi-ico"><svg class="ico ico-sm"><use href="#i-pie"/></svg></span></div>
+                      <div class="kpi-value"><small>¥</small>3,580.00</div>
+                      <div class="kpi-foot">已用 68% · 还剩 19 天</div>
+                    </div>
+                  </div>
+
+                  <div class="app-cols">
+                    <div class="stack" style="gap:14px">
+                      <div class="card quick-card">
+                        <div class="card-head"><h5>记一笔</h5><span class="badge badge-sage"><i class="bd"></i>云端账本</span></div>
+                        <div class="card-body">
+                          <div class="amount-input"><em>¥</em><input value="128.00" aria-label="金额"></div>
+                          <div class="cat-chips">
+                            <button class="cat-chip on"><svg class="ico"><use href="#i-utensils"/></svg>餐饮</button>
+                            <button class="cat-chip"><svg class="ico"><use href="#i-bus"/></svg>交通</button>
+                            <button class="cat-chip"><svg class="ico"><use href="#i-bag"/></svg>购物</button>
+                            <button class="cat-chip"><svg class="ico"><use href="#i-home"/></svg>居住</button>
+                            <button class="cat-chip"><svg class="ico"><use href="#i-heart"/></svg>娱乐</button>
+                          </div>
+                          <input class="input" placeholder="写点什么…（可选）" style="height:38px">
+                          <div class="quick-actions">
+                            <button class="btn btn-primary"><svg class="ico"><use href="#i-plus"/></svg>记一笔</button>
+                            <button class="btn btn-secondary">存为模板</button>
+                          </div>
+                          <div class="tpl-row">
+                            <span style="font-size:10px;color:var(--ink-400);align-self:center">快捷：</span>
+                            <button class="tpl">早餐 ¥28</button>
+                            <button class="tpl">地铁 ¥6</button>
+                            <button class="tpl">咖啡 ¥22</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="card">
+                        <div class="card-head"><h5>最近记录</h5><span class="badge badge-ghost">今天 3 笔</span><button class="link-btn" style="margin-left:auto;font-size:10.5px">全部<svg class="ico" style="width:11px;height:11px"><use href="#i-arrow"/></svg></button></div>
+                        <div class="card-body" style="padding-top:6px">
+                          <div class="rec-list">
+                            <div class="rec">
+                              <span class="rec-ico"><svg class="ico"><use href="#i-utensils"/></svg></span>
+                              <div class="rec-main"><b>楼下咖啡 · 早餐</b><span>餐饮 · 08:42 · 微信</span></div>
+                              <div class="rec-amt">−28.00</div>
+                              <div class="rec-act"><button class="icon-btn" style="width:26px;height:26px"><svg class="ico ico-sm"><use href="#i-edit"/></svg></button></div>
+                            </div>
+                            <div class="rec">
+                              <span class="rec-ico sage"><svg class="ico"><use href="#i-bus"/></svg></span>
+                              <div class="rec-main"><b>地铁通勤</b><span>交通 · 08:15 · 支付宝</span></div>
+                              <div class="rec-amt">−6.00</div>
+                            </div>
+                            <div class="rec">
+                              <span class="rec-ico butter"><svg class="ico"><use href="#i-bag"/></svg></span>
+                              <div class="rec-main"><b>超市采购</b><span>购物 · 昨天 · 信用卡</span></div>
+                              <div class="rec-amt">−132.40</div>
+                            </div>
+                            <div class="rec">
+                              <span class="rec-ico plum"><svg class="ico"><use href="#i-wallet"/></svg></span>
+                              <div class="rec-main"><b>项目尾款</b><span>收入 · 11 / 11 · 银行卡</span></div>
+                              <div class="rec-amt in">+4,500.00</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="card">
+                        <div class="card-head"><h5>近 7 日</h5><span class="badge badge-ghost">日均 ¥412</span></div>
+                        <div class="card-body" style="padding-top:2px">
+                          <div class="mini-bars" style="height:76px">
+                            <div class="bar-col"><div class="bar" style="height:34%"></div><span>一</span></div>
+                            <div class="bar-col"><div class="bar" style="height:58%"></div><span>二</span></div>
+                            <div class="bar-col"><div class="bar" style="height:42%"></div><span>三</span></div>
+                            <div class="bar-col"><div class="bar" style="height:74%"></div><span>四</span></div>
+                            <div class="bar-col"><div class="bar" style="height:50%"></div><span>五</span></div>
+                            <div class="bar-col"><div class="bar" style="height:86%"></div><span>六</span></div>
+                            <div class="bar-col today"><div class="bar" style="height:62%"></div><span>今</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="stack" style="gap:14px">
+                      <div class="card ring-card">
+                        <div class="card-head"><h5>本月预算</h5><span class="badge badge-butter">68%</span></div>
+                        <div class="card-body">
+                          <svg class="ring-big" viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="47" fill="none" stroke="#EFE4D6" stroke-width="11"/>
+                            <circle cx="60" cy="60" r="47" fill="none" stroke="#E76A3E" stroke-width="11" stroke-linecap="round" stroke-dasharray="201 295" transform="rotate(-90 60 60)"/>
+                            <text x="60" y="57" text-anchor="middle" font-family="Fraunces,serif" font-size="25" fill="#2B2520">68%</text>
+                            <text x="60" y="75" text-anchor="middle" font-family="DM Mono,monospace" font-size="7" letter-spacing="1.2" fill="#A2978A">USED</text>
+                          </svg>
+                          <div class="ring-legend"><span><i style="background:#E76A3E"></i>已用 ¥8,420</span><span><i style="background:#EFE4D6"></i>剩余 ¥3,580</span></div>
+                          <div class="bar-list">
+                            <div class="bar-item"><div class="bl"><span>餐饮</span><b>¥1,286 / 2,000</b></div><div class="track thin"><i style="width:64%"></i></div></div>
+                            <div class="bar-item"><div class="bl"><span>购物</span><b>¥1,780 / 2,000</b></div><div class="track thin"><i class="warn" style="width:89%"></i></div></div>
+                            <div class="bar-item"><div class="bl"><span>娱乐</span><b>¥1,240 / 1,000</b></div><div class="track thin"><i class="over" style="width:100%"></i></div></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="card">
+                        <div class="card-head"><h5>待办账单</h5><span class="badge badge-coral">2 笔待付</span></div>
+                        <div class="card-body" style="padding-top:6px">
+                          <div class="bill-mini">
+                            <div class="bill-row">
+                              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+                              <div class="bill-main"><b>房租</b><span>11 / 15 · 自动付</span></div>
+                              <div class="bill-amt">¥3,200</div>
+                            </div>
+                            <div class="bill-row">
+                              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+                              <div class="bill-main"><b>水电费</b><span>11 / 20 · 手动付</span></div>
+                              <div class="bill-amt">¥286</div>
+                            </div>
+                            <div class="bill-row paid">
+                              <button class="bill-check"><svg class="ico"><use href="#i-check"/></svg></button>
+                              <div class="bill-main"><b>宽带续费</b><span>11 / 10 · 已付</span></div>
+                              <div class="bill-amt">¥120</div>
+                            </div>
+                          </div>
+                          <div class="note-box" style="margin-top:12px;padding:10px 12px;font-size:10.5px">
+                            <svg class="ico" style="width:14px;height:14px"><use href="#i-sparkle"/></svg>
+                            <div>本月固定支出 <b>¥3,606</b>，占收入 23%。</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-note" style="margin-top:12px;display:flex;gap:8px;align-items:center"><svg class="ico ico-sm" style="color:var(--coral-500)"><use href="#i-image"/></svg>桌面端：左侧玻璃侧栏 + 顶部信息条 + 主内容纸面，保留原有信息结构。</div>
+      </div>
+
+      <div class="grid-2" style="margin-top:18px;align-items:start">
+        <div class="panel" style="padding:18px">
+          <div class="panel-title">Mobile · 记账本</div>
+          <div class="phone-stage">
+            <div class="phone">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <div class="statusbar"><span>9:41</span><span class="sb-right"><i></i><svg class="ico" style="width:11px;height:11px"><use href="#i-cloud"/></svg></span></div>
+                <div class="ph-head"><div><h4>记账本</h4><div class="ph-date">2026 / 11 / 13 · 周三</div></div><span class="avatar">满</span></div>
+                <div class="ph-body">
+                  <div class="ph-balance">
+                    <div class="pb-label">本月支出 · BUDGET 68%</div>
+                    <div class="pb-value">¥8,420.00</div>
+                    <div class="pb-bar"><i></i></div>
+                    <div class="pb-foot"><span>预算剩余 ¥3,580</span><span>还剩 19 天</span></div>
+                  </div>
+                  <div class="ph-quick">
+                    <button><svg class="ico"><use href="#i-utensils"/></svg>餐饮</button>
+                    <button><svg class="ico"><use href="#i-bus"/></svg>交通</button>
+                    <button><svg class="ico"><use href="#i-bag"/></svg>购物</button>
+                    <button><svg class="ico"><use href="#i-home"/></svg>居住</button>
+                  </div>
+                  <div>
+                    <div class="ph-list-title"><b>最近记录</b><span>全部</span></div>
+                    <div class="ph-list">
+                      <div class="rec"><span class="rec-ico"><svg class="ico"><use href="#i-utensils"/></svg></span><div class="rec-main"><b>楼下咖啡 · 早餐</b><span>餐饮 · 08:42</span></div><div class="rec-amt">−28.00</div></div>
+                      <div class="rec"><span class="rec-ico sage"><svg class="ico"><use href="#i-bus"/></svg></span><div class="rec-main"><b>地铁通勤</b><span>交通 · 08:15</span></div><div class="rec-amt">−6.00</div></div>
+                      <div class="rec"><span class="rec-ico butter"><svg class="ico"><use href="#i-bag"/></svg></span><div class="rec-main"><b>超市采购</b><span>购物 · 昨天</span></div><div class="rec-amt">−132.40</div></div>
+                    </div>
+                  </div>
+                  <div class="alert alert-warn" style="padding:8px 10px;font-size:9px;line-height:1.5;border-radius:10px"><svg class="ico" style="width:13px;height:13px"><use href="#i-bell"/></svg><div>「购物」已用 89%，注意预算。</div></div>
+                </div>
+                <div class="phone-tabs">
+                  <button class="on"><svg class="ico"><use href="#i-book"/></svg>记账</button>
+                  <button><svg class="ico"><use href="#i-calendar"/></svg>账单</button>
+                  <button><svg class="ico"><use href="#i-pie"/></svg>统计</button>
+                  <button><svg class="ico"><use href="#i-settings"/></svg>我的</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack" style="gap:18px">
+          <div class="panel">
+            <div class="panel-title">设计结论 · 为什么适合</div>
+            <div class="stack" style="gap:14px">
+              <div style="display:flex;gap:11px">
+                <span class="kpi-ico" style="flex:none;width:28px;height:28px;border-radius:9px"><svg class="ico ico-sm"><use href="#i-heart"/></svg></span>
+                <div><b style="font-size:12.5px;display:block;margin-bottom:2px">降低金钱焦虑</b><span style="font-size:11.5px;color:var(--ink-500);line-height:1.7">暖色比冷白更放松，珊瑚橙只出现在“行动”和“关键数字”上，不会制造压迫感。</span></div>
+              </div>
+              <div style="display:flex;gap:11px">
+                <span class="kpi-ico sage" style="flex:none;width:28px;height:28px;border-radius:9px"><svg class="ico ico-sm"><use href="#i-cloud"/></svg></span>
+                <div><b style="font-size:12.5px;display:block;margin-bottom:2px">原生应用质感</b><span style="font-size:11.5px;color:var(--ink-500);line-height:1.7">玻璃层、暖灰阴影、1px 高光边，让网页看起来像 macOS 上的常驻小工具。</span></div>
+              </div>
+              <div style="display:flex;gap:11px">
+                <span class="kpi-ico sky" style="flex:none;width:28px;height:28px;border-radius:9px"><svg class="ico ico-sm"><use href="#i-pie"/></svg></span>
+                <div><b style="font-size:12.5px;display:block;margin-bottom:2px">数据仍然清晰</b><span style="font-size:11.5px;color:var(--ink-500);line-height:1.7">功能色沿用鼠尾草 / 奶油黄 / 雾蓝，预算与收支状态不依赖珊瑚色，避免语义混淆。</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">落地注意 · 工程侧</div>
+            <ul style="margin:0;padding-left:18px;font-size:11.5px;line-height:1.9;color:var(--ink-500)">
+              <li><b style="color:var(--ink-700)">对比度：</b>正文 <code style="font-family:var(--font-mono);font-size:10px">#514940</code> on <code style="font-family:var(--font-mono);font-size:10px">#FFFCF7</code> 约 8.6:1，AA 通过。</li>
+              <li><b style="color:var(--ink-700)">性能：</b>backdrop-filter 仅用于侧栏 / 顶栏 / 弹窗，列表项不使用。</li>
+              <li><b style="color:var(--ink-700)">降级：</b>不支持模糊时回退为 96% 不透明纸面。</li>
+              <li><b style="color:var(--ink-700)">深浅：</b>整套为浅色，夜间模式需另做一套暖灰深色 token。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="kit-foot">
+      <div class="f-brand"><span class="brand-mark"><svg class="ico"><use href="#i-wallet"/></svg></span><span>财务管家 · Warm Cream Glass UI Kit</span></div>
+      <span>设计样稿 · 未修改现有页面 · 2026.11</span>
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- 真实弹窗 -->
+<dialog class="sheet" id="demo-dialog">
+  <div class="dialog-preview">
+    <h5>开始用这套风格？</h5>
+    <p>这是「暖奶油玻璃」的交互演示。实际替换会先改 design tokens，再逐页迁移，保证数据逻辑不受影响。</p>
+    <div class="dialog-actions">
+      <button class="btn btn-ghost btn-sm" data-close-modal>再看看</button>
+      <button class="btn btn-primary btn-sm" data-close-modal>好的</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toasts"></div>
+
+<script>
+(function(){
+  const $ = (s,c=document)=>c.querySelector(s);
+  const $$ = (s,c=document)=>[...c.querySelectorAll(s)];
+
+  /* toast */
+  function toast(msg, coral){
+    const root = $('#toasts');
+    const el = document.createElement('div');
+    el.className = 'toast' + (coral ? ' coral' : '');
+    el.innerHTML = '<span class="t-ico"><svg class="ico"><use href="#i-check"/></svg></span><span>' + msg + '</span>';
+    root.appendChild(el);
+    setTimeout(()=>{ el.style.transition='opacity .3s, transform .3s'; el.style.opacity='0'; el.style.transform='translateY(6px)'; }, 2400);
+    setTimeout(()=>el.remove(), 2800);
+  }
+
+  /* copy swatch */
+  document.addEventListener('click', e=>{
+    const sw = e.target.closest('.swatch');
+    if(!sw) return;
+    const hex = sw.dataset.hex;
+    if(navigator.clipboard) navigator.clipboard.writeText(hex).catch(()=>{});
+    toast('已复制色值 ' + hex);
+  });
+
+  /* segmented */
+  $$('[data-seg]').forEach(seg=>{
+    seg.addEventListener('click', e=>{
+      const b = e.target.closest('button');
+      if(!b) return;
+      $$('button', seg).forEach(x=>x.classList.toggle('is-active', x===b));
+    });
+  });
+
+  /* category chips inside preview + demo tabs */
+  $$('.cat-chip').forEach(c=>c.addEventListener('click',()=>{
+    c.parentElement.querySelectorAll('.cat-chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on');
+  }));
+
+  /* bill check */
+  $$('.bill-row').forEach(row=>{
+    const btn = row.querySelector('.bill-check');
+    if(btn) btn.addEventListener('click', ()=> row.classList.toggle('paid'));
+  });
+
+  /* tabs */
+  $$('.tabs').forEach(tabs=>{
+    tabs.addEventListener('click', e=>{
+      const t = e.target.closest('.tab');
+      if(!t || t.querySelector('.ico')) return;
+      tabs.querySelectorAll('.tab').forEach(x=>x.classList.toggle('is-active', x===t));
+    });
+  });
+
+  /* range */
+  $$('[data-range]').forEach(r=>{
+    const out = r.parentElement.querySelector('output');
+    const paint = ()=>{
+      const v = r.value;
+      r.style.background = 'linear-gradient(90deg,var(--coral-400) 0%,var(--coral-400) '+v+'%,var(--oat-200) '+v+'%,var(--oat-200) 100%)';
+      if(out) out.textContent = v + '%';
+    };
+    r.addEventListener('input', paint); paint();
+  });
+
+  /* dialog */
+  const dlg = $('#demo-dialog');
+  $$('[data-open-modal]').forEach(b=>b.addEventListener('click',()=>dlg.showModal()));
+  $$('[data-close-modal]').forEach(b=>b.addEventListener('click',()=>dlg.close()));
+  dlg.addEventListener('click', e=>{ if(e.target===dlg) dlg.close(); });
+
+  $$('[data-toast]').forEach(b=>b.addEventListener('click',()=>toast('已记一笔 · ¥128.00')));
+
+  /* scroll spy */
+  const links = $$('.kit-nav a');
+  const secs = links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const spy = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const id = '#' + en.target.id;
+        links.forEach(a=>a.classList.toggle('is-active', a.getAttribute('href')===id));
+      }
+    });
+  }, {rootMargin:'-20% 0px -68% 0px'});
+  secs.forEach(s=>spy.observe(s));
+
+  /* reveal */
+  const rev = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{ if(en.isIntersecting){ en.target.classList.add('in'); rev.unobserve(en.target); } });
+  }, {rootMargin:'0px 0px -8% 0px'});
+  $$('[data-reveal]').forEach(el=>rev.observe(el));
+
+  /* initial nav */
+  if(links[0]) links[0].classList.add('is-active');
+})();
+</script>
+</body>
+</html>
