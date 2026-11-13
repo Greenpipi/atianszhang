@@ -397,6 +397,125 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
 .season-grid span{height:30px;border-radius:8px;display:grid;place-items:center;font-size:9px;color:var(--muted);background:rgba(255,255,255,.5);border:1px solid rgba(88,82,72,.08)}
 .season-grid span.on{background:var(--gold-tint);border-color:var(--gold-line);color:var(--gold-deep);font-weight:600}
 
+/* ledger calendar + list */
+.ledger-card{padding:16px 18px 18px}
+.ledger-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.view-tabs{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:rgba(88,82,72,.07);border:1px solid rgba(88,82,72,.06);flex:none}
+.view-tabs button{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 11px;border-radius:7px;font-size:10px;font-weight:600;color:var(--muted);transition:.16s}
+.view-tabs button .ic{width:12px;height:12px}
+.view-tabs button.on{background:#FFFDF9;color:var(--gold-deep);box-shadow:0 1px 2px rgba(64,60,52,.12)}
+.search-box{flex:1;min-width:180px;display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9px;background:rgba(255,255,255,.55);border:1px solid rgba(88,82,72,.1);transition:.16s}
+.search-box:focus-within{background:#fff;border-color:var(--gold-line);box-shadow:0 0 0 3px rgba(165,130,76,.08)}
+.search-box .ic{width:14px;height:14px;color:var(--faint);flex:none}
+.search-box input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:11px;color:var(--ink2)}
+.search-box input::placeholder{color:#A9A196}
+.filter-wrap{position:relative;flex:none}
+.icon-btn{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;border:1px solid rgba(88,82,72,.1);background:rgba(255,255,255,.55);color:var(--muted);transition:.16s}
+.icon-btn:hover,.icon-btn.on{background:var(--gold-tint);border-color:var(--gold-line);color:var(--gold-deep)}
+.icon-btn .ic{width:14px;height:14px}
+.filter-pop{display:none;position:absolute;right:0;top:38px;z-index:30;width:max-content;min-width:136px;gap:4px;padding:5px;border-radius:10px;background:#FFFDF9;border:1px solid var(--gold-line);box-shadow:0 12px 28px rgba(64,60,52,.14)}
+.filter-pop.on{display:flex}
+.filter-pop .chip{height:24px;font-size:10px;padding:0 9px;white-space:nowrap;flex:none}
+.ledger-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:13px 0 11px}
+.range-nav{display:flex;align-items:center;gap:3px}
+.nav-btn{width:25px;height:25px;border-radius:7px;display:grid;place-items:center;color:var(--faint);border:1px solid transparent}
+.nav-btn:hover{background:#fff;border-color:var(--line);color:var(--ink2)}
+.nav-btn .ic{width:13px;height:13px}
+.range-nav b{font-family:"DM Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--ink2);min-width:140px;text-align:center}
+.range-nav .btn{margin-left:5px}
+#calView,#listView{animation:viewIn .25s ease both}
+.week-board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day-col{display:flex;flex-direction:column;min-height:300px;max-height:430px;padding:5px;border-radius:11px;background:rgba(255,255,255,.34);border:1px solid rgba(88,82,72,.07)}
+.day-col.today{background:var(--gold-tint);border-color:var(--gold-line)}
+.day-col-head{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 4px 8px}
+.day-col-head .dch{display:flex;flex-direction:column;gap:1px}
+.day-col-head b{font-size:10.5px;font-weight:600;color:var(--ink2)}
+.day-col-head small{font-family:"DM Mono",monospace;font-size:8px;color:var(--faint)}
+.day-col.today .day-col-head b{color:var(--gold-deep)}
+.day-add{width:17px;height:17px;border-radius:5px;display:grid;place-items:center;color:var(--gold-deep);background:rgba(255,255,255,.7);border:1px solid rgba(165,130,76,.2);flex:none}
+.day-add .ic{width:9px;height:9px}
+.day-add:hover{background:var(--gold-deep);color:#fff;border-color:var(--gold-deep)}
+.day-cards{flex:1;display:flex;flex-direction:column;gap:5px;overflow:auto;padding:1px 1px 2px}
+.day-cards::-webkit-scrollbar{width:3px}
+.day-cards::-webkit-scrollbar-thumb{background:rgba(165,130,76,.25);border-radius:3px}
+.week-card{width:100%;text-align:left;padding:7px;border-radius:8px;background:#FFFDF9;border:1px solid rgba(88,82,72,.09);box-shadow:0 1px 1px rgba(64,60,52,.03);transition:.14s}
+.week-card:hover{border-color:var(--gold-line);box-shadow:0 4px 12px rgba(64,60,52,.08);transform:translateY(-1px)}
+.wc-cat{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wc-cat .ic{width:10px;height:10px;flex:none;color:var(--gold-deep);opacity:.8}
+.wc-sub{display:block;font-size:10.5px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.wc-note{display:block;font-size:8.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.wc-amt{display:block;font-family:"DM Mono",monospace;font-size:10.5px;color:var(--ink2);margin-top:4px}
+.wc-amt.in{color:var(--sage-deep)}
+.day-foot{display:flex;justify-content:flex-end;gap:5px;margin-top:5px;padding:5px 4px 1px;border-top:1px dashed rgba(88,82,72,.10);font-family:"DM Mono",monospace;font-size:8px;color:var(--faint)}
+.day-foot .in{color:var(--sage-deep)}
+.empty-day{flex:1;display:grid;place-items:center;font-size:8.5px;color:#BDB5A8;letter-spacing:.04em}
+.month-board{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.month-cell{min-height:58px;padding:5px 6px;overflow:hidden;border-radius:8px;text-align:left;border:1px solid rgba(88,82,72,.07);background:rgba(255,255,255,.32);display:flex;flex-direction:column;gap:2px;transition:.14s}
+.month-cell:hover{background:rgba(255,255,255,.65);border-color:var(--line)}
+.month-cell.dim{opacity:.4}
+.month-cell.today{border-color:var(--gold-line);background:var(--gold-tint)}
+.month-cell.sel{background:var(--gold-deep);border-color:var(--gold-deep)}
+.month-cell .dnum{font-family:"DM Mono",monospace;font-size:9.5px;color:var(--ink2)}
+.month-cell .damt{width:100%;min-width:0;font-family:"DM Mono",monospace;font-size:7.5px;color:var(--faint);white-space:nowrap;overflow:hidden}
+.month-cell .damt.in{color:var(--sage-deep)}
+.month-cell.today .dnum{color:var(--gold-deep);font-weight:600}
+.month-cell.sel .dnum{color:#fff}
+.month-cell.sel .damt{color:rgba(255,255,255,.75)}
+.month-cell .ddots{display:flex;gap:2px;margin-top:auto}
+.month-cell .ddots i{width:3px;height:3px;border-radius:50%;background:var(--gold)}
+.month-cell.sel .ddots i{background:rgba(255,255,255,.8)}
+.month-foot{display:flex;align-items:center;justify-content:space-between;margin-top:9px;padding-top:9px;border-top:1px dashed rgba(88,82,72,.12)}
+.day-detail{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(88,82,72,.12)}
+.dd-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.dd-head b{font-size:11px;color:var(--ink2)}
+.dd-head span{font-family:"DM Mono",monospace;font-size:9px;color:var(--faint)}
+.year-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.year-card{padding:11px 12px;border-radius:10px;text-align:left;border:1px solid rgba(88,82,72,.08);background:rgba(255,255,255,.38);transition:.15s}
+.year-card:hover{background:#fff;border-color:var(--gold-line);transform:translateY(-1px)}
+.year-card.cur{border-color:var(--gold-line);background:var(--gold-tint)}
+.year-card .yc-m{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:600;color:var(--ink2)}
+.year-card .yc-m small{font-family:"DM Mono",monospace;font-size:8px;color:var(--faint);font-weight:400}
+.year-card .yc-amt{display:block;font-family:"Fraunces",serif;font-size:16px;color:var(--ink2);margin-top:5px;font-variant-numeric:tabular-nums}
+.year-card .yc-bar{display:block;height:4px;border-radius:4px;background:rgba(88,82,72,.08);margin-top:7px;overflow:hidden}
+.year-card .yc-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#C2A473,#A5824C)}
+.year-card.empty{opacity:.55}
+.year-card.empty .yc-amt{color:#B9B1A4;font-size:13px}
+.list-sum{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:1px 3px 9px;border-bottom:1px dashed rgba(88,82,72,.12);font-size:9.5px;color:var(--faint)}
+.list-sum b{font-family:"DM Mono",monospace;font-size:10px;color:var(--ink2);font-weight:500}
+.list-group{margin-top:11px}
+.list-group-head{display:flex;align-items:center;justify-content:space-between;padding:0 3px 5px}
+.list-group-head .lg-date{display:flex;align-items:center;gap:7px}
+.list-group-head b{font-size:11px;color:var(--ink2)}
+.list-group-head small{font-family:"DM Mono",monospace;font-size:8.5px;color:var(--faint)}
+.list-group-head .lg-total{font-family:"DM Mono",monospace;font-size:9px;color:var(--faint)}
+.lrow{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:10px;padding:7px 7px;border-radius:10px}
+.lrow:hover{background:rgba(255,255,255,.6)}
+.lrow .rec-ico{width:30px;height:30px}
+.lrow .rec-main b{font-size:11px}
+.lrow .rec-main span{font-size:9px}
+.lrow .rec-amt{font-size:10.5px}
+.lrow .lrow-time{font-family:"DM Mono",monospace;font-size:8px;color:var(--faint);margin-left:6px}
+.empty-state{padding:38px 10px;text-align:center;color:var(--faint)}
+.empty-state .ic{width:22px;height:22px;margin:0 auto 8px;display:block;opacity:.5}
+.empty-state b{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.empty-state span{display:block;font-size:9.5px;margin-top:3px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);opacity:0;pointer-events:none;background:#3B342A;color:#F6EFE2;font-size:11px;padding:9px 15px;border-radius:9px;box-shadow:0 12px 30px rgba(30,27,22,.24);transition:.2s;z-index:99}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+@media (max-width:1180px){
+  .week-board{grid-template-columns:repeat(7,132px);overflow-x:auto;padding-bottom:5px;scroll-snap-type:x proximity}
+  .day-col{scroll-snap-align:start}
+}
+@media (max-width:640px){
+  .ledger-top .search-box{order:3;flex-basis:100%}
+  .filter-wrap{order:2;margin-left:auto}
+  .year-grid{grid-template-columns:repeat(2,1fr)}
+  .week-board{grid-template-columns:repeat(7,124px)}
+  .month-cell{min-height:50px;padding:4px 5px}
+  .month-cell .damt{font-size:7px}
+  .range-nav b{min-width:120px;font-size:9px}
+}
+
 /* responsive */
 @media (max-width:1180px){
   .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -477,6 +596,7 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
   <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 3.5H20v7.4l-8.4 8.4a1.8 1.8 0 0 1-2.5 0l-5-5a1.8 1.8 0 0 1 0-2.5l8.5-8.3Z"/><circle cx="16.4" cy="7.2" r="1.2"/></symbol>
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 17.5a4 4 0 0 1-.3-8A5.5 5.5 0 0 1 17.4 8a4.8 4.8 0 0 1-.6 9.5H7Z"/></symbol>
   <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 2v-7.6L4 5.5Z"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8L12 3.8Z"/></symbol>
 </svg>
@@ -500,7 +620,7 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
     </nav>
     <div class="side-note">
       <b>DESIGN PREVIEW</b>
-      其他页面按当前灰金风格重绘，仅作视觉预览，未改动线上。
+      记账本新增日历 / 列表视图；其余页面按灰金风格重绘，仅作预览，未上线。
     </div>
     <div class="side-user">
       <span class="avatar">G</span>
@@ -526,7 +646,7 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
           <div>
             <div class="eyebrow">Ledger · November 2026</div>
             <h1>记账本</h1>
-            <div class="lede">本月 42 笔记录 · 最近更新 2 分钟前</div>
+            <div class="lede" id="ledgerLede">本月 42 笔记录 · 最近更新 2 分钟前</div>
           </div>
           <div class="head-actions">
             <button class="btn"><svg class="ic"><use href="#i-download"/></svg>导出</button>
@@ -537,18 +657,18 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
         <div class="kpis three">
           <div class="kpi">
             <div class="kpi-top"><span>本月支出</span><span class="kpi-ico"><svg class="ic"><use href="#i-wallet"/></svg></span></div>
-            <div class="kpi-num"><small>¥</small>4,182.60</div>
-            <div class="kpi-foot"><span class="down">↓ 8.2%</span><span>较上月</span></div>
+            <div class="kpi-num"><small>¥</small><span id="kpiExpense">4,182.60</span></div>
+            <div class="kpi-foot" id="kpiExpenseFoot"><span class="down">↓ 8.2%</span><span>较上月</span></div>
           </div>
           <div class="kpi">
             <div class="kpi-top"><span>本月收入</span><span class="kpi-ico"><svg class="ic"><use href="#i-arrow"/></svg></span></div>
-            <div class="kpi-num"><small>¥</small>18,500.00</div>
-            <div class="kpi-foot"><span>工资 + 理财</span></div>
+            <div class="kpi-num"><small>¥</small><span id="kpiIncome">18,500.00</span></div>
+            <div class="kpi-foot" id="kpiIncomeFoot"><span>工资 + 理财</span></div>
           </div>
           <div class="kpi accent">
             <div class="kpi-top"><span>本月结余</span><span class="kpi-ico"><svg class="ic"><use href="#i-check"/></svg></span></div>
-            <div class="kpi-num"><small>¥</small>14,317.40</div>
-            <div class="kpi-foot"><span>结余率 77.4%</span></div>
+            <div class="kpi-num"><small>¥</small><span id="kpiBalance">14,317.40</span></div>
+            <div class="kpi-foot" id="kpiBalanceFoot"><span>结余率 77.4%</span></div>
           </div>
         </div>
 
@@ -569,56 +689,57 @@ h1{font-family:"Fraunces","Songti SC","STSong","Noto Serif SC","Noto Serif CJK S
           </div>
         </div>
 
-        <div class="grid-2">
-          <div class="card cal">
-            <div class="cal-head">
-              <div><b>2026 年 11 月</b><div class="card-sub">点击日期查看当天记录</div></div>
-              <div class="cal-nav">
-                <button><svg class="ic"><use href="#i-chev"/></svg></button>
-                <button style="transform:rotate(-90deg)"><svg class="ic"><use href="#i-chev"/></svg></button>
-                <button style="transform:rotate(90deg)"><svg class="ic"><use href="#i-chev"/></svg></button>
-              </div>
+        <div class="card ledger-card">
+          <div class="ledger-top">
+            <div class="view-tabs" id="viewTabs">
+              <button class="on" data-mode="calendar"><svg class="ic"><use href="#i-cal"/></svg>日历</button>
+              <button data-mode="list"><svg class="ic"><use href="#i-ledger"/></svg>列表</button>
             </div>
-            <div class="cal-week"><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span></div>
-            <div class="cal-grid" id="calGrid"></div>
-            <div class="cal-foot">
-              <div class="cal-legend"><span><i></i>有记录</span><span><i style="background:#7C8C72"></i>收入</span></div>
-              <span class="badge gold">11 月合计 ¥4,182.60</span>
+            <label class="search-box">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input id="txSearch" type="search" autocomplete="off" placeholder="搜索账单（备注 / 大类 / 小类 / 金额 / 日期）">
+            </label>
+            <div class="filter-wrap">
+              <button class="icon-btn" id="filterBtn" title="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+              <div class="filter-pop" id="filterPop">
+                <button class="chip on" data-kind="all">全部</button>
+                <button class="chip" data-kind="expense">支出</button>
+                <button class="chip" data-kind="income">收入</button>
+              </div>
             </div>
           </div>
 
-          <div class="card">
-            <div class="card-head">
-              <h2><svg class="ic"><use href="#i-clock"/></svg>最近记录</h2>
-              <a class="link-more" href="#">全部 <svg class="ic"><use href="#i-arrow"/></svg></a>
+          <div class="ledger-toolbar" id="ledgerToolbar">
+            <div class="seg" id="rangeSeg">
+              <button class="on" data-range="week">周</button>
+              <button data-range="month">月</button>
+              <button data-range="year">年</button>
             </div>
-            <div class="rec-list">
-              <div class="rec">
-                <span class="rec-ico"><svg class="ic"><use href="#i-coffee"/></svg></span>
-                <div class="rec-main"><b>饮食支出</b><span>咖啡 · 拿铁</span></div>
-                <span class="rec-amt">−32.00</span>
-              </div>
-              <div class="rec">
-                <span class="rec-ico"><svg class="ic"><use href="#i-cart"/></svg></span>
-                <div class="rec-main"><b>日常支出</b><span>山姆购物 · 周末采购</span></div>
-                <span class="rec-amt">−420.00</span>
-              </div>
-              <div class="rec">
-                <span class="rec-ico sage"><svg class="ic"><use href="#i-wallet"/></svg></span>
-                <div class="rec-main"><b>综合收入</b><span>工资 · 十一月</span></div>
-                <span class="rec-amt in">+18,500.00</span>
-              </div>
-              <div class="rec">
-                <span class="rec-ico"><svg class="ic"><use href="#i-car"/></svg></span>
-                <div class="rec-main"><b>养车支出</b><span>车加油 · 加满</span></div>
-                <span class="rec-amt">−300.00</span>
-              </div>
-              <div class="rec">
-                <span class="rec-ico"><svg class="ic"><use href="#i-film"/></svg></span>
-                <div class="rec-main"><b>娱乐支出</b><span>电影 · 周末场</span></div>
-                <span class="rec-amt">−88.00</span>
-              </div>
+            <div class="range-nav">
+              <button class="nav-btn" id="prevRange"><svg class="ic" style="transform:rotate(90deg)"><use href="#i-chev"/></svg></button>
+              <b id="rangeLabel">11月09日 – 11月15日</b>
+              <button class="nav-btn" id="nextRange"><svg class="ic" style="transform:rotate(-90deg)"><use href="#i-chev"/></svg></button>
+              <button class="btn btn-sm" id="todayBtn">今天</button>
             </div>
+          </div>
+
+          <div id="calView">
+            <div class="week-board" id="weekBoard"></div>
+            <div class="month-wrap" id="monthWrap" hidden>
+              <div class="cal-week" id="monthWeek"></div>
+              <div class="month-board" id="monthBoard"></div>
+              <div class="month-foot">
+                <div class="cal-legend"><span><i></i>支出</span><span><i style="background:#7C8C72"></i>收入</span></div>
+                <span class="badge gold" id="monthTotalBadge">11 月合计 ¥0.00</span>
+              </div>
+              <div class="day-detail" id="dayDetail"></div>
+            </div>
+            <div class="year-grid" id="yearGrid" hidden></div>
+          </div>
+
+          <div class="list-wrap" id="listView" hidden>
+            <div class="list-sum" id="listSum"></div>
+            <div id="listGroups"></div>
           </div>
         </div>
       </section>
@@ -1162,24 +1283,299 @@ function show(page){
 nav.querySelectorAll('button').forEach(b => b.onclick = () => show(b.dataset.page));
 document.getElementById('menuBtn').onclick = () => sidebar.classList.toggle('open');
 
-/* calendar */
-const cal = document.getElementById('calGrid');
-const dots = {2:1,5:2,9:1,12:2,13:1,16:1,20:2,24:1,27:1};
-let html = '';
-for (let d = 26; d <= 31; d++) html += '<button class="cal-cell dim">'+d+'</button>';
-for (let d = 1; d <= 30; d++) {
-  const cls = d === 13 ? 'cal-cell today' : (d === 5 ? 'cal-cell sel' : 'cal-cell');
-  const n = dots[d] || 0;
-  html += '<button class="'+cls+'">'+d+(n ? '<span class="dots">'+'<i></i>'.repeat(n)+'</span>' : '')+'</button>';
+/* ============ 记账本：日历 / 列表 ============ */
+const TODAY = '2026-11-13';
+const TX = [
+  {date:'2026-11-01',time:'09:00',cat:'固定支出',sub:'房租',note:'11 月房租',amt:-3200,icon:'i-key'},
+  {date:'2026-11-01',time:'09:20',cat:'固定支出',sub:'水电燃气',note:'10 月账单',amt:-180,icon:'i-bolt'},
+  {date:'2026-11-02',time:'08:40',cat:'饮食支出',sub:'咖啡',note:'拿铁 · 燕麦奶',amt:-32,icon:'i-coffee'},
+  {date:'2026-11-03',time:'15:10',cat:'饮食支出',sub:'奶茶',note:'茉莉奶绿',amt:-18,icon:'i-coffee'},
+  {date:'2026-11-05',time:'11:30',cat:'日常支出',sub:'山姆购物',note:'周末采购',amt:-420,icon:'i-cart'},
+  {date:'2026-11-06',time:'09:10',cat:'综合收入',sub:'理财收益',note:'基金分红',amt:1240,icon:'i-spark'},
+  {date:'2026-11-06',time:'20:30',cat:'娱乐支出',sub:'电影',note:'周末场',amt:-88,icon:'i-film'},
+  {date:'2026-11-08',time:'17:20',cat:'日常支出',sub:'猫粮',note:'冻干 + 罐头',amt:-126,icon:'i-cat'},
+  {date:'2026-11-09',time:'08:12',cat:'饮食支出',sub:'早餐',note:'豆浆油条',amt:-11.5,icon:'i-bowl'},
+  {date:'2026-11-09',time:'12:05',cat:'饮食支出',sub:'外卖',note:'轻食套餐',amt:-32.4,icon:'i-bag'},
+  {date:'2026-11-09',time:'14:00',cat:'固定支出',sub:'电话网络费',note:'100M 宽带 + 手机',amt:-100,icon:'i-bolt'},
+  {date:'2026-11-09',time:'19:30',cat:'饮食支出',sub:'外卖',note:'番茄牛腩饭',amt:-25.6,icon:'i-bag'},
+  {date:'2026-11-09',time:'21:40',cat:'养车支出',sub:'车充电',note:'小区充电桩',amt:-11,icon:'i-car'},
+  {date:'2026-11-10',time:'09:05',cat:'综合收入',sub:'工资',note:'十一月工资',amt:18500,icon:'i-wallet'},
+  {date:'2026-11-10',time:'11:20',cat:'饮食支出',sub:'奶茶',note:'超浓茉莉',amt:-23,icon:'i-coffee'},
+  {date:'2026-11-10',time:'16:40',cat:'日常支出',sub:'山姆购物',note:'米、油、蓝莓',amt:-297.3,icon:'i-cart'},
+  {date:'2026-11-10',time:'18:10',cat:'出租屋',sub:'租房软装',note:'厨房置物架',amt:-22,icon:'i-home'},
+  {date:'2026-11-11',time:'12:30',cat:'饮食支出',sub:'外卖',note:'双拼饭',amt:-35,icon:'i-bag'},
+  {date:'2026-11-11',time:'15:00',cat:'饮食支出',sub:'零食',note:'便利店',amt:-5,icon:'i-tag'},
+  {date:'2026-11-12',time:'22:10',cat:'娱乐支出',sub:'游戏消费',note:'月卡续费',amt:-88,icon:'i-film'},
+  {date:'2026-11-13',time:'12:20',cat:'饮食支出',sub:'外出就餐',note:'小区餐馆',amt:-75,icon:'i-utensils'}
+];
+const MONTH_SAMPLE = {
+  1:{exp:3860,cnt:28},2:{exp:4980,cnt:26},3:{exp:3420,cnt:24},4:{exp:4650,cnt:30},
+  5:{exp:5120,cnt:33},6:{exp:3980,cnt:29},7:{exp:4310,cnt:27},8:{exp:3760,cnt:25},
+  9:{exp:4540,cnt:30},10:{exp:4560,cnt:32}
+};
+const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+const pad = n => String(n).padStart(2,'0');
+const iso = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+const parseISO = s => { const a=s.split('-').map(Number); return new Date(a[0],a[1]-1,a[2]); };
+const money = n => n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const signed = t => (t.amt > 0 ? '+' : '−') + '¥' + money(Math.abs(t.amt));
+const byWhen = (a,b) => a.date === b.date ? b.time.localeCompare(a.time) : b.date.localeCompare(a.date);
+
+const state = {mode:'calendar',range:'week',anchor:parseISO(TODAY),query:'',kind:'all',selected:TODAY};
+
+const el = id => document.getElementById(id);
+const weekBoard = el('weekBoard'), monthWrap = el('monthWrap'), monthBoard = el('monthBoard'),
+      monthWeek = el('monthWeek'), dayDetail = el('dayDetail'), yearGrid = el('yearGrid'),
+      listView = el('listView'), listGroups = el('listGroups'), listSum = el('listSum'),
+      calView = el('calView'), ledgerToolbar = el('ledgerToolbar'), viewTabs = el('viewTabs'),
+      rangeSeg = el('rangeSeg'), rangeLabel = el('rangeLabel');
+
+let toastTimer;
+function toast(msg){
+  let t = document.querySelector('.toast');
+  if(!t){ t = document.createElement('div'); t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 1800);
 }
-for (let d = 1; d <= 6; d++) html += '<button class="cal-cell dim">'+d+'</button>';
-cal.innerHTML = html;
-cal.querySelectorAll('.cal-cell').forEach(c => {
-  c.onclick = () => {
-    cal.querySelectorAll('.cal-cell').forEach(x => x.classList.remove('sel'));
-    c.classList.add('sel');
-  };
+
+function filtered(){
+  const q = state.query.trim().toLowerCase();
+  return TX.filter(t => {
+    if(state.kind === 'expense' && t.amt >= 0) return false;
+    if(state.kind === 'income' && t.amt <= 0) return false;
+    if(!q) return true;
+    const d = parseISO(t.date);
+    const hay = [t.cat,t.sub,t.note,t.date,WD[d.getDay()],signed(t),money(Math.abs(t.amt)),
+      pad(d.getMonth()+1)+'/'+pad(d.getDate()),(d.getMonth()+1)+'月'+d.getDate()+'日',d.getFullYear()+'年'+(d.getMonth()+1)+'月'].join(' ');
+    return hay.toLowerCase().includes(q);
+  }).sort(byWhen);
+}
+function sumAmt(list, sign){
+  return list.reduce((s,t) => s + ((sign > 0 ? t.amt > 0 : t.amt < 0) ? Math.abs(t.amt) : 0), 0);
+}
+
+function renderKPIs(){
+  const month = TX.filter(t => t.date.startsWith('2026-11'));
+  const exp = sumAmt(month,-1), inc = sumAmt(month,1), bal = inc - exp;
+  el('kpiExpense').textContent = money(exp);
+  el('kpiIncome').textContent = money(inc);
+  el('kpiBalance').textContent = money(bal);
+  el('kpiExpenseFoot').innerHTML = '<span>共 ' + month.filter(t=>t.amt<0).length + ' 笔支出</span>';
+  el('kpiIncomeFoot').innerHTML = '<span>工资 + 理财 · ' + month.filter(t=>t.amt>0).length + ' 笔</span>';
+  el('kpiBalanceFoot').innerHTML = '<span>结余率 ' + (inc ? (bal/inc*100).toFixed(1) : '0.0') + '%</span>';
+  el('ledgerLede').textContent = '本月 ' + month.length + ' 笔记录 · 最近更新 2 分钟前';
+}
+
+function renderWeek(){
+  const start = (() => { const x = new Date(state.anchor); x.setDate(x.getDate() - ((x.getDay()+6)%7)); x.setHours(0,0,0,0); return x; })();
+  const list = filtered();
+  let html = '';
+  for(let i=0;i<7;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const ds = iso(d), isToday = ds === TODAY;
+    const rows = list.filter(t => t.date === ds);
+    const dayExp = sumAmt(rows,-1), dayInc = sumAmt(rows,1);
+    const cards = rows.slice().reverse().map(t => {
+      const inc = t.amt > 0;
+      return '<button class="week-card" data-tx="'+ds+'">'
+        + '<span class="wc-cat"><svg class="ic"><use href="#'+t.icon+'"/></svg>'+t.cat+'</span>'
+        + '<b class="wc-sub">'+t.sub+'</b>'
+        + '<span class="wc-note">'+(t.note || '&nbsp;')+'</span>'
+        + '<span class="wc-amt '+(inc?'in':'')+'">'+signed(t)+'</span>'
+        + '</button>';
+    }).join('');
+    html += '<div class="day-col '+(isToday?'today':'')+'">'
+      + '<div class="day-col-head"><span class="dch"><b>'+WD[d.getDay()]+'</b><small>'+pad(d.getMonth()+1)+'/'+pad(d.getDate())+(isToday?' · 今天':'')+'</small></span>'
+      + '<button class="day-add" data-add="'+ds+'" title="记一笔"><svg class="ic"><use href="#i-plus"/></svg></button></div>'
+      + '<div class="day-cards">'+(cards || '<div class="empty-day">无记录</div>')+'</div>'
+      + '<div class="day-foot">'+(()=>{const net=dayInc-dayExp;return net?((net>0?'<span class="in">+¥':'−¥')+money(Math.abs(net))+(net>0?'</span>':'')):''})()+'</div>'
+      + '</div>';
+  }
+  weekBoard.innerHTML = html;
+}
+
+function renderMonth(){
+  const y = state.anchor.getFullYear(), m = state.anchor.getMonth();
+  const selD = parseISO(state.selected);
+  if(selD.getFullYear() !== y || selD.getMonth() !== m) state.selected = iso(new Date(y,m,1));
+  monthWeek.innerHTML = ['MON','TUE','WED','THU','FRI','SAT','SUN'].map(w=>'<span>'+w+'</span>').join('');
+  const first = new Date(y,m,1);
+  const start = new Date(first); start.setDate(first.getDate() - ((first.getDay()+6)%7));
+  const list = filtered();
+  let html = '', total = 0;
+  for(let i=0;i<42;i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const ds = iso(d), inMonth = d.getMonth() === m;
+    const rows = list.filter(t => t.date === ds);
+    const exp = sumAmt(rows,-1), inc = sumAmt(rows,1);
+    if(inMonth){ total += exp; }
+    const cls = ['month-cell'];
+    if(!inMonth) cls.push('dim');
+    if(ds === TODAY) cls.push('today');
+    if(ds === state.selected) cls.push('sel');
+    html += '<button class="'+cls.join(' ')+'" data-date="'+ds+'">'
+      + '<span class="dnum">'+d.getDate()+'</span>'
+      + (exp ? '<span class="damt">−¥'+money(exp)+'</span>' : (inc ? '<span class="damt in">+¥'+money(inc)+'</span>' : ''))
+      + (rows.length ? '<span class="ddots">'+'<i></i>'.repeat(Math.min(rows.length,3))+'</span>' : '')
+      + '</button>';
+  }
+  monthBoard.innerHTML = html;
+  el('monthTotalBadge').textContent = (m+1) + ' 月合计 ¥' + money(total);
+  renderDayDetail(list);
+}
+
+function renderDayDetail(list){
+  const sel = state.selected;
+  const d = parseISO(sel);
+  const rows = (list || filtered()).filter(t => t.date === sel);
+  const exp = sumAmt(rows,-1), inc = sumAmt(rows,1);
+  dayDetail.innerHTML = '<div class="dd-head"><b>'+(d.getMonth()+1)+'月'+d.getDate()+'日 · '+WD[d.getDay()]+'</b>'
+    + '<span>'+(exp?'支出 ¥'+money(exp):'')+(exp&&inc?' · ':'')+(inc?'收入 ¥'+money(inc):'')+(rows.length?'':'暂无记录')+'</span></div>'
+    + (rows.length ? rows.slice().reverse().map(rowHTML).join('') : '<div class="empty-state"><svg class="ic"><use href="#i-ledger"/></svg><b>这一天还没有记录</b><span>点击上方日期切换，或直接记一笔</span></div>');
+}
+
+function rowHTML(t){
+  const inc = t.amt > 0;
+  return '<div class="lrow" data-tx="'+t.date+'">'
+    + '<span class="rec-ico '+(inc?'sage':'')+'"><svg class="ic"><use href="#'+t.icon+'"/></svg></span>'
+    + '<div class="rec-main"><b>'+t.sub+'</b><span>'+t.cat+(t.note?' · '+t.note:'')+'<span class="lrow-time">'+t.time+'</span></span></div>'
+    + '<span class="rec-amt '+(inc?'in':'')+'">'+signed(t)+'</span>'
+    + '</div>';
+}
+
+function renderYear(){
+  const y = state.anchor.getFullYear();
+  const novExp = sumAmt(TX.filter(t=>t.date.startsWith('2026-11')),-1);
+  const months = [];
+  for(let m=1;m<=12;m++){
+    let row = null;
+    if(y === 2026 && m === 11) row = {exp:novExp,cnt:TX.filter(t=>t.date.startsWith('2026-11')).length};
+    else if(y === 2026 && MONTH_SAMPLE[m]) row = MONTH_SAMPLE[m];
+    months.push({m,row});
+  }
+  const max = Math.max(1, ...months.map(x => x.row ? x.row.exp : 0));
+  yearGrid.innerHTML = months.map(({m,row}) => {
+    const cur = m === state.anchor.getMonth()+1;
+    return '<button class="year-card '+(cur?'cur':'')+' '+(row?'':'empty')+'" data-month="'+m+'">'
+      + '<span class="yc-m">'+m+' 月 <small>'+(row?row.cnt+' 笔':'—')+'</small></span>'
+      + '<span class="yc-amt">'+(row?'¥'+money(row.exp):'暂无记录')+'</span>'
+      + '<span class="yc-bar"><i style="width:'+(row?Math.max(6,row.exp/max*100):0)+'%"></i></span>'
+      + '</button>';
+  }).join('');
+}
+
+function renderList(){
+  const list = filtered();
+  const exp = sumAmt(list,-1), inc = sumAmt(list,1);
+  listSum.innerHTML = '<span>共 <b>'+list.length+'</b> 笔</span><span>支出 <b>¥'+money(exp)+'</b></span><span>收入 <b>¥'+money(inc)+'</b></span>';
+  if(!list.length){
+    listGroups.innerHTML = '<div class="empty-state"><svg class="ic"><use href="#i-search"/></svg><b>没有找到匹配的账单</b><span>试试换个关键词，或清除筛选</span></div>';
+    return;
+  }
+  const groups = {};
+  list.forEach(t => { (groups[t.date] = groups[t.date] || []).push(t); });
+  listGroups.innerHTML = Object.keys(groups).sort().reverse().map(date => {
+    const rows = groups[date].sort(byWhen);
+    const d = parseISO(date);
+    const gExp = sumAmt(rows,-1);
+    const isToday = date === TODAY;
+    return '<div class="list-group">'
+      + '<div class="list-group-head"><span class="lg-date"><b>'+(d.getMonth()+1)+'月'+d.getDate()+'日</b><small>'+WD[d.getDay()]+(isToday?' · 今天':'')+'</small></span>'
+      + '<span class="lg-total">'+(gExp?'支出 ¥'+money(gExp):'收入 ¥'+money(sumAmt(rows,1)))+'</span></div>'
+      + rows.map(rowHTML).join('')
+      + '</div>';
+  }).join('');
+}
+
+function renderRangeLabel(){
+  if(state.range === 'week'){
+    const start = new Date(state.anchor); start.setDate(start.getDate() - ((start.getDay()+6)%7));
+    const end = new Date(start); end.setDate(start.getDate()+6);
+    rangeLabel.textContent = (start.getMonth()+1)+'月'+pad(start.getDate())+'日 – '+(end.getMonth()+1)+'月'+pad(end.getDate())+'日';
+  } else if(state.range === 'month'){
+    rangeLabel.textContent = state.anchor.getFullYear()+' 年 '+(state.anchor.getMonth()+1)+' 月';
+  } else {
+    rangeLabel.textContent = state.anchor.getFullYear()+' 年';
+  }
+}
+
+function render(){
+  renderKPIs();
+  const cal = state.mode === 'calendar';
+  calView.hidden = !cal;
+  listView.hidden = cal;
+  ledgerToolbar.hidden = !cal;
+  viewTabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode));
+  rangeSeg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.range === state.range));
+  if(!cal){ renderList(); return; }
+  renderRangeLabel();
+  weekBoard.hidden = state.range !== 'week';
+  monthWrap.hidden = state.range !== 'month';
+  yearGrid.hidden = state.range !== 'year';
+  if(state.range === 'week') renderWeek();
+  else if(state.range === 'month') renderMonth();
+  else renderYear();
+}
+
+/* interactions */
+viewTabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.mode = b.dataset.mode; render(); }));
+rangeSeg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.range = b.dataset.range; render(); }));
+el('prevRange').addEventListener('click', () => {
+  if(state.range === 'week') state.anchor = new Date(state.anchor.getFullYear(),state.anchor.getMonth(),state.anchor.getDate()-7);
+  else if(state.range === 'month') state.anchor = new Date(state.anchor.getFullYear(),state.anchor.getMonth()-1,1);
+  else state.anchor = new Date(state.anchor.getFullYear()-1,state.anchor.getMonth(),1);
+  render();
 });
+el('nextRange').addEventListener('click', () => {
+  if(state.range === 'week') state.anchor = new Date(state.anchor.getFullYear(),state.anchor.getMonth(),state.anchor.getDate()+7);
+  else if(state.range === 'month') state.anchor = new Date(state.anchor.getFullYear(),state.anchor.getMonth()+1,1);
+  else state.anchor = new Date(state.anchor.getFullYear()+1,state.anchor.getMonth(),1);
+  render();
+});
+el('todayBtn').addEventListener('click', () => { state.anchor = parseISO(TODAY); state.selected = TODAY; render(); });
+el('txSearch').addEventListener('input', e => { state.query = e.target.value; render(); });
+
+const filterPop = el('filterPop'), filterBtn = el('filterBtn');
+filterBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  filterPop.classList.toggle('on');
+  filterBtn.classList.toggle('on', filterPop.classList.contains('on'));
+});
+filterPop.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  state.kind = c.dataset.kind;
+  filterPop.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c));
+  filterPop.classList.remove('on'); filterBtn.classList.remove('on');
+  render();
+}));
+document.addEventListener('click', e => {
+  if(!e.target.closest('.filter-wrap')){ filterPop.classList.remove('on'); filterBtn.classList.remove('on'); }
+});
+
+weekBoard.addEventListener('click', e => {
+  const add = e.target.closest('[data-add]');
+  if(add){ const d = parseISO(add.dataset.add); toast('预览：为 '+(d.getMonth()+1)+'/'+d.getDate()+' 记一笔'); return; }
+  const card = e.target.closest('.week-card');
+  if(card) toast('预览：打开账单详情');
+});
+monthBoard.addEventListener('click', e => {
+  const cell = e.target.closest('[data-date]');
+  if(!cell) return;
+  state.selected = cell.dataset.date;
+  const d = parseISO(state.selected);
+  if(d.getMonth() !== state.anchor.getMonth() || d.getFullYear() !== state.anchor.getFullYear()) state.anchor = d;
+  render();
+});
+yearGrid.addEventListener('click', e => {
+  const card = e.target.closest('[data-month]');
+  if(!card) return;
+  state.anchor = new Date(state.anchor.getFullYear(), Number(card.dataset.month)-1, 1);
+  state.range = 'month';
+  render();
+});
+
+render();
 
 /* generic segmented */
 document.querySelectorAll('.seg').forEach(seg => {
