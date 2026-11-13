@@ -1158,8 +1158,11 @@ const App = {
     const budgets = this.state.budgets.filter(b => b.ledger_id === lid && !isBudgetMeta(b) && Number(b.amount) > 0);
     const totalLimit = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
     const hasBudget = totalLimit > 0;
-    const usedPct = hasBudget ? Math.min(100, Math.round(s.expense / totalLimit * 100)) : 0;
-    const remainRaw = hasBudget ? totalLimit - s.expense : 0;
+    // 与「预算设置 → 关注类目月度规划」同口径：只累计已设预算类目的本月支出，
+    // 不用全月总支出，否则未设预算的类目会把人误判成超支。
+    const budgetUsed = budgets.reduce((sum, b) => sum + this.monthUsed(lid, b.category, b.sub, month), 0);
+    const usedPct = hasBudget ? Math.min(100, Math.round(budgetUsed / totalLimit * 100)) : 0;
+    const remainRaw = hasBudget ? totalLimit - budgetUsed : 0;
     const remain = Math.max(0, remainRaw);
     const overBudget = hasBudget && remainRaw < 0;
     const ringPct = hasBudget ? usedPct : (s.income > 0 ? Math.min(100, Math.round(s.expense / s.income * 100)) : 0);
@@ -1276,8 +1279,8 @@ const App = {
           <div class="hp-kpi-value"><small>¥</small>${fmtMoney(s.income, { plain: true })}</div>
           <div class="hp-kpi-foot">${deltaHTML(s.income, pv.income, false)}</div>
         </div>
-        <div class="hp-kpi accent">
-          <div class="hp-kpi-top"><span>预算剩余</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></svg></span></div>
+        <div class="hp-kpi accent" title="来自「预算设置 → 关注类目月度规划」：已设预算类目的本月预算合计">
+          <div class="hp-kpi-top"><span>本月预算剩余</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></svg></span></div>
           <div class="hp-kpi-value">${hasBudget ? '<small>¥</small>' + fmtMoney(remain, { plain: true }) : '—'}</div>
           <div class="hp-kpi-foot"><span class="hp-kpi-sub">${hasBudget ? (overBudget ? '已超支 ' + fmtMoney(-remainRaw) + ' · 还剩 ' + daysLeft + ' 天' : '已用 ' + usedPct + '% · 还剩 ' + daysLeft + ' 天') : '尚未设置预算'}</span></div>
         </div>
@@ -1324,10 +1327,11 @@ const App = {
                 </svg>
               </div>
               <div class="hp-ring-legend">
-                <span><i class="gold"></i>${hasBudget ? '已用 ' + fmtMoney(s.expense) : '本月支出 ' + fmtMoney(s.expense)}</span>
+                <span><i class="gold"></i>${hasBudget ? '已用 ' + fmtMoney(budgetUsed) : '本月支出 ' + fmtMoney(s.expense)}</span>
                 <span><i></i>${hasBudget ? '剩余 ' + fmtMoney(remain) : '本月结余 ' + fmtMoney(s.balance)}</span>
               </div>
               <div class="hp-bars-list">${barsHTML}</div>
+              <p class="hp-budget-note">本月口径 · 预算设置里的关注类目合计</p>
             </div>
           </section>
 
