@@ -2573,7 +2573,7 @@ const App = {
             </div>
             <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : (r._imgLoaded === true ? '点击添加图片' : '图片加载中')}">
               ${imgs.length
-                ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+                ? '<img src="' + esc(this.thumbUrl(imgs[0], 200)) + '" data-full="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
                 : (r._imgLoaded === true
                     ? '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'
                     : '<span class="wi-loading"><i></i></span>')}
@@ -2584,6 +2584,7 @@ const App = {
         </div>
       </div>`;
     }).join('');
+    this.bindThumbImgs(grid);
 
     grid.querySelectorAll('.wish-card').forEach(card => {
       const rid = card.dataset.wid;
@@ -2630,6 +2631,48 @@ const App = {
     const one = r.image || r.image_url || r.img || '';
     return typeof one === 'string' && one.trim() ? [one.trim()] : [];
   },
+  /* 卡片只要 88px 的小图，没必要下几 MB 原图：
+     按常见图床的缩放规则把地址换成 200px 缩略图，认不出的图床原样返回。
+     点开大图仍用原链接，清晰度不受影响。 */
+  thumbUrl(src, size) {
+    const s = size || 200;
+    try {
+      if (!/^https?:\/\//i.test(src)) return src;
+      const u = new URL(src);
+      const host = u.hostname.toLowerCase();
+      // 阿里 CDN（淘宝 / 天猫 / 1688）：文件名后加 _200x200.jpg
+      if (/(^|\.)alicdn\.com$/.test(host) && /\.(jpe?g|png|webp)$/i.test(u.pathname)) {
+        u.pathname = u.pathname.replace(/_\d+x\d+\.(jpe?g|png|webp)$/i, '') + '_' + s + 'x' + s + '.jpg';
+        return u.href;
+      }
+      // 京东：/n0/jfs/xx → /s200x200_jfs/xx
+      if (/(^|\.)360buyimg\.com$/.test(host) && /\/(n\d|imgzone)\/jfs\//.test(u.pathname)) {
+        u.pathname = u.pathname.replace(/\/(n\d|imgzone)\/jfs\//, '/s' + s + 'x' + s + '_jfs/');
+        return u.href;
+      }
+      // 七牛 / 小红书 / 拼多多等支持 imageView2（斜杠不能被编码，手工拼）
+      if (/(xhscdn\.com|pddpic\.com|qbox\.me|qiniucdn\.com)$/.test(host)) {
+        const q = 'imageView2/2/w/' + s;
+        u.search = u.search ? u.search + '&' + q : '?' + q;
+        return u.href;
+      }
+      // 阿里云 OSS
+      if (/\.aliyuncs\.com$/.test(host)) {
+        const q = 'x-oss-process=image/resize,w_' + s;
+        u.search = u.search ? u.search + '&' + q : '?' + q;
+        return u.href;
+      }
+      return src;
+    } catch (e) { return src; }
+  },
+  /* 缩略图地址不被图床接受（404/403）时，自动退回原图，保证不会变空白 */
+  bindThumbImgs(root) {
+    (root || document).querySelectorAll('.wish-imgbox img[data-full]').forEach(img => {
+      if (img._fbBound) return;
+      img._fbBound = true;
+      img.onerror = () => { img.onerror = null; img.src = img.dataset.full; };
+    });
+  },
   /* 图片按需加载：records 列表查询已排除 images（base64 单张 60–120KB），
      只有真的要展示图片的地方（好物仓库、编辑弹窗、大图灯箱）才补一次，按记录标记 _imgLoaded。
      同一记录并发调用会复用同一个请求，避免「还在拉图时追加图片」把原图覆盖掉。 */
@@ -2675,8 +2718,9 @@ const App = {
       const imgs = this.recImages(rec);
       if (!imgs.length) return;
       const cur = box.querySelector('img');
-      if (cur && cur.getAttribute('src') === imgs[0]) return;
-      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
+      if (cur && cur.dataset.full === imgs[0]) return;
+      box.innerHTML = '<img src="' + esc(this.thumbUrl(imgs[0], 200)) + '" data-full="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
+      this.bindThumbImgs(box);
       box.title = '点击查看大图';
     });
   },
@@ -2714,7 +2758,8 @@ const App = {
     rec.images = next;
     const box = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="img"]');
     if (box) {
-      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
+      box.innerHTML = '<img src="' + esc(this.thumbUrl(next[0], 200)) + '" data-full="' + esc(next[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
+      this.bindThumbImgs(box);
       box.title = '点击查看大图';
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
@@ -3319,7 +3364,7 @@ const App = {
     const imgGrid = document.getElementById('ad-img-grid');
     const renderImgGrid = () => {
       imgGrid.innerHTML = adImgs.length
-        ? adImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(src) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
+        ? adImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(this.thumbUrl(src, 200)) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
         : '<span class="ph">暂无图片</span>';
       imgGrid.querySelectorAll('.ri-del').forEach(b => {
         b.onclick = () => { adImgs.splice(Number(b.dataset.i), 1); renderImgGrid(); };
@@ -4338,7 +4383,7 @@ const App = {
     let edImgs = this.recImages(r);
     const renderImgGrid = () => {
       imgGrid.innerHTML = edImgs.length
-        ? edImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(src) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
+        ? edImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(this.thumbUrl(src, 200)) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
         : '<span class="ph">暂无图片</span>';
       imgGrid.querySelectorAll('.ri-del').forEach(b => {
         b.onclick = async () => {
