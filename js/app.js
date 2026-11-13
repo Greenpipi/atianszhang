@@ -41,6 +41,7 @@ const App = {
   /* ---------- 启动 ---------- */
   async init() {
     Store.init();
+    this.registerImageCache();
     Store.setHandlers(() => this.onDataChange(), () => this.onAuthChange());
     Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
@@ -198,6 +199,16 @@ const App = {
     this.route();
     // 自动付：打开应用先补算一次（服务端 pg_cron 之外的兜底），再展示「已自动支付」通知
     this.startAutoPayWatch();
+  },
+
+  /* 外链图片本地缓存（sw.js）：只在浏览器本机缓存图片，云端依旧只存链接。
+     只影响再次打开/切换筛选时的下载速度；file:// 或不支持 SW 的环境自动跳过。 */
+  registerImageCache() {
+    try {
+      if (!('serviceWorker' in navigator)) return;
+      if (!/^https?:$/.test(location.protocol)) return;
+      navigator.serviceWorker.register('sw.js').catch(() => { /* 注册失败不影响使用 */ });
+    } catch (e) { /* 忽略 */ }
   },
 
   /* 自动付巡检：进入应用立即跑一次，之后每 30 分钟、以及页面切回前台时再跑 */
