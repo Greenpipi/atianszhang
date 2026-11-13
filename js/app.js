@@ -2547,10 +2547,12 @@ const App = {
               <div class="wish-amount">${fmtMoney(r.amount)}</div>
               ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
             </div>
-            <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
+            <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : (r._imgLoaded === true ? '点击添加图片' : '图片加载中')}">
               ${imgs.length
                 ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
-                : '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'}
+                : (r._imgLoaded === true
+                    ? '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'
+                    : '<span class="wi-loading"><i></i></span>')}
             </div>
           </div>
           <div class="wish-meta">${this.wishMetaHTML(r)}</div>
@@ -2676,8 +2678,9 @@ const App = {
     if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
     const rec = this.state.records.find(r => r.id === rid);
     if (!rec) return;
-    // 图片是懒加载的：先确保拿到已有图片再追加，否则会用空数组覆盖掉原图
+    // 图片是懒加载的：先确保拿到已有图片再追加；没取到就中止，别用空数组覆盖掉原图
     if (rec._imgLoaded !== true) await this.ensureImages([rec]);
+    if (rec._imgLoaded !== true) { this.toast('图片信息还没加载出来，请稍后重试', 'err'); return; }
     this.toast('图片处理中…');
     const added = await this.pickImages();
     if (!added.length) return;
@@ -4333,15 +4336,17 @@ const App = {
     renderImgGrid();
     // 图片懒加载：弹窗先开、图片后补（本记录只会拉一次）
     const ensureEdImgs = async () => {
-      if (r._imgLoaded === true) return;
+      if (r._imgLoaded === true) return true;
       await this.ensureImages([r]);
       edImgs = this.recImages(r);
       renderImgGrid();
+      return r._imgLoaded === true;
     };
     ensureEdImgs();
     imgUp.onclick = async () => {
       if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
-      await ensureEdImgs();   // 必须等原图到位，否则会把已有图片覆盖成空
+      // 原图没取到就别写库：否则会用空数组把已存的图片链接覆盖掉
+      if (!(await ensureEdImgs())) { this.toast('图片信息还没加载出来，请稍后重试', 'err'); return; }
       this.toast('图片处理中…');
       const added = await this.pickImages();
       if (!added.length) return;
@@ -4373,7 +4378,8 @@ const App = {
     bindThinScroll(edMask && edMask.querySelector('.modal-body'));
     bindThinScroll(document.getElementById('ed-tagpicker'));
     document.getElementById('ed-img-link').onclick = async () => {
-      await ensureEdImgs();   // 同上：先补齐全量图片再追加链接
+      // 同上：先补齐全量图片再追加链接，没取到就不写，避免覆盖已有链接
+      if (!(await ensureEdImgs())) { this.toast('图片信息还没加载出来，请稍后重试', 'err'); return; }
       this.addImageLink(rid, edImgs, next => { edImgs = next; r.images = next; renderImgGrid(); });
     };
     document.querySelectorAll('#ed-stars button').forEach(b => {
@@ -4402,11 +4408,12 @@ const App = {
         favorite: fav,
         tags: fav ? this.pickedTags('#ed-tagpicker') : [],
         rental: document.getElementById('ed-rental').checked,
-        images: edImgs,
         rating, kind: this.kindOf(ledgerId, catSel.value),
         purchase_platform: document.getElementById('ed-platform').value.trim(),
         attribute: document.getElementById('ed-attr').value.trim()
       };
+      // 图片还没取到就不要回写 images，否则一次普通编辑就会把已存的图片链接冲成空
+      if (r._imgLoaded === true) patch.images = edImgs;
       try {
         await Store.update('records', rid, patch);
         this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前

@@ -2163,6 +2163,9 @@ input,select,textarea{font-family:inherit}
 /* 图片保持标题右侧的小正方形（不再整块大图） */
 .wish-head{display:flex;gap:10px;align-items:flex-start}
 .wish-head-main{flex:1;min-width:0}
+.wish-imgbox .wi-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.wish-imgbox .wi-loading i{width:16px;height:16px;border-radius:50%;border:2px solid rgba(165,130,76,.18);border-top-color:#A5824C;animation:wiSpin .9s linear infinite}
+@keyframes wiSpin{to{transform:rotate(360deg)}}
 
 /* 自定义下拉：打开时抬升所在卡片，避免被后面的卡片盖住 */
 .card:has(.csel.open){position:relative;z-index:80}
