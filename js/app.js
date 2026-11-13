@@ -1153,21 +1153,42 @@ const App = {
     const pd = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
     const pv = this.monthSummary(lid, prevMonth);
-    const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
+    const year = String(now.getFullYear());
+    const daysLeftMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
+    const daysLeftYear = Math.max(0, Math.ceil((new Date(now.getFullYear() + 1, 0, 1) - now) / 86400000));
 
+    if (!this._hpBudgetScope) {
+      try { this._hpBudgetScope = localStorage.getItem('fin_home_budget_scope') === 'year' ? 'year' : 'month'; }
+      catch (e) { this._hpBudgetScope = 'month'; }
+    }
+    if (this._hpBudgetScope !== 'year') this._hpBudgetScope = 'month';
+    const isYear = this._hpBudgetScope === 'year';
+    const scopeWord = isYear ? '年度' : '本月';
+    const daysLeft = isYear ? daysLeftYear : daysLeftMonth;
+
+    /* 月度预算：预算设置 → 关注类目月度规划，只累计已设预算类目的本月支出 */
     const budgets = this.state.budgets.filter(b => b.ledger_id === lid && !isBudgetMeta(b) && Number(b.amount) > 0);
-    const totalLimit = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
-    const hasBudget = totalLimit > 0;
-    // 与「预算设置 → 关注类目月度规划」同口径：只累计已设预算类目的本月支出，
-    // 不用全月总支出，否则未设预算的类目会把人误判成超支。
-    const budgetUsed = budgets.reduce((sum, b) => sum + this.monthUsed(lid, b.category, b.sub, month), 0);
-    const usedPct = hasBudget ? Math.min(100, Math.round(budgetUsed / totalLimit * 100)) : 0;
-    const remainRaw = hasBudget ? totalLimit - budgetUsed : 0;
+    const monthLimit = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+    const monthUsed = budgets.reduce((sum, b) => sum + this.monthUsed(lid, b.category, b.sub, month), 0);
+
+    /* 年度预算：预算设置 → 年度总控（budgets 里 category=__annual__ 的那一行） */
+    const annualRow = this.state.budgets.find(b => b.ledger_id === lid
+      && b.category === BUDGET_ANNUAL && String(b.sub) === year);
+    const yearLimit = annualRow ? (Number(annualRow.amount) || 0) : 0;
+    const yearRecs = this.recsOf(lid).filter(r => yearOf(r.date) === year
+      && (r.kind || this.kindOf(lid, r.category)) !== 'income');
+    const yearUsed = yearRecs.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+    const budgetLimit = isYear ? yearLimit : monthLimit;
+    const budgetUsed = isYear ? yearUsed : monthUsed;
+    const hasBudget = budgetLimit > 0;
+    const usedPct = hasBudget ? Math.min(100, Math.round(budgetUsed / budgetLimit * 100)) : 0;
+    const remainRaw = hasBudget ? budgetLimit - budgetUsed : 0;
     const remain = Math.max(0, remainRaw);
     const overBudget = hasBudget && remainRaw < 0;
-    const ringPct = hasBudget ? usedPct : (s.income > 0 ? Math.min(100, Math.round(s.expense / s.income * 100)) : 0);
-    const ringCenter = hasBudget || s.income > 0 ? ringPct + '%' : '—';
-    const ringCap = hasBudget ? 'USED' : (s.income > 0 ? 'OF INCOME' : 'NO BUDGET');
+    const ringPct = hasBudget ? usedPct : (!isYear && s.income > 0 ? Math.min(100, Math.round(s.expense / s.income * 100)) : 0);
+    const ringCenter = hasBudget || (!isYear && s.income > 0) ? ringPct + '%' : '—';
+    const ringCap = hasBudget ? 'USED' : (!isYear && s.income > 0 ? 'OF INCOME' : 'NO BUDGET');
     const circ = 2 * Math.PI * 58;
     const dash = (ringPct / 100 * circ).toFixed(1);
 
@@ -1179,28 +1200,35 @@ const App = {
       return '<span class="hp-delta ' + tone + '">' + (up ? '↑' : '↓') + ' ' + Math.abs(p).toFixed(1) + '%</span><span class="hp-kpi-sub">较上月</span>';
     };
 
-    /* 预算条：有预算用预算，没有预算用本月分类占比 */
-    const budgetRows = budgets.map(b => {
-      const used = this.monthUsed(lid, b.category, b.sub, month);
-      return { name: b.sub || b.category, used, limit: Number(b.amount) || 0 };
-    }).filter(r => r.limit > 0).sort((a, b) => (b.used / b.limit) - (a.used / a.limit)).slice(0, 3);
-
-    let barRows = budgetRows;
-    if (!barRows.length) {
+    /* 预算条：本月看各类目预算进度；年度看全年支出前 3 类目 */
+    let barRows = [];
+    if (isYear) {
       const map = {};
-      this.recsOf(lid).filter(r => monthOf(r.date) === month && (r.kind || this.kindOf(lid, r.category)) !== 'income').forEach(r => {
-        map[r.category] = (map[r.category] || 0) + (Number(r.amount) || 0);
-      });
+      yearRecs.forEach(r => { map[r.category] = (map[r.category] || 0) + (Number(r.amount) || 0); });
       const top = Object.keys(map).map(k => ({ name: k, used: map[k] })).sort((a, b) => b.used - a.used).slice(0, 3);
       const max = (top[0] && top[0].used) || 1;
       barRows = top.map(r => ({ name: r.name, used: r.used, limit: 0, width: Math.max(4, Math.round(r.used / max * 100)) }));
+    } else {
+      barRows = budgets.map(b => {
+        const used = this.monthUsed(lid, b.category, b.sub, month);
+        return { name: b.sub || b.category, used, limit: Number(b.amount) || 0 };
+      }).filter(r => r.limit > 0).sort((a, b) => (b.used / b.limit) - (a.used / a.limit)).slice(0, 3);
+      if (!barRows.length) {
+        const map = {};
+        this.recsOf(lid).filter(r => monthOf(r.date) === month && (r.kind || this.kindOf(lid, r.category)) !== 'income').forEach(r => {
+          map[r.category] = (map[r.category] || 0) + (Number(r.amount) || 0);
+        });
+        const top = Object.keys(map).map(k => ({ name: k, used: map[k] })).sort((a, b) => b.used - a.used).slice(0, 3);
+        const max = (top[0] && top[0].used) || 1;
+        barRows = top.map(r => ({ name: r.name, used: r.used, limit: 0, width: Math.max(4, Math.round(r.used / max * 100)) }));
+      }
     }
     const barsHTML = barRows.length ? barRows.map(r => {
       const pct = r.limit > 0 ? Math.round(r.used / r.limit * 100) : (r.width || 0);
       const cls = r.limit > 0 ? (pct > 100 ? ' over' : pct >= 80 ? ' warn' : '') : '';
       const right = r.limit > 0 ? fmtMoney(r.used) + ' / ' + fmtMoney(r.limit) : fmtMoney(r.used);
       return '<div class="hp-bar"><div class="hp-bar-top"><span>' + esc(r.name) + '</span><b>' + right + '</b></div><div class="hp-track"><i class="' + cls.trim() + '" style="width:' + Math.min(100, pct) + '%"></i></div></div>';
-    }).join('') : '<p class="hp-empty-line">本月还没有支出记录</p>';
+    }).join('') : '<p class="hp-empty-line">' + (isYear ? '本年度还没有支出记录' : '本月还没有支出记录') + '</p>';
 
     /* 快捷分类 */
     const cats = this.catsOf(lid).filter(c => c.kind !== 'income');
@@ -1279,10 +1307,10 @@ const App = {
           <div class="hp-kpi-value"><small>¥</small>${fmtMoney(s.income, { plain: true })}</div>
           <div class="hp-kpi-foot">${deltaHTML(s.income, pv.income, false)}</div>
         </div>
-        <div class="hp-kpi accent" title="来自「预算设置 → 关注类目月度规划」：已设预算类目的本月预算合计">
-          <div class="hp-kpi-top"><span>本月预算剩余</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></svg></span></div>
+        <div class="hp-kpi accent" title="${isYear ? '来自「预算设置 → 年度总控」：本年度总预算' : '来自「预算设置 → 关注类目月度规划」：已设预算类目的本月预算合计'}">
+          <div class="hp-kpi-top"><span>${scopeWord}预算剩余</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></svg></span></div>
           <div class="hp-kpi-value">${hasBudget ? '<small>¥</small>' + fmtMoney(remain, { plain: true }) : '—'}</div>
-          <div class="hp-kpi-foot"><span class="hp-kpi-sub">${hasBudget ? (overBudget ? '已超支 ' + fmtMoney(-remainRaw) + ' · 还剩 ' + daysLeft + ' 天' : '已用 ' + usedPct + '% · 还剩 ' + daysLeft + ' 天') : '尚未设置预算'}</span></div>
+          <div class="hp-kpi-foot"><span class="hp-kpi-sub">${hasBudget ? (overBudget ? '已超支 ' + fmtMoney(-remainRaw) + ' · 还剩 ' + daysLeft + ' 天' : '已用 ' + usedPct + '% · 还剩 ' + daysLeft + ' 天') : '尚未设置' + scopeWord + '预算'}</span></div>
         </div>
       </div>
 
@@ -1316,7 +1344,13 @@ const App = {
 
         <aside class="hp-side">
           <section class="hp-card hp-budget">
-            <div class="hp-card-head"><h2>本月预算</h2><span class="hp-badge gold">${hasBudget ? usedPct + '%' : '未设置'}</span></div>
+            <div class="hp-card-head">
+              <h2>${scopeWord}预算</h2>
+              <div class="hp-seg" role="group" aria-label="预算范围">
+                <button type="button" data-hp-budget="month" class="${isYear ? '' : 'on'}">本月</button>
+                <button type="button" data-hp-budget="year" class="${isYear ? 'on' : ''}">年度</button>
+              </div>
+            </div>
             <div class="hp-card-body">
               <div class="hp-ring">
                 <svg viewBox="0 0 140 140" aria-hidden="true">
@@ -1327,11 +1361,14 @@ const App = {
                 </svg>
               </div>
               <div class="hp-ring-legend">
-                <span><i class="gold"></i>${hasBudget ? '已用 ' + fmtMoney(budgetUsed) : '本月支出 ' + fmtMoney(s.expense)}</span>
-                <span><i></i>${hasBudget ? '剩余 ' + fmtMoney(remain) : '本月结余 ' + fmtMoney(s.balance)}</span>
+                ${hasBudget
+                  ? '<span><i class="gold"></i>已用 ' + fmtMoney(budgetUsed) + '</span><span><i></i>剩余 ' + fmtMoney(remain) + '</span>'
+                  : (isYear
+                    ? '<span><i></i>年度预算未设置</span>'
+                    : '<span><i class="gold"></i>本月支出 ' + fmtMoney(s.expense) + '</span><span><i></i>本月结余 ' + fmtMoney(s.balance) + '</span>')}
               </div>
               <div class="hp-bars-list">${barsHTML}</div>
-              <p class="hp-budget-note">本月口径 · 预算设置里的关注类目合计</p>
+              <p class="hp-budget-note">${isYear ? '年度口径 · 预算设置里的年度总控' : '本月口径 · 预算设置里的关注类目合计'}</p>
             </div>
           </section>
 
@@ -1344,6 +1381,13 @@ const App = {
     </div>`;
 
     /* 交互 */
+    el.querySelectorAll('[data-hp-budget]').forEach(b => {
+      b.onclick = () => {
+        this._hpBudgetScope = b.dataset.hpBudget === 'year' ? 'year' : 'month';
+        try { localStorage.setItem('fin_home_budget_scope', this._hpBudgetScope); } catch (e) { /* ignore */ }
+        this.renderHomePage();
+      };
+    });
     el.querySelectorAll('[data-hpcat]').forEach(b => {
       b.onclick = () => {
         this._hpCat = b.dataset.hpcat;

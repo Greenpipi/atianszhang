@@ -1651,3 +1651,15 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
   margin-top:12px;padding-top:10px;border-top:1px dashed rgba(88,82,72,.14);
   font-size:9.5px;color:#9F998F;line-height:1.6;text-align:center;
 }
+/* 预算 本月 / 年度 切换 */
+.hp-seg{
+  margin-left:auto;display:inline-flex;gap:2px;padding:2px;border-radius:8px;
+  background:rgba(88,82,72,.08);border:1px solid rgba(88,82,72,.07);
+  box-shadow:inset 0 1px 2px rgba(64,60,52,.05);
+}
+.hp-seg button{
+  height:22px;padding:0 8px;border-radius:6px;font-size:9.5px;font-weight:600;
+  color:#837D74;transition:all .16s ease;white-space:nowrap;
+}
+.hp-seg button:hover{color:#37342D}
+.hp-seg button.on{background:#FFFDF9;color:#5E4726;box-shadow:0 1px 2px rgba(64,60,52,.14)}
