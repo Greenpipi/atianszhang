@@ -1356,8 +1356,8 @@ const App = {
                 <svg viewBox="0 0 140 140" aria-hidden="true">
                   <circle cx="70" cy="70" r="58" class="hp-ring-track"/>
                   <circle cx="70" cy="70" r="58" class="hp-ring-fill" stroke-dasharray="${dash} ${circ.toFixed(1)}"/>
-                  <text x="70" y="67" text-anchor="middle" class="hp-ring-num">${ringCenter}</text>
-                  <text x="70" y="85" text-anchor="middle" class="hp-ring-cap">${ringCap}</text>
+                  <text x="70" y="79" text-anchor="middle" class="hp-ring-num">${ringCenter}</text>
+                  <text x="70" y="93" text-anchor="middle" class="hp-ring-cap">${ringCap}</text>
                 </svg>
               </div>
               <div class="hp-ring-legend">
