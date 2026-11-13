@@ -1905,3 +1905,7 @@ input,select,textarea{color:var(--text)}
 
 /* 图表容器底色（画布颜色由 JS 调色板控制） */
 .chart-box,.chart-wrap{background:transparent}
+
+/* 精简界面：隐藏顶栏账本切换 / 同步状态 / 主页风格标记 */
+.ledger-switch,.sync-chip{display:none!important}
+.hp-head-mark{display:none!important}
