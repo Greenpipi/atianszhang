@@ -618,6 +618,23 @@ const App = {
         this._commitMigration();   // 全部干净通过 → 记下版本号，之后启动不再进这些分支
       }
 
+      // 云端列表不含 images，直接整体替换会让卡片瞬间「图片消失」再等一轮网络才回来。
+      // 把内存里已取到的图片按 id 带到新记录上，刷新时图片不再闪空。
+      const prevImgs = new Map();
+      (this.state.records || []).forEach(r => {
+        if (!r || !r.id) return;
+        const imgs = this.recImages(r);
+        if (imgs.length) prevImgs.set(r.id, { imgs, loaded: r._imgLoaded === true });
+      });
+      if (prevImgs.size) {
+        records.forEach(r => {
+          const hit = prevImgs.get(r.id);
+          if (!hit) return;
+          if (!this.recImages(r).length) r.images = hit.imgs;
+          if (hit.loaded) r._imgLoaded = true;
+        });
+      }
+
       this.state.ledgers = ledgers;
       this.state.categories = categories;
       this.state.records = records;
@@ -655,12 +672,19 @@ const App = {
     try {
       const key = this._cacheKey();
       if (!key || Store.mode !== 'supabase' || !Store.user) return;
-      // 图片（base64 dataURL）不进快照：单张几十 KB，几张就把 localStorage 撑爆；
-      // 图片由 ensureImages 进页面时按需拉，去掉图片后快照保持在几百 KB，秒开才稳
+      // 图片链接只有几十字节，存进快照可以让刷新后第一帧就显示缩略图，不再先空一下；
+      // base64 dataURL 单张几十 KB，仍然剔除，避免把 localStorage 撑爆。
+      const isLink = s => typeof s === 'string' && s.length > 0 && s.length < 600;
       const lightRecords = this.state.records.map(r => {
+        const imgs = Array.isArray(r.images) ? r.images : null;
+        const keepImgs = imgs && imgs.length && imgs.every(isLink);
+        const one = typeof r.image === 'string' ? r.image : '';
+        const keepOne = isLink(one);
         if (r.images == null && r.image == null && r._imgLoaded == null) return r;
         const x = { ...r };
-        delete x.images; delete x.image; delete x._imgLoaded;
+        if (!keepImgs) delete x.images;
+        if (!keepOne) delete x.image;
+        delete x._imgLoaded;
         return x;
       });
       const snap = {
