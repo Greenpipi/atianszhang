@@ -3004,8 +3004,8 @@ const App = {
           </div>
           <div class="chart-box"><canvas id="line-canvas" height="240"></canvas></div>
           <div class="chart-legend">
-            <div class="legend-item"><span class="legend-dot" style="background:#34D399"></span>收入</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#3B82F6"></span>支出</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#7C8C72"></span>收入</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#A5824C"></span>支出</div>
           </div>
         </div>
       </div>
@@ -3043,8 +3043,8 @@ const App = {
 
     Charts.donut(el.querySelector('#pie-canvas'), pieItems, { label: '合计', value: fmtMoney(pieTotal, { plain: true }) });
     Charts.line(el.querySelector('#line-canvas'), labels, [
-      { name: '收入', color: '#34D399', data: incSeries },
-      { name: '支出', color: '#3B82F6', data: expSeries }
+      { name: '收入', color: '#7C8C72', data: incSeries },
+      { name: '支出', color: '#A5824C', data: expSeries }
     ]);
     this.enhanceSelects(el);
   },
@@ -3254,7 +3254,7 @@ const App = {
   /* ---------- 视图：出租屋（主账本中标记了「出租屋」的记录） ---------- */
   /* 固定费用占位卡：还没建对应账单时也列出来，点「设置」带着名称建到待办账单 */
   fixedSlotHTML(name) {
-    const meta = RENTAL_META[name] || { emoji: '•', color: '#94A3B8' };
+    const meta = RENTAL_META[name] || { emoji: '•', color: '#9A948A' };
     return `
       <div class="bill-card slot">
         <div class="bill-ico" style="background:${meta.color}1F;color:${meta.color}">${meta.emoji}</div>
@@ -3446,7 +3446,7 @@ const App = {
     this.enhanceSelects(el);
 
     if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, scopeName + '合计');
-    Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#3B82F6', data: trendData }]);
+    Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#A5824C', data: trendData }]);
   },
 
   /* ---------- 视图：预算设置（年度总控 + 关注类目月度规划） ---------- */
@@ -3548,9 +3548,9 @@ const App = {
       <div class="card">
         <div class="card-title" style="margin-bottom:10px">颜色规则</div>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)">
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#34D399;margin-right:6px"></span>80% 以下 · 正常</span>
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F97316;margin-right:6px"></span>80%–100% · 橙色预警</span>
-          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#EF4444;margin-right:6px"></span>超过 100% · 红色超支</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7C8C72;margin-right:6px"></span>80% 以下 · 正常</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#B0763C;margin-right:6px"></span>80%–100% · 橙色预警</span>
+          <span><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#C05B4A;margin-right:6px"></span>超过 100% · 红色超支</span>
         </div>
       </div>`;
 
@@ -3797,11 +3797,11 @@ const App = {
             (plan.catPlan.length ? '，补齐 ' + plan.catPlan.length + ' 个分类的小类' : '') + '。确定导入吗？');
           if (!ok) return;
           const ov = document.createElement('div');
-          ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:200';
-          ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:250px;text-align:center;box-shadow:0 12px 40px rgba(15,23,42,.18)">' +
+          ov.style.cssText = 'position:fixed;inset:0;background:rgba(64,60,52,.45);display:flex;align-items:center;justify-content:center;z-index:200';
+          ov.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px 26px;min-width:250px;text-align:center;box-shadow:0 12px 40px rgba(64,60,52,.18)">' +
             '<div style="font-weight:800;margin-bottom:8px">正在导入 Notion 数据</div>' +
             '<div class="imp-pct" style="font-size:13px;color:var(--muted)">准备中…</div>' +
-            '<div style="font-size:11.5px;color:#F97316;margin-top:10px">导入期间请勿关闭或刷新页面</div></div>';
+            '<div style="font-size:11.5px;color:#B0763C;margin-top:10px">导入期间请勿关闭或刷新页面</div></div>';
           document.getElementById('modal-root').appendChild(ov);
           const pct = ov.querySelector('.imp-pct');
           try {

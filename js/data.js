@@ -23,14 +23,14 @@ const RENTAL_CAT = '出租屋';
 const RENTAL_SUBS = ['房租', '水费', '电费', '燃气费', '物业费', '装修硬装费', '装修材料费', '租房软装', '搬家搬物'];
 /* 出租屋子类图标与主题色 */
 const RENTAL_META = {
-  '房租': { emoji: '🏠', color: '#3B82F6' },
-  '水费': { emoji: '💧', color: '#0EA5E9' },
-  '电费': { emoji: '💡', color: '#F59E0B' },
-  '燃气费': { emoji: '🔥', color: '#F97316' },
-  '物业费': { emoji: '🧹', color: '#10B981' },
-  '装修硬装费': { emoji: '🛠️', color: '#6366F1' },
-  '装修材料费': { emoji: '🧱', color: '#84CC16' },
-  '租房软装': { emoji: '🛋️', color: '#14B8A6' },
+  '房租': { emoji: '🏠', color: '#A5824C' },
+  '水费': { emoji: '💧', color: '#8A9A8C' },
+  '电费': { emoji: '💡', color: '#C2A473' },
+  '燃气费': { emoji: '🔥', color: '#B0763C' },
+  '物业费': { emoji: '🧹', color: '#708268' },
+  '装修硬装费': { emoji: '🛠️', color: '#8B6B3F' },
+  '装修材料费': { emoji: '🧱', color: '#9AA98F' },
+  '租房软装': { emoji: '🛋️', color: '#7C8C72' },
   '搬家搬物': { emoji: '📦', color: '#64748B' }
 };
 
@@ -369,7 +369,7 @@ function tplIconHTML(t, cls) {
   return iconSVG(tplIconKey(t), cls);
 }
 
-const PALETTE = ['#3B82F6', '#34D399', '#F97316', '#0EA5E9', '#10B981', '#F59E0B', '#6366F1', '#84CC16', '#14B8A6', '#94A3B8'];
+const PALETTE = ['#A5824C','#7C8C72','#C2A473','#8A9A8C','#B0763C','#8B6B3F','#67745F','#CFC7BA','#D8C6AA','#9A948A'];
 
 /* ---------- 工具 ---------- */
 function uid() {
@@ -459,7 +459,7 @@ function daysBetween(dateStr, ref) {
 }
 function starsStr(n) {
   n = Math.round(Number(n) || 0);
-  return n > 0 ? '★'.repeat(n) + '<span style="color:#E5E7EB">' + '★'.repeat(5 - n) + '</span>' : '';
+  return n > 0 ? '★'.repeat(n) + '<span style="color:#E2DCD1">' + '★'.repeat(5 - n) + '</span>' : '';
 }
 function downloadJSON(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -508,16 +508,16 @@ function compressImage(file, maxSide = 720, quality = 0.72) {
  * 这里只放纯计算：周期枚举、到期日、状态判定、年度汇总。 */
 const BILL_CUSTOM_TYPE = '自定义';
 const BILL_TYPES = [
-  { name: '房贷', emoji: '🏠', color: '#3B82F6' },
-  { name: '房租', emoji: '🔑', color: '#0EA5E9' },
-  { name: '医保', emoji: '🏥', color: '#10B981' },
-  { name: '养老金', emoji: '👴', color: '#6366F1' },
-  { name: '保险', emoji: '🛡️', color: '#8B5CF6' },
-  { name: '水电燃气', emoji: '💡', color: '#F59E0B' },
-  { name: '话费', emoji: '📱', color: '#14B8A6' },
+  { name: '房贷', emoji: '🏠', color: '#A5824C' },
+  { name: '房租', emoji: '🔑', color: '#8A9A8C' },
+  { name: '医保', emoji: '🏥', color: '#708268' },
+  { name: '养老金', emoji: '👴', color: '#8B6B3F' },
+  { name: '保险', emoji: '🛡️', color: '#A5824C' },
+  { name: '水电燃气', emoji: '💡', color: '#C2A473' },
+  { name: '话费', emoji: '📱', color: '#7C8C72' },
   { name: '会员订阅', emoji: '⭐', color: '#EC4899' },
-  { name: '车险', emoji: '🚗', color: '#F97316' },
-  { name: '物业费', emoji: '🧹', color: '#84CC16' }
+  { name: '车险', emoji: '🚗', color: '#B0763C' },
+  { name: '物业费', emoji: '🧹', color: '#9AA98F' }
 ];
 const BILL_CYCLES = [
   { key: 'monthly', label: '每月', months: 1 },

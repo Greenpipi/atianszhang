@@ -44,7 +44,7 @@ const Charts = {
     const r = R * 0.64;
 
     if (!total) {
-      ctx.fillStyle = '#9CA3AF';
+      ctx.fillStyle = '#9F998F';
       ctx.textAlign = 'center';
       ctx.font = '13px Inter, sans-serif';
       ctx.fillText('暂无数据', cx, cy);
@@ -71,10 +71,10 @@ const Charts = {
 
     if (centerLabel) {
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#6B7280';
+      ctx.fillStyle = '#837D74';
       ctx.font = '11px Inter, sans-serif';
       ctx.fillText(centerLabel.label || '', cx, cy - 6);
-      ctx.fillStyle = '#374151';
+      ctx.fillStyle = '#37342D';
       ctx.font = '700 19px Inter, sans-serif';
       ctx.fillText(centerLabel.value || '', cx, cy + 16);
     }
@@ -118,8 +118,8 @@ const Charts = {
     const n = labels.length;
 
     // 网格与 Y 轴（含负值区间：min ~ max 四等分）
-    ctx.strokeStyle = '#F3F4F6';
-    ctx.fillStyle = '#9CA3AF';
+    ctx.strokeStyle = '#EFEAE2';
+    ctx.fillStyle = '#9F998F';
     ctx.textAlign = 'right';
     ctx.lineWidth = 1;
     const fmtV = v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : Math.round(v);
@@ -143,7 +143,7 @@ const Charts = {
 
     // 0 基准线（有负值时加粗一点，便于区分收入/支出正负）
     if (min < 0) {
-      ctx.strokeStyle = '#CBD5E1';
+      ctx.strokeStyle = '#D5CDC0';
       ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(padL, py(0)); ctx.lineTo(w - padR, py(0)); ctx.stroke();
       ctx.lineWidth = 1;
