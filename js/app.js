@@ -45,9 +45,13 @@ const App = {
     Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
 
+    // 暖启动：先按上次登录身份 + 本地快照把内容画出来，恢复会话（可能触发网络刷新 token）放到后面
+    const warmed = this.paintWarmStart();
+
     let user = null;
+    let sessionFailed = false;
     try { user = await Store.restoreSession(); }
-    catch (e) { console.warn(e); }
+    catch (e) { sessionFailed = true; console.warn(e); }
 
     window.addEventListener('hashchange', () => this.route());
     // 标签页重新可见时检测是否跨入新月份，触发季节自动切换（非实时轮询）
@@ -62,7 +66,36 @@ const App = {
     window.addEventListener('online', () => this.updateOnline());
     window.addEventListener('offline', () => this.updateOnline());
 
-    if (user) { await this.enterApp(); } else { this.showLogin(); }
+    if (user) { await this.enterApp(warmed); }
+    else {
+      // 会话确实失效才清掉暖启动标记；网络异常导致的失败保留标记，下次开页仍可秒开
+      if (!sessionFailed) Store._forgetUser();
+      Store.user = null;
+      this.showLogin();
+    }
+  },
+
+  /* ---------- 暖启动：不等任何网络，先用上次身份 + 本地快照出内容 ---------- */
+  paintWarmStart() {
+    if (Store.mode !== 'supabase') return false;
+    let email = '';
+    let raw = null;
+    try {
+      email = localStorage.getItem('fin_last_user') || '';
+      if (!email) return false;
+      raw = localStorage.getItem('fin_cache_' + email);
+    } catch (e) { return false; }
+    if (!raw) return false;
+    // 临时身份：仅用于读取该账号的快照并渲染顶栏；真实会话稍后由 restoreSession 覆盖
+    Store.user = { id: null, email };
+    document.getElementById('login-view').hidden = true;
+    document.getElementById('app-view').hidden = false;
+    this.primeRoute();
+    this.initNavToggle();
+    this.paintFromCache();
+    // 背景配置单独走网络，绝不能挡住内容
+    this.initHero().catch(e => console.warn('背景配置加载失败', e));
+    return true;
   },
 
   bindChrome() {
@@ -166,17 +199,19 @@ const App = {
   },
 
   /* ---------- 进入应用 ---------- */
-  async enterApp() {
+  async enterApp(warmed = false) {
     document.getElementById('login-view').hidden = true;
     document.getElementById('app-view').hidden = false;
     // 先按地址栏定位页面：刷新后直接停在当前页，不再先闪一下记账本
     this.primeRoute();
     this.initNavToggle();
-    // 首屏先用本地快照立即渲染，不再等待背景图请求 / 历史迁移 / 云端全量数据
-    const hadCache = this.paintFromCache();
-    if (!hadCache && this.state.route === 'home') this.renderHomePage(); // 先出骨架，避免白屏
-    // 背景配置放后台，晚到也没关系；主页本身不展示头图
-    this.initHero().catch(e => console.warn('背景配置加载失败', e));
+    if (!warmed) {
+      // 首屏先用本地快照立即渲染，不再等待背景图请求 / 历史迁移 / 云端全量数据
+      const hadCache = this.paintFromCache();
+      if (!hadCache && this.state.route === 'home') this.renderHomePage(); // 先出骨架，避免白屏
+      // 背景配置放后台，晚到也没关系；主页本身不展示头图
+      this.initHero().catch(e => console.warn('背景配置加载失败', e));
+    }
     // 云端数据（主路径）：其它初始化全部并行，不再串行卡首屏
     await this.loadData();
     // 本地数据一次性上云：放到首屏之后，完成后自动补一次刷新
@@ -609,10 +644,18 @@ const App = {
     try {
       const key = this._cacheKey();
       if (!key || Store.mode !== 'supabase' || !Store.user) return;
+      // 图片（base64 dataURL）不进快照：单张几十 KB，几张就把 localStorage 撑爆；
+      // 图片由 ensureImages 进页面时按需拉，去掉图片后快照保持在几百 KB，秒开才稳
+      const lightRecords = this.state.records.map(r => {
+        if (r.images == null && r.image == null && r._imgLoaded == null) return r;
+        const x = { ...r };
+        delete x.images; delete x.image; delete x._imgLoaded;
+        return x;
+      });
       const snap = {
         ts: Date.now(),
         ledgers: this.state.ledgers, categories: this.state.categories,
-        records: this.state.records, budgets: this.state.budgets, templates: this.state.templates,
+        records: lightRecords, budgets: this.state.budgets, templates: this.state.templates,
         bills: this.state.bills,
         currentLedgerId: this.state.currentLedgerId
       };
@@ -647,6 +690,55 @@ const App = {
       this.renderView();
       return true;
     } catch (e) { return false; }
+  },
+
+  /* ---------- 乐观写入：本地立即生效，云端后台同步 ---------- */
+  /* 写完后只重绘当前页；原先保存/删除要等 6 张表全量拉完才变化，所以感觉要好几秒 */
+  refreshCurrentView() {
+    const r = this.state.route;
+    if (r === 'home') this.renderHomePage();
+    else if (r === 'ledger') this.refreshLedgerPane();
+    else if (r === 'wishlist') this.renderWishlist();
+    else if (r === 'rental') this.renderRental();
+    else if (r === 'stats') this.renderStats();
+    else if (r === 'budget') this.renderBudget();
+    else if (r === 'bills' && this.renderBills) this.renderBills();
+  },
+  /* 新增：先插入内存并立即渲染，服务端返回后用真实行替换临时行；失败则回滚 */
+  optimisticAdd(payload) {
+    const rec = { ...payload, id: uid(), created_at: new Date().toISOString(), _pending: true };
+    this.state.records.push(rec);
+    this._cacheSnapshot();
+    this.refreshCurrentView();
+    Store.insert('records', payload).then(row => {
+      const i = this.state.records.indexOf(rec);
+      if (row && row.id) {
+        if (i >= 0) { row._imgLoaded = true; this.state.records[i] = row; }
+        else if (!this.state.records.some(x => x.id === row.id)) this.state.records.push(row);
+      }
+      this._cacheSnapshot();
+      this.refreshCurrentView();
+    }).catch(e => {
+      this.state.records = this.state.records.filter(x => x !== rec);
+      this._cacheSnapshot();
+      this.refreshCurrentView();
+      this.toast('保存失败：' + ((e && e.message) || e), 'err');
+    });
+    return rec;
+  },
+  /* 删除：先从内存移除并立即渲染，云端删除失败再放回原位 */
+  optimisticRemove(rid) {
+    const idx = this.state.records.findIndex(r => r.id === rid);
+    if (idx < 0) return;
+    const removed = this.state.records.splice(idx, 1)[0];
+    this._cacheSnapshot();
+    this.refreshCurrentView();
+    Store.remove('records', rid).catch(e => {
+      this.state.records.splice(Math.min(idx, this.state.records.length), 0, removed);
+      this._cacheSnapshot();
+      this.refreshCurrentView();
+      this.toast('删除失败：' + ((e && e.message) || e), 'err');
+    });
   },
 
   onDataChange() {
@@ -955,29 +1047,26 @@ const App = {
     };
     $('en-reset').onclick = reset;
 
-    $('en-save').onclick = async () => {
+    $('en-save').onclick = () => {
       const amount = parseFloat($('en-amt').value);
       if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
       const date = $('en-date').dataset.date || todayStr();
       const fav = $('en-fav').checked;
-      try {
-        await Store.insert('records', {
-          ledger_id: ledgerId,
-          category: cat.value,
-          sub: sub.value,
-          amount,
-          note: $('en-note').value.trim(),
-          favorite: fav,
-          tags: fav ? this.pickedTags('#en-tagpicker') : [],
-          rating: this.state.rating,
-          date,
-          image: null,
-          kind: this.kindOf(ledgerId, cat.value)
-        });
-        this.toast('已记账 ' + fmtMoney(amount), 'ok');
-        reset();
-        await this.loadData();
-      } catch (e) { this.toast(e.message, 'err'); }
+      this.optimisticAdd({
+        ledger_id: ledgerId,
+        category: cat.value,
+        sub: sub.value,
+        amount,
+        note: $('en-note').value.trim(),
+        favorite: fav,
+        tags: fav ? this.pickedTags('#en-tagpicker') : [],
+        rating: this.state.rating,
+        date,
+        image: null,
+        kind: this.kindOf(ledgerId, cat.value)
+      });
+      this.toast('已记账 ' + fmtMoney(amount), 'ok');
+      reset();
     };
   },
 
@@ -1040,8 +1129,8 @@ const App = {
       item.querySelector('[data-act="del"]').onclick = async () => {
         const ok = await this.confirmDialog('删除记录', '删除后无法恢复，确定删除这条记录吗？');
         if (!ok) return;
-        try { await Store.remove('records', rid); this.toast('已删除'); await this.loadData(); }
-        catch (e) { this.toast(e.message, 'err'); }
+        this.optimisticRemove(rid);
+        this.toast('已删除');
       };
     });
   },
@@ -1425,8 +1514,9 @@ const App = {
     const amountEl = el.querySelector('#hp-amount');
     const noteEl = el.querySelector('#hp-note');
     const saveBtn = el.querySelector('#hp-save');
-    const save = async () => {
-      if (this._hpSaving) return;
+    const save = () => {
+      // 500ms 内重复点击/回车防抖：乐观写入是同步的，避免连点记成两笔
+      if (Date.now() - (this._hpLastSave || 0) < 500) return;
       const amount = parseFloat(amountEl.value);
       if (!amount || !isFinite(amount) || amount <= 0) return this.toast('请输入正确金额', 'err');
       const catName = this._hpCat;
@@ -1439,53 +1529,25 @@ const App = {
       if (listEl) listEl.querySelectorAll('.hp-rec').forEach(row => {
         if (row.dataset.recId) oldRects.set(row.dataset.recId, row.getBoundingClientRect());
       });
-      this._hpSaving = true;
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.classList.add('is-loading');
-        saveBtn.innerHTML = '<span class="hp-spin" role="status" aria-label="记账中"></span>';
-      }
-      try {
-        const rec = await Store.insert('records', {
-          ledger_id: lid,
-          category: catName,
-          sub: subName || ((cat && cat.subs && cat.subs[0]) || ''),
-          amount,
-          note: noteEl.value.trim(),
-          favorite: false,
-          tags: [],
-          rating: 0,
-          date: today,
-          image: null,
-          kind: this.kindOf(lid, catName)
-        });
-        this.toast('已记一笔 ' + fmtMoney(amount), 'ok');
-        this._hpCat = catName;
-        this._hpSub = subName;
-        /* 乐观更新：插入接口返回后立即用这条记录更新本地数据并渲染，
-           不再等全量 loadData（要重新拉 6 张表，弱网下会卡好几秒）。
-           云端实时订阅/下次进入时仍会以服务端数据为准。 */
-        const saved = rec || {};
-        if (saved.id) {
-          if (!saved.created_at) saved.created_at = new Date().toISOString();
-          if (!this.state.records.some(r => r.id === saved.id)) this.state.records.push(saved);
-          this._cacheSnapshot();
-          this.renderHomePage();
-          this.animateRecentInsert(document.getElementById('view-home'), oldRects, saved.id);
-        } else {
-          await this.loadData();
-          this.animateRecentInsert(document.getElementById('view-home'), oldRects, rec && rec.id);
-        }
-      } catch (e) {
-        this.toast(e.message, 'err');
-      } finally {
-        this._hpSaving = false;
-        if (saveBtn && saveBtn.isConnected) {
-          saveBtn.disabled = false;
-          saveBtn.classList.remove('is-loading');
-          saveBtn.textContent = '+ 记一笔';
-        }
-      }
+      /* 乐观更新：本地先插入并立即渲染，云端写入在后台完成；失败会自动撤回 */
+      const rec = this.optimisticAdd({
+        ledger_id: lid,
+        category: catName,
+        sub: subName || ((cat && cat.subs && cat.subs[0]) || ''),
+        amount,
+        note: noteEl.value.trim(),
+        favorite: false,
+        tags: [],
+        rating: 0,
+        date: today,
+        image: null,
+        kind: this.kindOf(lid, catName)
+      });
+      this._hpLastSave = Date.now();
+      this.toast('已记一笔 ' + fmtMoney(amount), 'ok');
+      this._hpCat = catName;
+      this._hpSub = subName;
+      this.animateRecentInsert(document.getElementById('view-home'), oldRects, rec && rec.id);
     };
     if (saveBtn) saveBtn.onclick = save;
     el.querySelector('#hp-more').onclick = () => this.addRecordModal(lid, todayStr(), this._hpCat || null, null);
@@ -3145,53 +3207,47 @@ const App = {
     };
     bindThinScroll(adMask && adMask.querySelector('.modal-body'));
     bindThinScroll(document.getElementById('ad-tagpicker'));
-    document.getElementById('ad-save').onclick = async () => {
+    document.getElementById('ad-save').onclick = () => {
       const amount = parseFloat(document.getElementById('ad-amt').value);
       if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
       const fav = document.getElementById('ad-fav').checked;
-      try {
-        const row = await Store.insert('records', {
-          ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
-          note: document.getElementById('ad-note').value.trim(),
-          remark: document.getElementById('ad-remark').value.trim(),
-          favorite: fav,
-          tags: fav ? this.pickedTags('#ad-tagpicker') : [],
-          rental: document.getElementById('ad-rental').checked,
-          images: adImgs,
-          purchase_platform: document.getElementById('ad-platform').value.trim(),
-          attribute: document.getElementById('ad-attr').value.trim(),
-          rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
-        });
-        // 即存即显：把新记录乐观加入内存并局部刷新日历/列表，避免全量重载的秒级延迟
-        if (row && row.id) { row._imgLoaded = true; this.state.records.push(row); }
-        this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
-        this.refreshQuickBar(ledgerId);
-        this.refreshLedgerPane();
-        if (continuous) {
-          // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
-          document.getElementById('ad-amt').value = '';
-          document.getElementById('ad-note').value = '';
-          document.getElementById('ad-remark').value = '';
-          fitRemark();
-          document.getElementById('ad-platform').value = '';
-          document.getElementById('ad-attr').value = '';
-          adImgs = [];
-          renderImgGrid();
-          document.getElementById('ad-fav').checked = false;
-          document.getElementById('ad-tags-field').style.display = 'none';
-          document.querySelectorAll('#ad-tagpicker input').forEach(i => { i.checked = false; });
-          document.getElementById('ad-rental').checked = false;
-          rating = 0;
-          document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
-          document.getElementById('ad-amt').focus();
-          this.toast('已保存，可继续记下一笔', 'ok');
-          this._cacheSnapshot(); // 只落本地快照，不再整表重拉
-          return;
-        }
-        this.closeModal();
-        this.toast('已记账 ' + fmtMoney(amount), 'ok');
-        this._cacheSnapshot(); // 只落本地快照，不再整表重拉
-      } catch (e) { this.toast(e.message, 'err'); }
+      // 即存即显：乐观加入内存并立刻刷新日历/列表，云端写入在后台完成
+      this.optimisticAdd({
+        ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
+        note: document.getElementById('ad-note').value.trim(),
+        remark: document.getElementById('ad-remark').value.trim(),
+        favorite: fav,
+        tags: fav ? this.pickedTags('#ad-tagpicker') : [],
+        rental: document.getElementById('ad-rental').checked,
+        images: adImgs,
+        purchase_platform: document.getElementById('ad-platform').value.trim(),
+        attribute: document.getElementById('ad-attr').value.trim(),
+        rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
+      });
+      this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
+      this.refreshQuickBar(ledgerId);
+      if (continuous) {
+        // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
+        document.getElementById('ad-amt').value = '';
+        document.getElementById('ad-note').value = '';
+        document.getElementById('ad-remark').value = '';
+        fitRemark();
+        document.getElementById('ad-platform').value = '';
+        document.getElementById('ad-attr').value = '';
+        adImgs = [];
+        renderImgGrid();
+        document.getElementById('ad-fav').checked = false;
+        document.getElementById('ad-tags-field').style.display = 'none';
+        document.querySelectorAll('#ad-tagpicker input').forEach(i => { i.checked = false; });
+        document.getElementById('ad-rental').checked = false;
+        rating = 0;
+        document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
+        document.getElementById('ad-amt').focus();
+        this.toast('已保存，可继续记下一笔', 'ok');
+        return;
+      }
+      this.closeModal();
+      this.toast('已记账 ' + fmtMoney(amount), 'ok');
     };
   },
 
@@ -4202,12 +4258,9 @@ const App = {
     document.getElementById('ed-del').onclick = async () => {
       const ok = await this.confirmDialog('删除记录', '确定删除这笔账单吗？删除后不可恢复。');
       if (!ok) return; // 取消：底层编辑窗原样保持（栈式弹窗，无需重开）
-      try {
-        await Store.remove('records', rid);
-        this.closeModal(); // 关掉底层编辑窗（确认框已被 confirmDialog 关闭）
-        this.toast('已删除', 'ok');
-        await this.loadData();
-      } catch (e) { this.toast(e.message, 'err'); }
+      this.closeModal(); // 关掉底层编辑窗（确认框已被 confirmDialog 关闭）
+      this.optimisticRemove(rid);
+      this.toast('已删除', 'ok');
     };
     document.getElementById('ed-save').onclick = async () => {
       const amount = parseFloat(document.getElementById('ed-amt').value);
@@ -4475,9 +4528,8 @@ const App = {
       this.closeRecMenu();
       const ok = await this.confirmDialog('删除账单', '确定删除「' + (r.sub || r.category) + '」' + fmtMoney(r.amount) + ' 这笔吗？删除后无法恢复。');
       if (!ok) return;
-      await Store.remove('records', rid);
+      this.optimisticRemove(rid);
       this.toast('已删除');
-      await this.loadData();
     };
     this._recMenuOut = (e) => { if (!menu.contains(e.target)) this.closeRecMenu(); };
     this._recMenuKey = (e) => { if (e.key === 'Escape') this.closeRecMenu(); };

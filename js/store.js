@@ -61,21 +61,30 @@ const Store = {
   _noteWrite() { this._lastWriteAt = Date.now(); },
 
   /* ---------- 认证 ---------- */
+  /* 上次成功登录的邮箱：用于下一次打开页面时「暖启动」——不等网络、先用本地快照出内容 */
+  _noteUser(email) {
+    try { if (email) localStorage.setItem('fin_last_user', email); } catch (e) { /* ignore */ }
+  },
+  _forgetUser() {
+    try { localStorage.removeItem('fin_last_user'); } catch (e) { /* ignore */ }
+  },
   async restoreSession() {
     if (this.mode === 'supabase') {
       const { data, error } = await this.sb.auth.getSession();
       if (error) throw error;
       if (data.session && data.session.user) {
         this.user = { id: data.session.user.id, email: data.session.user.email };
+        this._noteUser(this.user.email);
         this._watchAuth();
         this._subscribeRealtime();
         return this.user;
       }
+      this.user = null;   // 会话已失效：清掉可能残留的暖启动临时身份
       this._watchAuth();
       return null;
     }
     const email = localStorage.getItem('fin_local_user');
-    if (email) { this.user = { id: 'local-' + email, email }; return this.user; }
+    if (email) { this.user = { id: 'local-' + email, email }; this._noteUser(email); return this.user; }
     return null;
   },
 
@@ -95,10 +104,12 @@ const Store = {
       const { data, error } = await this.sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(this._authErr(error));
       this.user = { id: data.user.id, email: data.user.email };
+      this._noteUser(this.user.email);
       return this.user;
     }
     localStorage.setItem('fin_local_user', email);
     this.user = { id: 'local-' + email, email };
+    this._noteUser(email);
     return this.user;
   },
 
@@ -108,12 +119,14 @@ const Store = {
       if (error) throw new Error(this._authErr(error));
       if (data.session) {
         this.user = { id: data.user.id, email: data.user.email };
+        this._noteUser(this.user.email);
         return { needConfirm: false };
       }
       return { needConfirm: true };
     }
     localStorage.setItem('fin_local_user', email);
     this.user = { id: 'local-' + email, email };
+    this._noteUser(email);
     return { needConfirm: false };
   },
 
@@ -129,6 +142,7 @@ const Store = {
   async signOut() {
     if (this.mode === 'supabase') { await this.sb.auth.signOut(); }
     localStorage.removeItem('fin_local_user');
+    this._forgetUser();
     this.user = null;
     this._emitAuth();
   },
