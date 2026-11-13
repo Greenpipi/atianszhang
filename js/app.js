@@ -6,7 +6,7 @@ const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用
  * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
  * 该窗口内被自动切换过的好物，status_since 精确等于 2026-10-26 或 2026-10-27 → 即被污染值。 */
 const WISH_STATUS_BUG_DATES = ['2026-10-26', '2026-10-27'];
-const ROUTE_NAMES = { ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
+const ROUTE_NAMES = { home: '主页', ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
 /* 预算表复用标记行（不新增表/列，云端无需 DDL）：
  *   __annual__ + sub=年份  → 年度总预算（amount）
  *   __follow__ + sub=''    → 关注的类目清单（note 存 JSON 数组，元素 "大类::小类"） */
@@ -20,7 +20,7 @@ const isBudgetMeta = b => b && (b.category === BUDGET_ANNUAL || b.category === B
 const DATA_MIGRATION_VERSION = 3;
 const App = {
   state: {
-    route: 'ledger',
+    route: 'home',
     ledgers: [], categories: [], records: [], budgets: [], templates: [],
     bills: [],              // 周期性待办账单（独立于 records）
     billsTab: 'due',        // due 本月待付 / all 全部 / overview 今年总览
@@ -651,9 +651,9 @@ const App = {
   /* ---------- 路由 ---------- */
   /* 地址栏 → 页面 key（无 hash 时归一到记账本并写回地址） */
   routeKey() {
-    if (!location.hash || location.hash === '#/') location.hash = '#/ledger';
-    const r = (location.hash || '#/ledger').replace('#/', '') || 'ledger';
-    return ROUTE_NAMES[r] ? r : 'ledger';
+    if (!location.hash || location.hash === '#/') location.hash = '#/home';
+    const r = (location.hash || '#/home').replace('#/', '') || 'home';
+    return ROUTE_NAMES[r] ? r : 'home';
   },
 
   /* 进入应用的最早一刻就把外壳切到当前页（只切视图与标题，不渲染内容），数据到位后再走 route() 完整渲染 */
@@ -661,6 +661,7 @@ const App = {
     this.state.route = this.routeKey();
     const on = this.state.route;
     document.getElementById('page-title').textContent = ROUTE_NAMES[on];
+    document.getElementById('app-view').dataset.route = on;
     document.querySelectorAll('.nav-item').forEach(a => {
       a.classList.toggle('active', a.dataset.route === on);
     });
@@ -670,6 +671,7 @@ const App = {
   route() {
     this.state.route = this.routeKey();
     document.getElementById('page-title').textContent = ROUTE_NAMES[this.state.route];
+    document.getElementById('app-view').dataset.route = this.state.route;
     document.querySelectorAll('.nav-item').forEach(a => {
       a.classList.toggle('active', a.dataset.route === this.state.route);
     });
@@ -710,6 +712,7 @@ const App = {
 
   renderView() {
     const map = {
+      home: () => this.renderHomePage(),
       ledger: () => this.renderLedger(),
       bills: () => this.renderBills(),
       wishlist: () => this.renderWishlist(),
@@ -1067,6 +1070,266 @@ const App = {
   /* ---------- 视图：记账本 ---------- */
   renderLedger() {
     return this.renderLedgerHome();
+  },
+
+  /* ---------- 视图：主页（灰金版） ---------- */
+  hpIcon(name) {
+    const n = String(name || '');
+    const box = inner => '<svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+    if (/餐|食|饮|咖啡|奶茶|吃/.test(n)) return box('<path d="M7 3.5v6.4a2.3 2.3 0 0 1-2.3 2.3h-.2A2.3 2.3 0 0 1 2.2 9.9V3.5"/><path d="M4.6 3.5v17"/><path d="M17.5 3.5c-1.9 1.5-3 4-3 6.9 0 1.9 1.2 3.1 3 3.1s3-1.2 3-3.1c0-2.9-1.1-5.4-3-6.9Z"/><path d="M17.5 13.5v7"/>');
+    if (/交通|车|通勤|地铁|公交/.test(n)) return box('<rect x="4.5" y="3.5" width="15" height="13.5" rx="3"/><path d="M4.5 11h15"/><circle cx="8" cy="19" r="1.6"/><circle cx="16" cy="19" r="1.6"/><path d="M7.5 6.5h9"/>');
+    if (/购物|日用|买|逛/.test(n)) return box('<path d="M5.2 7.5h13.6l1.2 12.2a1.3 1.3 0 0 1-1.3 1.4H5.3A1.3 1.3 0 0 1 4 19.7L5.2 7.5Z"/><path d="M8.7 9.5V6.2a3.3 3.3 0 0 1 6.6 0v3.3"/>');
+    if (/房|住|家|物业|租/.test(n)) return box('<path d="M3.5 10.6 12 3.5l8.5 7.1"/><path d="M5.5 9.8V20a.8.8 0 0 0 .8.8h11.4a.8.8 0 0 0 .8-.8V9.8"/><path d="M9.7 20.8v-5.5h4.6v5.5"/>');
+    if (/娱乐|兴趣|玩|电影|旅/.test(n)) return box('<path d="M20.4 8.7a5.2 5.2 0 0 0-8.8-2.3l-.4.5-.4-.5a5.2 5.2 0 0 0-8.8 5.9l8 8.5a1.7 1.7 0 0 0 2.5 0l8-8.6a5.2 5.2 0 0 0-.1-3.5Z"/>');
+    return box('<path d="M12.6 3.5H20v7.4l-8.4 8.4a1.8 1.8 0 0 1-2.5 0l-5-5a1.8 1.8 0 0 1 0-2.5l8.5-8.3Z"/><circle cx="16.4" cy="7.2" r="1.2"/>');
+  },
+  renderHomePage() {
+    const el = document.getElementById('view-home');
+    if (!el) return;
+    const lid = this.state.currentLedgerId;
+    if (!lid) { el.innerHTML = ''; return; }
+
+    const now = new Date();
+    const today = todayStr();
+    const month = thisMonth();
+    const week = '日一二三四五六'[now.getDay()];
+    const dateText = now.getFullYear() + ' 年 ' + (now.getMonth() + 1) + ' 月 ' + now.getDate() + ' 日 · 周' + week;
+    const hour = now.getHours();
+    const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+    const email = (Store.user && Store.user.email) || '';
+    const who = email ? email.split('@')[0].slice(0, 12) : '朋友';
+
+    const s = this.monthSummary(lid, month);
+    const pd = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+    const pv = this.monthSummary(lid, prevMonth);
+    const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
+
+    const budgets = this.state.budgets.filter(b => b.ledger_id === lid && !isBudgetMeta(b) && Number(b.amount) > 0);
+    const totalLimit = budgets.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+    const hasBudget = totalLimit > 0;
+    const usedPct = hasBudget ? Math.min(100, Math.round(s.expense / totalLimit * 100)) : 0;
+    const remainRaw = hasBudget ? totalLimit - s.expense : 0;
+    const remain = Math.max(0, remainRaw);
+    const overBudget = hasBudget && remainRaw < 0;
+    const ringPct = hasBudget ? usedPct : (s.income > 0 ? Math.min(100, Math.round(s.expense / s.income * 100)) : 0);
+    const ringCenter = hasBudget || s.income > 0 ? ringPct + '%' : '—';
+    const ringCap = hasBudget ? 'USED' : (s.income > 0 ? 'OF INCOME' : 'NO BUDGET');
+    const circ = 2 * Math.PI * 58;
+    const dash = (ringPct / 100 * circ).toFixed(1);
+
+    const deltaHTML = (cur, prev, downIsGood) => {
+      if (!prev) return '<span class="hp-kpi-sub">较上月 —</span>';
+      const p = (cur - prev) / prev * 100;
+      const up = p >= 0;
+      const tone = downIsGood ? (up ? 'ochre' : 'sage') : (up ? 'sage' : 'ochre');
+      return '<span class="hp-delta ' + tone + '">' + (up ? '↑' : '↓') + ' ' + Math.abs(p).toFixed(1) + '%</span><span class="hp-kpi-sub">较上月</span>';
+    };
+
+    /* 预算条：有预算用预算，没有预算用本月分类占比 */
+    const budgetRows = budgets.map(b => {
+      const used = this.monthUsed(lid, b.category, b.sub, month);
+      return { name: b.sub || b.category, used, limit: Number(b.amount) || 0 };
+    }).filter(r => r.limit > 0).sort((a, b) => (b.used / b.limit) - (a.used / a.limit)).slice(0, 3);
+
+    let barRows = budgetRows;
+    if (!barRows.length) {
+      const map = {};
+      this.recsOf(lid).filter(r => monthOf(r.date) === month && (r.kind || this.kindOf(lid, r.category)) !== 'income').forEach(r => {
+        map[r.category] = (map[r.category] || 0) + (Number(r.amount) || 0);
+      });
+      const top = Object.keys(map).map(k => ({ name: k, used: map[k] })).sort((a, b) => b.used - a.used).slice(0, 3);
+      const max = (top[0] && top[0].used) || 1;
+      barRows = top.map(r => ({ name: r.name, used: r.used, limit: 0, width: Math.max(4, Math.round(r.used / max * 100)) }));
+    }
+    const barsHTML = barRows.length ? barRows.map(r => {
+      const pct = r.limit > 0 ? Math.round(r.used / r.limit * 100) : (r.width || 0);
+      const cls = r.limit > 0 ? (pct > 100 ? ' over' : pct >= 80 ? ' warn' : '') : '';
+      const right = r.limit > 0 ? fmtMoney(r.used) + ' / ' + fmtMoney(r.limit) : fmtMoney(r.used);
+      return '<div class="hp-bar"><div class="hp-bar-top"><span>' + esc(r.name) + '</span><b>' + right + '</b></div><div class="hp-track"><i class="' + cls.trim() + '" style="width:' + Math.min(100, pct) + '%"></i></div></div>';
+    }).join('') : '<p class="hp-empty-line">本月还没有支出记录</p>';
+
+    /* 快捷分类 */
+    const cats = this.catsOf(lid).filter(c => c.kind !== 'income');
+    const quickCats = cats.slice(0, 5);
+    const selCat = (this._hpCat && cats.some(c => c.name === this._hpCat)) ? this._hpCat : ((quickCats[0] && quickCats[0].name) || '');
+    this._hpCat = selCat;
+    const chipsHTML = quickCats.map(c =>
+      '<button type="button" class="hp-cat' + (c.name === selCat ? ' on' : '') + '" data-hpcat="' + esc(c.name) + '">' + this.hpIcon(c.name) + '<span>' + esc(c.name) + '</span></button>'
+    ).join('');
+
+    /* 最近记录 */
+    const recs = this.recsOf(lid).slice().sort((a, b) => a.date === b.date ? String(b.created_at || '').localeCompare(String(a.created_at || '')) : (a.date < b.date ? 1 : -1)).slice(0, 5);
+    const recsHTML = recs.length ? recs.map(r => {
+      const inc = (r.kind || this.kindOf(lid, r.category)) === 'income';
+      const meta = [r.sub, r.note].filter(Boolean).join(' · ') || (inc ? '收入' : '支出');
+      return '<div class="hp-rec" data-hp-go="#/ledger">' +
+        '<span class="hp-rec-ico ' + (inc ? 'sage' : '') + '">' + (inc ? '<svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></svg>' : this.hpIcon(r.category)) + '</span>' +
+        '<div class="hp-rec-main"><b>' + esc(r.category) + '</b><span>' + esc(meta) + '</span></div>' +
+        '<div class="hp-rec-amt' + (inc ? ' in' : '') + '">' + (inc ? '+' : '−') + fmtMoney(r.amount, { plain: true }) + '</div>' +
+        '</div>';
+    }).join('') : '<p class="hp-empty-line">还没有记录，记下第一笔吧</p>';
+
+    /* 待办账单 */
+    const bills = (this.state.bills || []).map(b => {
+      if (!billDueThisMonth(b, today)) return null;
+      const due = billOccurrenceInMonth(b, month);
+      return due ? { b, due } : null;
+    }).filter(Boolean).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 3);
+    const billsHTML = bills.length ? bills.map(({ b, due }) => {
+      const diff = Math.round((new Date(due + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+      const tone = diff < 0 ? 'over' : diff <= 3 ? 'soon' : '';
+      const when = diff < 0 ? '已逾期 ' + (-diff) + ' 天' : diff === 0 ? '今天到期' : diff + ' 天后';
+      const nm = b.name || b.sub || b.cat || '待办账单';
+      return '<div class="hp-bill" data-hp-go="#/bills">' +
+        '<span class="hp-bill-check"></span>' +
+        '<div class="hp-bill-main"><b>' + esc(nm) + '</b><span>' + esc(due.slice(5).replace('-', ' / ')) + ' · ' + (b.payment_method === 'auto' ? '自动付' : '手动付') + '</span></div>' +
+        '<div class="hp-bill-right"><b>' + fmtMoney(b.preset_amount || 0, { plain: true }) + '</b><em class="' + tone + '">' + when + '</em></div>' +
+        '</div>';
+    }).join('') : '<p class="hp-empty-line">本月没有待付账单</p>';
+
+    /* 近 7 日支出 */
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const key = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+      const sum = this.recsOf(lid).filter(r => r.date === key && (r.kind || this.kindOf(lid, r.category)) !== 'income').reduce((n, r) => n + (Number(r.amount) || 0), 0);
+      days.push({ label: '日一二三四五六'[dt.getDay()], value: sum, today: i === 0 });
+    }
+    const weekMax = Math.max(...days.map(d => d.value), 1);
+    const weekTotal = days.reduce((n, d) => n + d.value, 0);
+    const weekHTML = days.map(d =>
+      '<div class="hp-bar-col' + (d.today ? ' today' : '') + '"><i style="height:' + Math.max(4, Math.round(Math.sqrt(d.value / weekMax) * 100)) + '%"></i><span>' + d.label + '</span></div>'
+    ).join('');
+
+    el.innerHTML = `
+    <div class="hp">
+      <header class="hp-head">
+        <div class="hp-head-main">
+          <p class="hp-eyebrow">${esc(dateText)}</p>
+          <h1>${greet}，<em>${esc(who)}</em></h1>
+          <p class="hp-sub">今天也有认真记录生活。</p>
+        </div>
+        <div class="hp-head-mark" aria-hidden="true">
+          <i class="hp-mark-dot"></i><span>GRAY GOLD · 灰金</span>
+        </div>
+      </header>
+
+      <div class="hp-kpis">
+        <div class="hp-kpi">
+          <div class="hp-kpi-top"><span>本月支出</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4.5L8 6l2-1.5L12 6l2-1.5L16 6l3-1.5V21l-3-1.5-2 1.5-2-1.5L8 21l-3-1.5L5 21Z"/><path d="M8.5 9h7M8.5 13h7M8.5 17h4"/></svg></span></div>
+          <div class="hp-kpi-value"><small>¥</small>${fmtMoney(s.expense, { plain: true })}</div>
+          <div class="hp-kpi-foot">${deltaHTML(s.expense, pv.expense, true)}</div>
+        </div>
+        <div class="hp-kpi">
+          <div class="hp-kpi-top"><span>本月收入</span><span class="hp-kpi-ico sage"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></svg></span></div>
+          <div class="hp-kpi-value"><small>¥</small>${fmtMoney(s.income, { plain: true })}</div>
+          <div class="hp-kpi-foot">${deltaHTML(s.income, pv.income, false)}</div>
+        </div>
+        <div class="hp-kpi accent">
+          <div class="hp-kpi-top"><span>预算剩余</span><span class="hp-kpi-ico"><svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12V3.5Z"/><path d="M12 3.5V12h8.5A8.5 8.5 0 0 0 12 3.5Z"/></svg></span></div>
+          <div class="hp-kpi-value">${hasBudget ? '<small>¥</small>' + fmtMoney(remain, { plain: true }) : '—'}</div>
+          <div class="hp-kpi-foot"><span class="hp-kpi-sub">${hasBudget ? (overBudget ? '已超支 ' + fmtMoney(-remainRaw) + ' · 还剩 ' + daysLeft + ' 天' : '已用 ' + usedPct + '% · 还剩 ' + daysLeft + ' 天') : '尚未设置预算'}</span></div>
+        </div>
+      </div>
+
+      <div class="hp-cols">
+        <div class="hp-main">
+          <section class="hp-card hp-quick">
+            <div class="hp-card-head"><h2>记一笔</h2><span class="hp-badge sage"><i></i>云端账本</span></div>
+            <div class="hp-card-body">
+              <div class="hp-amount"><em>¥</em><input id="hp-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" aria-label="金额"></div>
+              <div class="hp-cats">${chipsHTML || '<span class="hp-empty-line">还没有支出分类</span>'}</div>
+              <input id="hp-note" class="hp-input" type="text" maxlength="60" placeholder="写点什么…（可选）" autocomplete="off">
+              <div class="hp-quick-actions">
+                <button type="button" class="hp-btn-primary" id="hp-save">+ 记一笔</button>
+                <button type="button" class="hp-btn-ghost" id="hp-more">详细记账</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="hp-card">
+            <div class="hp-card-head"><h2>最近记录</h2><span class="hp-badge plain">最近 ${recs.length} 笔</span><button type="button" class="hp-link" data-hp-go="#/ledger">全部 →</button></div>
+            <div class="hp-card-body hp-recs">${recsHTML}</div>
+          </section>
+
+          <section class="hp-card hp-week">
+            <div class="hp-card-head"><h2>近 7 日</h2><span class="hp-badge plain">日均 ${fmtMoney(weekTotal / 7, { plain: true })}</span></div>
+            <div class="hp-card-body">
+              <div class="hp-bars">${weekHTML}</div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="hp-side">
+          <section class="hp-card hp-budget">
+            <div class="hp-card-head"><h2>本月预算</h2><span class="hp-badge gold">${hasBudget ? usedPct + '%' : '未设置'}</span></div>
+            <div class="hp-card-body">
+              <div class="hp-ring">
+                <svg viewBox="0 0 140 140" aria-hidden="true">
+                  <circle cx="70" cy="70" r="58" class="hp-ring-track"/>
+                  <circle cx="70" cy="70" r="58" class="hp-ring-fill" stroke-dasharray="${dash} ${circ.toFixed(1)}"/>
+                  <text x="70" y="67" text-anchor="middle" class="hp-ring-num">${ringCenter}</text>
+                  <text x="70" y="85" text-anchor="middle" class="hp-ring-cap">${ringCap}</text>
+                </svg>
+              </div>
+              <div class="hp-ring-legend">
+                <span><i class="gold"></i>${hasBudget ? '已用 ' + fmtMoney(s.expense) : '本月支出 ' + fmtMoney(s.expense)}</span>
+                <span><i></i>${hasBudget ? '剩余 ' + fmtMoney(remain) : '本月结余 ' + fmtMoney(s.balance)}</span>
+              </div>
+              <div class="hp-bars-list">${barsHTML}</div>
+            </div>
+          </section>
+
+          <section class="hp-card hp-bills">
+            <div class="hp-card-head"><h2>待办账单</h2><span class="hp-badge ${bills.length ? 'coral' : 'plain'}">${bills.length ? bills.length + ' 笔待付' : '已清'}</span></div>
+            <div class="hp-card-body hp-bill-list">${billsHTML}</div>
+          </section>
+        </aside>
+      </div>
+    </div>`;
+
+    /* 交互 */
+    el.querySelectorAll('[data-hpcat]').forEach(b => {
+      b.onclick = () => {
+        this._hpCat = b.dataset.hpcat;
+        el.querySelectorAll('[data-hpcat]').forEach(x => x.classList.toggle('on', x === b));
+      };
+    });
+    el.querySelectorAll('[data-hp-go]').forEach(b => {
+      b.onclick = () => { location.hash = b.dataset.hpGo; };
+    });
+    const amountEl = el.querySelector('#hp-amount');
+    const noteEl = el.querySelector('#hp-note');
+    const save = async () => {
+      const amount = parseFloat(amountEl.value);
+      if (!amount || !isFinite(amount) || amount <= 0) return this.toast('请输入正确金额', 'err');
+      const catName = this._hpCat;
+      if (!catName) return this.toast('请先选择分类', 'err');
+      const cat = this.catByName(lid, catName);
+      try {
+        await Store.insert('records', {
+          ledger_id: lid,
+          category: catName,
+          sub: (cat && cat.subs && cat.subs[0]) || '',
+          amount,
+          note: noteEl.value.trim(),
+          favorite: false,
+          tags: [],
+          rating: 0,
+          date: today,
+          image: null,
+          kind: this.kindOf(lid, catName)
+        });
+        this.toast('已记一笔 ' + fmtMoney(amount), 'ok');
+        this._hpCat = catName;
+        await this.loadData();
+        this.renderHomePage();
+      } catch (e) { this.toast(e.message, 'err'); }
+    };
+    el.querySelector('#hp-save').onclick = save;
+    el.querySelector('#hp-more').onclick = () => this.addRecordModal(lid, todayStr(), this._hpCat || null, null);
+    if (amountEl) amountEl.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
   },
 
   /* ---------- 记账本主页（顶部快捷横排 + 日历/列表视图） ---------- */
