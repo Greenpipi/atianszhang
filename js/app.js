@@ -1462,8 +1462,20 @@ const App = {
         this.toast('已记一笔 ' + fmtMoney(amount), 'ok');
         this._hpCat = catName;
         this._hpSub = subName;
-        await this.loadData();
-        this.animateRecentInsert(document.getElementById('view-home'), oldRects, rec && rec.id);
+        /* 乐观更新：插入接口返回后立即用这条记录更新本地数据并渲染，
+           不再等全量 loadData（要重新拉 6 张表，弱网下会卡好几秒）。
+           云端实时订阅/下次进入时仍会以服务端数据为准。 */
+        const saved = rec || {};
+        if (saved.id) {
+          if (!saved.created_at) saved.created_at = new Date().toISOString();
+          if (!this.state.records.some(r => r.id === saved.id)) this.state.records.push(saved);
+          this._cacheSnapshot();
+          this.renderHomePage();
+          this.animateRecentInsert(document.getElementById('view-home'), oldRects, saved.id);
+        } else {
+          await this.loadData();
+          this.animateRecentInsert(document.getElementById('view-home'), oldRects, rec && rec.id);
+        }
       } catch (e) {
         this.toast(e.message, 'err');
       } finally {
