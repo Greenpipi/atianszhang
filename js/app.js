@@ -41,6 +41,7 @@ const App = {
   /* ---------- 启动 ---------- */
   async init() {
     Store.init();
+    this.registerImageCache();
     Store.setHandlers(() => this.onDataChange(), () => this.onAuthChange());
     Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
@@ -73,6 +74,16 @@ const App = {
       Store.user = null;
       this.showLogin();
     }
+  },
+
+  /* 外链图片本地缓存（sw.js）：只在浏览器本机缓存图片，云端依旧只存链接。
+     只影响再次打开/切换筛选时的下载速度；file:// 或不支持 SW 的环境自动跳过。 */
+  registerImageCache() {
+    try {
+      if (!('serviceWorker' in navigator)) return;
+      if (!/^https?:$/.test(location.protocol)) return;
+      navigator.serviceWorker.register('sw.js').catch(() => { /* 注册失败不影响使用 */ });
+    } catch (e) { /* 忽略 */ }
   },
 
   /* ---------- 暖启动：不等任何网络，先用上次身份 + 本地快照出内容 ---------- */
@@ -2578,7 +2589,7 @@ const App = {
       <div class="wish-card" data-wid="${r.id}">
         <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
           ${imgs.length
-            ? '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+            ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
             : (r._imgLoaded === true
                 ? this.goodsArtHTML(r) + '<span class="wi-add">＋ 图片</span>'
                 : '<span class="wi-loading"><i></i>图片加载中</span>')}
@@ -2644,32 +2655,38 @@ const App = {
   /* 图片按需加载：records 列表查询已排除 images（base64 单张 60–120KB），
      只有真的要展示图片的地方（好物仓库、编辑弹窗、大图灯箱）才补一次，按记录标记 _imgLoaded。
      同一记录并发调用会复用同一个请求，避免「还在拉图时追加图片」把原图覆盖掉。 */
-  _imgJobs: new Map(),
+  _imgJobs: new Map(),     // id -> Promise<map|null>，null 表示这次取图失败，不标记已加载、下次重试
   async ensureImages(recs) {
+    // 暖启动会在恢复会话之前先画快照，此时 user.id 还是空的。
+    // 用匿名身份去查会被 RLS 过滤成空数组且不报错，图片就会被误判成「本来就没有」而永久显示占位插画。
+    if (Store.mode === 'supabase' && !(Store.user && Store.user.id)) return false;
     const need = (recs || []).filter(r => r && r.id && r._imgLoaded !== true);
     if (!need.length) return false;
-    const waits = [], fresh = [];
-    for (const r of need) {
-      const job = this._imgJobs.get(r.id);
-      if (job) waits.push(job); else fresh.push(r);
+    const ids = [...new Set(need.map(r => r.id))];
+    const missing = ids.filter(id => !this._imgJobs.has(id));
+    if (missing.length) {
+      const job = Store.fetchImages(missing)
+        .catch(e => { console.warn('图片加载失败', e); return null; });
+      const settled = job.then(map => {
+        missing.forEach(id => this._imgJobs.delete(id));
+        return map;
+      });
+      missing.forEach(id => this._imgJobs.set(id, settled));
     }
-    if (fresh.length) {
-      const job = (async () => {
-        let map = {};
-        try { map = await Store.fetchImages(fresh.map(r => r.id)); }
-        catch (e) { /* 图片失败不影响主体 */ }
-        for (const r of fresh) {
-          r._imgLoaded = true;
-          const imgs = map[r.id];
-          if (imgs && imgs.length) r.images = imgs;
-        }
-      })();
-      fresh.forEach(r => this._imgJobs.set(r.id, job));
-      job.then(() => fresh.forEach(r => this._imgJobs.delete(r.id)));
-      waits.push(job);
-    }
-    await Promise.all(waits);
-    return need.some(r => this.recImages(r).length > 0);
+    const maps = await Promise.all(ids.map(id => this._imgJobs.get(id)));
+    const byId = {};
+    ids.forEach((id, i) => { byId[id] = maps[i]; });
+    let got = false;
+    // 结果要回填给所有等待中的记录对象：取图期间 loadData/快照渲染会整体替换 state.records，
+    // 只写回发起请求的那批对象的话，新渲染出来的卡片会一直停在占位插画。
+    need.forEach(r => {
+      const map = byId[r.id];
+      if (!map || !(r.id in map)) return;   // 失败或没返回：保持未加载，下次渲染自动重试
+      r._imgLoaded = true;
+      const imgs = map[r.id];
+      if (imgs && imgs.length) { r.images = imgs; got = true; }
+    });
+    return got;
   },
   /* 图片到位后原地补图：不重排、不闪烁、不打断滚动 */
   _paintWishImages() {
@@ -2681,7 +2698,7 @@ const App = {
       if (!imgs.length) return;
       const cur = box.querySelector('img');
       if (cur && cur.getAttribute('src') === imgs[0]) return;
-      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
+      box.innerHTML = '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '');
       box.title = '点击查看大图';
     });
   },
@@ -2718,7 +2735,7 @@ const App = {
     rec.images = next;
     const box = document.querySelector('.wish-card[data-wid="' + rid + '"] [data-act="img"]');
     if (box) {
-      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
+      box.innerHTML = '<img src="' + esc(next[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (next.length > 1 ? '<span class="wi-cnt">1/' + next.length + '</span>' : '');
       box.title = '点击查看大图';
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
@@ -2730,6 +2747,7 @@ const App = {
       const box = card.querySelector('.wish-imgbox');
       if (!rec || !box || box.querySelector('img')) return;
       if (this.recImages(rec).length) return;
+      if (rec._imgLoaded !== true) return;   // 图还没取到（含取图失败）：保持「加载中」，别提前画成「没有图」
       if (!box.querySelector('.wi-loading')) return;
       box.innerHTML = this.goodsArtHTML(rec) + '<span class="wi-add">＋ 图片</span>';
       box.title = '点击添加图片';
