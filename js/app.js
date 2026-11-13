@@ -1230,21 +1230,25 @@ const App = {
       return '<div class="hp-bar"><div class="hp-bar-top"><span>' + esc(r.name) + '</span><b>' + right + '</b></div><div class="hp-track"><i class="' + cls.trim() + '" style="width:' + Math.min(100, pct) + '%"></i></div></div>';
     }).join('') : '<p class="hp-empty-line">' + (isYear ? '本年度还没有支出记录' : '本月还没有支出记录') + '</p>';
 
-    /* 快捷分类 */
+    /* 快捷分类：默认同时展示大类和小类，点大类切换小类 */
     const cats = this.catsOf(lid).filter(c => c.kind !== 'income');
-    const quickCats = cats.slice(0, 5);
-    const selCat = (this._hpCat && cats.some(c => c.name === this._hpCat)) ? this._hpCat : ((quickCats[0] && quickCats[0].name) || '');
+    const selCat = (this._hpCat && cats.some(c => c.name === this._hpCat)) ? this._hpCat : ((cats[0] && cats[0].name) || '');
     this._hpCat = selCat;
-    const chipsHTML = quickCats.map(c =>
-      '<button type="button" class="hp-cat' + (c.name === selCat ? ' on' : '') + '" data-hpcat="' + esc(c.name) + '">' + this.hpIcon(c.name) + '<span>' + esc(c.name) + '</span></button>'
-    ).join('');
+    const selCatObj = cats.find(c => c.name === selCat);
+    const selSubs = (selCatObj && selCatObj.subs) || [];
+    const selSub = (this._hpSub && selSubs.includes(this._hpSub)) ? this._hpSub : (selSubs[0] || '');
+    this._hpSub = selSub;
+    const catChips = c => '<button type="button" class="hp-cat' + (c.name === selCat ? ' on' : '') + '" data-hpcat="' + esc(c.name) + '">' + this.hpIcon(c.name) + '<span>' + esc(c.name) + '</span></button>';
+    const majorHTML = cats.map(catChips).join('');
+    const subChips = subs => subs.map(s => '<button type="button" class="hp-sub' + (s === selSub ? ' on' : '') + '" data-hpsub="' + esc(s) + '">' + esc(s) + '</button>').join('');
+    const subsHTML = selSubs.length ? subChips(selSubs) : '<span class="hp-empty-line">该分类暂无小类</span>';
 
     /* 最近记录 */
     const recs = this.recsOf(lid).slice().sort((a, b) => a.date === b.date ? String(b.created_at || '').localeCompare(String(a.created_at || '')) : (a.date < b.date ? 1 : -1)).slice(0, 5);
     const recsHTML = recs.length ? recs.map(r => {
       const inc = (r.kind || this.kindOf(lid, r.category)) === 'income';
       const meta = [r.sub, r.note].filter(Boolean).join(' · ') || (inc ? '收入' : '支出');
-      return '<div class="hp-rec" data-hp-go="#/ledger">' +
+      return '<div class="hp-rec" data-rec-id="' + esc(r.id || '') + '" data-hp-go="#/ledger">' +
         '<span class="hp-rec-ico ' + (inc ? 'sage' : '') + '">' + (inc ? '<svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></svg>' : this.hpIcon(r.category)) + '</span>' +
         '<div class="hp-rec-main"><b>' + esc(r.category) + '</b><span>' + esc(meta) + '</span></div>' +
         '<div class="hp-rec-amt' + (inc ? ' in' : '') + '">' + (inc ? '+' : '−') + fmtMoney(r.amount, { plain: true }) + '</div>' +
@@ -1320,7 +1324,8 @@ const App = {
             <div class="hp-card-head"><h2>记一笔</h2><span class="hp-badge sage"><i></i>云端账本</span></div>
             <div class="hp-card-body">
               <div class="hp-amount"><em>¥</em><input id="hp-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" aria-label="金额"></div>
-              <div class="hp-cats">${chipsHTML || '<span class="hp-empty-line">还没有支出分类</span>'}</div>
+              <div class="hp-cats">${majorHTML || '<span class="hp-empty-line">还没有支出分类</span>'}</div>
+              <div class="hp-cats hp-cats-sub" id="hp-subs">${subsHTML}</div>
               <input id="hp-note" class="hp-input" type="text" maxlength="60" placeholder="写点什么…（可选）" autocomplete="off">
               <div class="hp-quick-actions">
                 <button type="button" class="hp-btn-primary" id="hp-save">+ 记一笔</button>
@@ -1388,10 +1393,30 @@ const App = {
         this.renderHomePage();
       };
     });
+    const bindSubs = root => {
+      if (!root) return;
+      root.querySelectorAll('[data-hpsub]').forEach(b => {
+        b.onclick = () => {
+          this._hpSub = b.dataset.hpsub;
+          root.querySelectorAll('[data-hpsub]').forEach(x => x.classList.toggle('on', x === b));
+        };
+      });
+    };
+    bindSubs(el.querySelector('#hp-subs'));
     el.querySelectorAll('[data-hpcat]').forEach(b => {
       b.onclick = () => {
-        this._hpCat = b.dataset.hpcat;
+        const name = b.dataset.hpcat;
+        this._hpCat = name;
         el.querySelectorAll('[data-hpcat]').forEach(x => x.classList.toggle('on', x === b));
+        const c = this.catByName(lid, name);
+        const subs = (c && c.subs) || [];
+        this._hpSub = subs[0] || '';
+        const box = el.querySelector('#hp-subs');
+        if (!box) return;
+        box.innerHTML = subs.length
+          ? subs.map(s => '<button type="button" class="hp-sub' + (s === this._hpSub ? ' on' : '') + '" data-hpsub="' + esc(s) + '">' + esc(s) + '</button>').join('')
+          : '<span class="hp-empty-line">该分类暂无小类</span>';
+        bindSubs(box);
       };
     });
     el.querySelectorAll('[data-hp-go]').forEach(b => {
@@ -1399,17 +1424,32 @@ const App = {
     });
     const amountEl = el.querySelector('#hp-amount');
     const noteEl = el.querySelector('#hp-note');
+    const saveBtn = el.querySelector('#hp-save');
     const save = async () => {
+      if (this._hpSaving) return;
       const amount = parseFloat(amountEl.value);
       if (!amount || !isFinite(amount) || amount <= 0) return this.toast('请输入正确金额', 'err');
       const catName = this._hpCat;
       if (!catName) return this.toast('请先选择分类', 'err');
+      const subName = this._hpSub || '';
       const cat = this.catByName(lid, catName);
+      /* 记账前记录旧列表位置，入账后用 FLIP 让旧记录平滑下滑 */
+      const oldRects = new Map();
+      const listEl = el.querySelector('.hp-recs');
+      if (listEl) listEl.querySelectorAll('.hp-rec').forEach(row => {
+        if (row.dataset.recId) oldRects.set(row.dataset.recId, row.getBoundingClientRect());
+      });
+      this._hpSaving = true;
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.classList.add('is-loading');
+        saveBtn.innerHTML = '<span class="hp-spin" role="status" aria-label="记账中"></span>';
+      }
       try {
-        await Store.insert('records', {
+        const rec = await Store.insert('records', {
           ledger_id: lid,
           category: catName,
-          sub: (cat && cat.subs && cat.subs[0]) || '',
+          sub: subName || ((cat && cat.subs && cat.subs[0]) || ''),
           amount,
           note: noteEl.value.trim(),
           favorite: false,
@@ -1421,13 +1461,59 @@ const App = {
         });
         this.toast('已记一笔 ' + fmtMoney(amount), 'ok');
         this._hpCat = catName;
+        this._hpSub = subName;
         await this.loadData();
-        this.renderHomePage();
-      } catch (e) { this.toast(e.message, 'err'); }
+        this.animateRecentInsert(document.getElementById('view-home'), oldRects, rec && rec.id);
+      } catch (e) {
+        this.toast(e.message, 'err');
+      } finally {
+        this._hpSaving = false;
+        if (saveBtn && saveBtn.isConnected) {
+          saveBtn.disabled = false;
+          saveBtn.classList.remove('is-loading');
+          saveBtn.textContent = '+ 记一笔';
+        }
+      }
     };
-    el.querySelector('#hp-save').onclick = save;
+    if (saveBtn) saveBtn.onclick = save;
     el.querySelector('#hp-more').onclick = () => this.addRecordModal(lid, todayStr(), this._hpCat || null, null);
     if (amountEl) amountEl.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+  },
+
+  /* 最近记录插入动效：旧记录 FLIP 下滑，新记录淡入上浮 */
+  animateRecentInsert(root, oldRects, newId) {
+    if (!root) return;
+    const prevMap = oldRects || new Map();
+    const newKey = newId == null ? '' : String(newId);
+    const list = root.querySelector('.hp-recs');
+    if (!list) return;
+    const rows = Array.from(list.querySelectorAll('.hp-rec'));
+    let hasShift = false;
+    rows.forEach(row => {
+      const id = row.dataset.recId;
+      const prev = id ? prevMap.get(id) : null;
+      if (prev) {
+        const delta = prev.top - row.getBoundingClientRect().top;
+        if (Math.abs(delta) > 0.5) {
+          row.style.transition = 'none';
+          row.style.transform = 'translateY(' + delta + 'px)';
+          hasShift = true;
+        }
+      } else if (newKey && id === newKey) {
+        row.classList.add('hp-rec-enter');
+      }
+    });
+    if (!hasShift && !list.querySelector('.hp-rec-enter')) return;
+    void list.offsetHeight;
+    rows.forEach(row => {
+      if (!row.style.transform) return;
+      row.style.transition = 'transform .55s cubic-bezier(.22, 1, .36, 1)';
+      row.style.transform = 'translateY(0)';
+    });
+    setTimeout(() => {
+      rows.forEach(row => { row.style.transition = ''; row.style.transform = ''; });
+      list.querySelectorAll('.hp-rec-enter').forEach(row => row.classList.remove('hp-rec-enter'));
+    }, 720);
   },
 
   /* ---------- 记账本主页（顶部快捷横排 + 日历/列表视图） ---------- */

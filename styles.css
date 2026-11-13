@@ -1663,3 +1663,34 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 }
 .hp-seg button:hover{color:#37342D}
 .hp-seg button.on{background:#FFFDF9;color:#5E4726;box-shadow:0 1px 2px rgba(64,60,52,.14)}
+
+/* 记一笔：大类 / 小类 */
+.hp-cats-sub{margin:-2px 0 10px;gap:5px}
+.hp-sub{
+  display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:7px;
+  font-size:10.5px;color:#7A746B;background:rgba(255,255,255,.48);
+  border:1px solid rgba(88,82,72,.11);transition:all .16s ease;
+}
+.hp-sub:hover{border-color:#DCC9A8;color:#37342D}
+.hp-sub.on{background:#F3E8D8;border-color:#E0D3BA;color:#7B5D33;font-weight:600}
+.hp-cats-sub .hp-empty-line{font-size:10px;color:#B0AAA1;padding:2px 0}
+
+/* 记一笔按钮 loading */
+.hp-btn-primary.is-loading{pointer-events:none;cursor:default;display:flex;align-items:center;justify-content:center}
+.hp-spin{
+  display:inline-block;width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.32);border-top-color:#fff;
+  animation:hpSpin .68s linear infinite;vertical-align:middle;
+}
+@keyframes hpSpin{to{transform:rotate(360deg)}}
+
+/* 最近记录：新记录淡入上浮，旧记录 FLIP 下滑 */
+.hp-rec-enter{animation:hpRecIn .58s cubic-bezier(.22,1,.36,1) both}
+@keyframes hpRecIn{
+  0%{opacity:0;transform:translateY(-10px) scale(.985)}
+  55%{opacity:1}
+  100%{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .hp-rec-enter{animation:none}
+}
