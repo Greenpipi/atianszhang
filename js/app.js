@@ -899,7 +899,7 @@ const App = {
       <div class="tpl-section">
         <div class="tpl-label">${esc(g)}</div>
         <div class="tpl-chips">
-          ${groups[g].map(({ t, i }) => '<button type="button" class="chip accent" data-tpl="' + i + '">' + tplEmoji(t) + ' ' + esc(t.label || (t.category + ' · ' + t.sub)) + '</button>').join('')}
+          ${groups[g].map(({ t, i }) => '<button type="button" class="chip accent" data-tpl="' + i + '">' + tplIconHTML(t) + ' ' + esc(t.label || (t.category + ' · ' + t.sub)) + '</button>').join('')}
         </div>
       </div>`).join('');
   },
@@ -1240,7 +1240,7 @@ const App = {
     this._hpSub = selSub;
     const catChips = c => '<button type="button" class="hp-cat' + (c.name === selCat ? ' on' : '') + '" data-hpcat="' + esc(c.name) + '">' + this.hpIcon(c.name) + '<span>' + esc(c.name) + '</span></button>';
     const majorHTML = cats.map(catChips).join('');
-    const subChips = subs => subs.map(s => '<button type="button" class="hp-sub' + (s === selSub ? ' on' : '') + '" data-hpsub="' + esc(s) + '">' + esc(s) + '</button>').join('');
+    const subChips = subs => subs.map(s => '<button type="button" class="hp-sub' + (s === selSub ? ' on' : '') + '" data-hpsub="' + esc(s) + '">' + iconSVG(iconKeyForSub(s, selCat), 'hp-ico') + '<span>' + esc(s) + '</span></button>').join('');
     const subsHTML = selSubs.length ? subChips(selSubs) : '<span class="hp-empty-line">该分类暂无小类</span>';
 
     /* 最近记录 */
@@ -1249,7 +1249,7 @@ const App = {
       const inc = (r.kind || this.kindOf(lid, r.category)) === 'income';
       const meta = [r.sub, r.note].filter(Boolean).join(' · ') || (inc ? '收入' : '支出');
       return '<div class="hp-rec" data-rec-id="' + esc(r.id || '') + '" data-hp-go="#/ledger">' +
-        '<span class="hp-rec-ico ' + (inc ? 'sage' : '') + '">' + (inc ? '<svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></svg>' : this.hpIcon(r.category)) + '</span>' +
+        '<span class="hp-rec-ico ' + (inc ? 'sage' : '') + '">' + (inc ? '<svg class="hp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6A2.6 2.6 0 0 1 6.1 6H18a2.5 2.5 0 0 1 2.5 2.5v8A2.5 2.5 0 0 1 18 19H6.1a2.6 2.6 0 0 1-2.6-2.6v-7.8Z"/><path d="M3.5 9h17"/><path d="M16.6 13.2h1.6"/></svg>' : iconSVG(iconKeyForSub(r.sub, r.category), 'hp-ico')) + '</span>' +
         '<div class="hp-rec-main"><b>' + esc(r.category) + '</b><span>' + esc(meta) + '</span></div>' +
         '<div class="hp-rec-amt' + (inc ? ' in' : '') + '">' + (inc ? '+' : '−') + fmtMoney(r.amount, { plain: true }) + '</div>' +
         '</div>';
@@ -1550,7 +1550,7 @@ const App = {
   quickBtnHTML(t) {
     return `
           <button class="qbtn" data-cat="${esc(t.category)}" data-sub="${esc(t.sub)}" title="${esc(t.category)} · ${esc(t.sub)}">
-            <span class="qemoji">${tplEmoji(t)}</span>
+            <span class="qemoji">${tplIconHTML(t)}</span>
             <span class="qlabel">${esc(tplShort(t))}</span>
           </button>`;
   },
@@ -3669,6 +3669,11 @@ const App = {
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <select id="tpl-cat" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
           <select id="tpl-sub" style="flex:1;min-width:130px;height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff"></select>
+          <button type="button" class="icon-trigger icon-trigger-sm" id="tpl-icon-pick" title="为这个快捷模板选择图标">
+            <span class="icon-trigger-ico" id="tpl-icon-preview"></span>
+            <span class="icon-trigger-txt" id="tpl-icon-pick-txt">自动图标</span>
+            <span class="icon-trigger-arrow">›</span>
+          </button>
           <button class="btn btn-primary" id="add-tpl">添加模板</button>
         </div>
       </div>
@@ -3920,19 +3925,50 @@ const App = {
 
     /* --- 模板管理 --- */
     const editTpl = t => {
+      let iconKey = tplIconKey(t);
+      let iconManual = String(t.emoji || '').indexOf('i:') === 0;
       const m = this.openModal(`
         <div class="modal-title">编辑快捷模板<button class="icon-btn" style="display:flex" data-close>✕</button></div>
         <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 12px">${esc(t.category)} · ${esc(t.sub)}</p>
         <div class="field"><label>简称（首页快捷按钮显示）</label><input id="tpl-lab" type="text" maxlength="4" value="${esc(t.label || tplShort(t))}" placeholder="如：咖啡"></div>
-        <div class="field"><label>emoji</label><input id="tpl-emo" type="text" maxlength="4" value="${esc(t.emoji || tplEmoji(t))}" placeholder="☕"></div>
+        <div class="field"><label>图标</label>
+          <div class="icon-field">
+            <button type="button" class="icon-trigger" id="tpl-icon-btn">
+              <span class="icon-trigger-ico">${iconSVG(iconKey)}</span>
+              <span class="icon-trigger-txt"></span>
+              <span class="icon-trigger-arrow">›</span>
+            </button>
+            <button type="button" class="btn btn-ghost" id="tpl-icon-auto">自动</button>
+          </div>
+        </div>
         <div class="modal-acts">
           <button class="btn btn-ghost" data-close>取消</button>
           <button class="btn btn-primary" data-save>保存</button>
         </div>`);
-      const lab = m.querySelector('#tpl-lab'), emo = m.querySelector('#tpl-emo');
+      const lab = m.querySelector('#tpl-lab');
+      const paintIcon = () => {
+        const ico = m.querySelector('#tpl-icon-btn .icon-trigger-ico');
+        const txt = m.querySelector('#tpl-icon-btn .icon-trigger-txt');
+        if (ico) ico.innerHTML = iconSVG(iconKey);
+        if (txt) txt.textContent = iconManual ? ((ICON_LIB[iconKey] || {}).label || '已选图标') : '自动匹配';
+      };
+      paintIcon();
+      m.querySelector('#tpl-icon-btn').onclick = () => {
+        this.openIconPicker(iconKey, key => {
+          if (!key) { iconManual = false; iconKey = iconKeyForSub(t.sub, t.category); }
+          else { iconManual = true; iconKey = key; }
+          paintIcon();
+        });
+      };
+      m.querySelector('#tpl-icon-auto').onclick = () => {
+        iconManual = false;
+        iconKey = iconKeyForSub(t.sub, t.category);
+        paintIcon();
+      };
       lab.focus(); lab.select();
       m.querySelector('[data-save]').onclick = async () => {
-        const label = lab.value.trim(), emoji = emo.value.trim();
+        const label = lab.value.trim();
+        const emoji = iconManual ? 'i:' + iconKey : '';
         this.closeModal();
         await Store.update('templates', t.id, { label, emoji });
         this.toast('模板已更新', 'ok');
@@ -3944,8 +3980,8 @@ const App = {
       const lid = ledgerSel.value;
       const tpls = this.state.templates.filter(t => t.ledger_id === lid);
       el.querySelector('#tpl-mgr').innerHTML = tpls.length ? tpls.map(t =>
-        '<span class="chip purple" style="cursor:pointer" data-tplchip="' + t.id + '" title="点击改简称 / emoji">' +
-          tplEmoji(t) + ' ' + esc(t.category) + ' · ' + esc(t.sub) +
+        '<span class="chip purple" style="cursor:pointer" data-tplchip="' + t.id + '" title="点击改简称 / 图标">' +
+          tplIconHTML(t) + ' ' + esc(t.category) + ' · ' + esc(t.sub) +
           (t.label ? ' <span style="opacity:.7">（' + esc(t.label) + '）</span>' : '') +
           ' <button data-deltpl="' + t.id + '" style="color:var(--danger);font-weight:800">×</button>' +
         '</span>'
@@ -3969,18 +4005,35 @@ const App = {
       const cSel = el.querySelector('#tpl-cat'), sSel = el.querySelector('#tpl-sub');
       cSel.innerHTML = cats.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('');
       this.enhanceSelects(cSel);
+      let newIconKey = '';
+      const paintNewIcon = () => {
+        const key = newIconKey || iconKeyForSub(sSel.value, cSel.value);
+        const ico = el.querySelector('#tpl-icon-preview');
+        const txt = el.querySelector('#tpl-icon-pick-txt');
+        if (ico) ico.innerHTML = iconSVG(key);
+        if (txt) txt.textContent = newIconKey ? ((ICON_LIB[newIconKey] || {}).label || '已选图标') : '自动图标';
+      };
       const fillSubs = () => {
         const c = this.catByName(lid, cSel.value);
         sSel.innerHTML = ((c && c.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
         this.enhanceSelects(sSel);
       };
       fillSubs();
-      cSel.onchange = fillSubs;
+      paintNewIcon();
+      cSel.onchange = () => { fillSubs(); if (!newIconKey) paintNewIcon(); };
+      sSel.onchange = () => { if (!newIconKey) paintNewIcon(); };
+      el.querySelector('#tpl-icon-pick').onclick = () => {
+        const key = newIconKey || iconKeyForSub(sSel.value, cSel.value);
+        this.openIconPicker(key, picked => {
+          newIconKey = picked || '';
+          paintNewIcon();
+        });
+      };
       el.querySelector('#add-tpl').onclick = async () => {
         const cat = cSel.value, sub = sSel.value;
         if (!cat || !sub) return;
         if (tpls.some(t => t.category === cat && t.sub === sub)) return this.toast('模板已存在', 'err');
-        await Store.insert('templates', { ledger_id: lid, category: cat, sub });
+        await Store.insert('templates', { ledger_id: lid, category: cat, sub, emoji: newIconKey ? 'i:' + newIconKey : '' });
         this.toast('模板已添加', 'ok');
         await this.loadData();
         renderTplMgr();
@@ -4646,6 +4699,32 @@ const App = {
     // 只关最顶层弹窗（嵌套时底层编辑弹窗保持打开）
     const root = document.getElementById('modal-root');
     if (root.lastElementChild) root.lastElementChild.remove();
+  },
+
+  /* 小类图标选择器：选中后回调 key；传空字符串表示按小类自动匹配 */
+  openIconPicker(selectedKey, onPick) {
+    const selected = ICON_LIB[selectedKey] ? selectedKey : 'tag';
+    const keys = Object.keys(ICON_LIB);
+    const m = this.openModal(`
+      <div class="modal-title">选择图标<button class="icon-btn" style="display:flex" data-close>✕</button></div>
+      <p class="icon-picker-tip">灰金线性图标，自动跟随按钮文字颜色</p>
+      <div class="icon-picker">
+        ${keys.map(k => '<button type="button" class="icon-opt' + (k === selected ? ' on' : '') + '" data-icon="' + k + '" title="' + esc(ICON_LIB[k].label) + '">' + iconSVG(k, 'ui-ico') + '<span>' + esc(ICON_LIB[k].label) + '</span></button>').join('')}
+      </div>
+      <div class="modal-acts">
+        <button type="button" class="btn btn-ghost" data-auto>自动匹配</button>
+        <button type="button" class="btn btn-ghost" data-close>取消</button>
+      </div>`, true);
+    m.querySelectorAll('[data-icon]').forEach(b => {
+      b.onclick = () => {
+        this.closeModal();
+        if (typeof onPick === 'function') onPick(b.dataset.icon);
+      };
+    });
+    m.querySelector('[data-auto]').onclick = () => {
+      this.closeModal();
+      if (typeof onPick === 'function') onPick('');
+    };
   },
 
   confirmDialog(title, msg) {

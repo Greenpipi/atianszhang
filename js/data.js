@@ -245,6 +245,130 @@ function tplEmoji(t) {
   return t.emoji || subEmoji(t.sub) || catEmoji(t.category) || '💸';
 }
 
+/* ============================================================
+   小类图标库（灰金线性风格，24×24 / 1.7 stroke / currentColor）
+   模板的 emoji 字段支持 "i:<key>" 存储所选图标，兼容旧 emoji
+   ============================================================ */
+const ICON_LIB = {
+  home: { label: '住房', svg: '<path d="M3.6 10.7 12 3.8l8.4 6.9"/><path d="M5.7 9.8V20h12.6V9.8"/><path d="M9.8 20v-5.2h4.4V20"/>' },
+  building: { label: '物业', svg: '<path d="M5 20V5.2a1.7 1.7 0 0 1 1.7-1.7h6.6A1.7 1.7 0 0 1 15 5.2V20"/><path d="M15 9h2.8a1.7 1.7 0 0 1 1.7 1.7V20"/><path d="M8 7.5h1.5M11.5 7.5H13M8 11h1.5M11.5 11H13M8 14.5h1.5M11.5 14.5H13"/><path d="M3.5 20h17"/>' },
+  shield: { label: '保险', svg: '<path d="M12 3.4 18.8 6v5.4c0 4.3-2.9 7.4-6.8 9.2-3.9-1.8-6.8-4.9-6.8-9.2V6L12 3.4Z"/><path d="m9.2 11.8 1.9 1.9 3.7-3.9"/>' },
+  wifi: { label: '网络', svg: '<path d="M4.2 9.4a11.4 11.4 0 0 1 15.6 0"/><path d="M6.8 12.3a7.6 7.6 0 0 1 10.4 0"/><path d="M9.4 15.2a3.8 3.8 0 0 1 5.2 0"/><circle cx="12" cy="18.5" r="1"/>' },
+  flame: { label: '燃气', svg: '<path d="M12.2 3.6c2.9 3.2 4.6 5.8 4.6 8.4a4.8 4.8 0 0 1-9.6 0c0-1.5.7-2.9 1.8-4.3.3 1.6 1.1 2.6 2.2 3.1-.1-2.2.3-4.3 1-7.2Z"/>' },
+  key: { label: '房租', svg: '<circle cx="8" cy="12" r="3.4"/><path d="M11.4 12H20"/><path d="M17.2 12v2.6M14.4 12v2"/>' },
+  basket: { label: '日用', svg: '<path d="M4.2 10.5h15.6l-1.3 8.2a1.6 1.6 0 0 1-1.6 1.3H7.1a1.6 1.6 0 0 1-1.6-1.3L4.2 10.5Z"/><path d="m8 10.5 2.2-6M16 10.5l-2.2-6"/><path d="M9.5 14v3M14.5 14v3"/>' },
+  cart: { label: '购物', svg: '<circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/><path d="M3.5 4.5h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.5-1.2l1.2-6.2H6.2"/>' },
+  shirt: { label: '服饰', svg: '<path d="M8.8 4.5 12 6.3l3.2-1.8 4.3 2.3-1.7 4-2.3-.9V20H8.5V9.9l-2.3.9-1.7-4 4.3-2.3Z"/>' },
+  bowl: { label: '食物', svg: '<path d="M3.8 11.5h16.4a8.2 8.2 0 0 1-16.4 0Z"/><path d="M7.5 8.5c0-1.2 1-1.8 1-3M12 8.5c0-1.2 1-1.8 1-3M16.5 8.5c0-1.2 1-1.8 1-3"/>' },
+  utensils: { label: '餐具', svg: '<path d="M7 3.5v6.2a2.2 2.2 0 0 1-4.4 0V3.5"/><path d="M4.8 3.5v17"/><path d="M17.5 20.5V4.2c-1.7 1.3-2.8 3.5-2.8 6 0 1.8 1.1 3 2.8 3h2.2"/>' },
+  plug: { label: '电器', svg: '<path d="M8 3.5v5M16 3.5v5"/><path d="M6 8.5h12v3.8a6 6 0 0 1-12 0V8.5Z"/><path d="M12 18.3V21"/>' },
+  sofa: { label: '家具', svg: '<path d="M5 11V8.2A2.2 2.2 0 0 1 7.2 6h9.6A2.2 2.2 0 0 1 19 8.2V11"/><path d="M5 11a2 2 0 0 0-2 2v3.5h18V13a2 2 0 0 0-2-2"/><path d="M6 16.5V20M18 16.5V20"/>' },
+  box: { label: '收纳', svg: '<path d="M4 8.5h16v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-10Z"/><path d="M3.3 5h17.4v3.5H3.3z"/><path d="M10 5v3.5M14 5v3.5"/>' },
+  bag: { label: '外卖', svg: '<path d="M6 8.5h12l1 10.2a1.5 1.5 0 0 1-1.5 1.6h-11A1.5 1.5 0 0 1 5 18.7L6 8.5Z"/><path d="M9 9V6.8a3 3 0 0 1 6 0V9"/>' },
+  cup: { label: '饮品', svg: '<path d="M6.5 8.5h11l-1 10.2a1.5 1.5 0 0 1-1.5 1.3H9a1.5 1.5 0 0 1-1.5-1.3L6.5 8.5Z"/><path d="M5.5 5.5h13"/><path d="M14.2 5.5 12 2.8"/>' },
+  coffee: { label: '咖啡', svg: '<path d="M5 8h11v6.5a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 14.5V8Z"/><path d="M16 9.5h2.2a2.3 2.3 0 0 1 0 4.6H16"/><path d="M8 4.5c-.6 1 .6 1.6 0 2.6M11.5 4.5c-.6 1 .6 1.6 0 2.6"/>' },
+  cake: { label: '甜点', svg: '<path d="M4 20h16"/><path d="M5.5 20v-6.2a1.8 1.8 0 0 1 1.8-1.8h9.4a1.8 1.8 0 0 1 1.8 1.8V20"/><path d="M5.5 16.2c1.3 1 2.3 1 3.5 0s2.2-1 3.5 0 2.3 1 3.5 0 2.2-1 3 0"/><path d="M12 8.5v3.5"/><path d="M12 5.2c.9.8.9 1.8 0 2.6-.9-.8-.9-1.8 0-2.6Z"/>' },
+  cookie: { label: '零食', svg: '<path d="M20 12.3A8.2 8.2 0 1 1 11.7 4a3 3 0 0 0 4 4 3 3 0 0 0 4.3 4.3Z"/><circle cx="9" cy="10" r=".9"/><circle cx="12.5" cy="15" r=".9"/><circle cx="8" cy="15.5" r=".9"/>' },
+  leaf: { label: '养生', svg: '<path d="M20 4.5c-8.5.4-13.3 4.2-13.3 9.2a5.2 5.2 0 0 0 5.2 5.2c5 0 7.7-4.5 8.1-14.4Z"/><path d="M4 20c2.2-4 5.2-6.6 9.2-8.6"/>' },
+  medical: { label: '医疗', svg: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/>' },
+  scissors: { label: '美容', svg: '<circle cx="7" cy="7" r="2.4"/><circle cx="7" cy="17" r="2.4"/><path d="m9 8.6 11 6.9M9 15.4l11-6.9"/>' },
+  dumbbell: { label: '运动', svg: '<path d="M4 9.5v5M7 7.5v9M17 7.5v9M20 9.5v5M7 12h10"/>' },
+  laptop: { label: '数码', svg: '<rect x="5" y="4.5" width="14" height="10" rx="1.8"/><path d="M3.5 18.5h17l-1-4h-15l-1 4Z"/>' },
+  pen: { label: '文具', svg: '<path d="m5 19 1-4.2L16.6 4.2a2 2 0 0 1 2.8 2.8L8.8 17.6 5 19Z"/><path d="m14.5 6.3 3.2 3.2"/>' },
+  sparkle: { label: '爱好', svg: '<path d="M12 3.5c.6 4.3 2.2 6 6.5 6.5-4.3.6-6 2.2-6.5 6.5-.6-4.3-2.2-6-6.5-6.5 4.3-.6 6-2.2 6.5-6.5Z"/><path d="M18.5 15.5c.3 1.8 1 2.6 2.8 2.9-1.8.3-2.5 1.1-2.8 2.9-.3-1.8-1-2.6-2.8-2.9 1.8-.3 2.5-1.1 2.8-2.9Z"/>' },
+  gamepad: { label: '游戏', svg: '<path d="M7.5 8.5h9a4.5 4.5 0 0 1 4.4 3.6l.6 3.2a2.7 2.7 0 0 1-4.8 2.3l-1.2-1.6H8.5l-1.2 1.6a2.7 2.7 0 0 1-4.8-2.3l.6-3.2a4.5 4.5 0 0 1 4.4-3.6Z"/><path d="M8 11v3M6.5 12.5h3"/><circle cx="16" cy="11.5" r=".9"/><circle cx="18" cy="13.5" r=".9"/>' },
+  bolt: { label: '充电', svg: '<path d="M13.2 2.8 5.5 13.3h5.2l-.9 7.9 7.7-10.5h-5.2l.9-7.9Z"/>' },
+  fuel: { label: '加油', svg: '<rect x="4.5" y="4" width="8" height="16" rx="1.6"/><path d="M6.8 7.5h4.4v4H6.8z"/><path d="m12.5 8 2.5 2.5V18a2 2 0 0 0 4 0v-7l-2.5-2.5"/><path d="M3.5 20h10"/>' },
+  wrench: { label: '保养', svg: '<path d="M20 5.5a4 4 0 0 1-5.2 5.2L6 19.5 4.5 18l8.8-8.8A4 4 0 0 1 18.5 4l-2.7 2.7 1.5 1.5L20 5.5Z"/>' },
+  parking: { label: '停车', svg: '<rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M9.8 17V7.2h3.4a3 3 0 0 1 0 6H9.8"/>' },
+  bus: { label: '交通', svg: '<rect x="4.5" y="3.5" width="15" height="13" rx="3"/><path d="M4.5 11h15"/><path d="M7.5 6.8h9"/><circle cx="8.2" cy="18.8" r="1.5"/><circle cx="15.8" cy="18.8" r="1.5"/>' },
+  bed: { label: '住宿', svg: '<path d="M3.5 19v-7.5h17V19"/><path d="M3.5 14.5h17"/><path d="M3.5 19v2M20.5 19v2"/><path d="M6.5 11.5V8.3A1.8 1.8 0 0 1 8.3 6.5h3.2v5H6.5Z"/><path d="M14.5 11.5v-3h1.2a1.8 1.8 0 0 1 1.8 1.8v1.2"/>' },
+  mic: { label: '演出', svg: '<rect x="9" y="3" width="6" height="10" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3M8.5 21h7"/>' },
+  film: { label: '电影', svg: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M8 4.5v15M16 4.5v15M3.5 9h4.5M3.5 15h4.5M16 9h4.5M16 15h4.5"/>' },
+  play: { label: '内容', svg: '<circle cx="12" cy="12" r="8.5"/><path d="M10 8.7v6.6l5.2-3.3L10 8.7Z"/>' },
+  mountain: { label: '景区', svg: '<path d="m3.5 19 5.2-9 3.2 5.2 2.2-3.5 6.4 7.3H3.5Z"/><circle cx="17" cy="6.5" r="2"/>' },
+  cat: { label: '猫咪', svg: '<path d="M5 10.5 4 5l4 2.2h8L20 5l-1 5.5v4a7 7 0 0 1-14 0v-4Z"/><path d="M8.5 13.5h.01M15.5 13.5h.01M10.5 16.5c1 .8 2 .8 3 0"/>' },
+  fish: { label: '猫粮', svg: '<path d="M4 12c2-3 5-4.5 8.5-4.5 3 0 5.4 1.4 7.5 4.5-2.1 3.1-4.5 4.5-7.5 4.5C9 16.5 6 15 4 12Z"/><path d="M4 12c1.5-1 3-1.5 4.5-1.5M17 7.5l2.5-2v13l-2.5-2"/><circle cx="9" cy="11.5" r=".8"/>' },
+  wallet: { label: '工资', svg: '<rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M3.5 9.5h17"/><path d="M15.5 13.5h5"/><circle cx="17.5" cy="14" r="1"/>' },
+  chart: { label: '理财', svg: '<path d="M4 20V4M4 20h16"/><path d="M7.5 16v-4M11.5 16V9M15.5 16v-6M19 16V6"/>' },
+  arrows: { label: '转账', svg: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>' },
+  gift: { label: '人情', svg: '<rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8h14v-8"/><path d="M12 8v12"/><path d="M12 8c-2.8 0-4.5-1-4.5-2.7C7.5 3.8 9 3 10.3 3.8 11.5 4.6 12 6.5 12 8Zm0 0c2.8 0 4.5-1 4.5-2.7C16.5 3.8 15 3 13.7 3.8 12.5 4.6 12 6.5 12 8Z"/>' },
+  tag: { label: '其他', svg: '<path d="M12.6 3.5H20v7.4l-8.4 8.4a1.8 1.8 0 0 1-2.5 0l-5-5a1.8 1.8 0 0 1 0-2.5l8.5-8.3Z"/><circle cx="16.4" cy="7.2" r="1.2"/>' }
+};
+
+const SUB_ICON = {
+  '房贷': 'home', '保险': 'shield', '电话网络费': 'wifi', '燃气费': 'flame', '物业费': 'building',
+  '租房房租': 'key', '租房支出': 'home',
+  '日用品': 'basket', '山姆购物': 'cart', '衣服鞋袜': 'shirt', '食物': 'bowl', '餐厨具': 'utensils',
+  '电器': 'plug', '家具': 'sofa', '杂货': 'box', '收纳用品': 'box',
+  '早餐': 'bowl', '外出就餐': 'utensils', '外卖': 'bag', '奶茶饮料': 'cup', '咖啡': 'coffee',
+  '甜食': 'cake', '零食': 'cookie',
+  '养生按摩': 'leaf', '医疗健康': 'medical', '美容美发': 'scissors', '运动健康': 'dumbbell',
+  '数码产品': 'laptop', '文创文具': 'pen', '谷子氪金': 'sparkle', '游戏消费': 'gamepad',
+  '车充电': 'bolt', '车加油': 'fuel', '车保养': 'wrench', '停车费': 'parking', '交通费': 'bus',
+  '酒店度假': 'bed', '演唱会': 'mic', '电影': 'film', '内容消费': 'play', '景区景点': 'mountain',
+  '猫清洁': 'cat', '猫粮': 'fish',
+  '工资': 'wallet', '理财': 'chart', '进出差额': 'arrows', '人情': 'gift'
+};
+
+const CAT_ICON = {
+  '固定支出': 'home', '日常支出': 'basket', '饮食支出': 'utensils', '健康支出': 'leaf',
+  '兴趣支出': 'sparkle', '养车支出': 'bus', '娱乐支出': 'film', '光酱专区': 'cat', '综合收入': 'wallet'
+};
+
+const ICON_RULES = [
+  [/咖啡/, 'coffee'], [/奶茶|饮料|茶|果汁/, 'cup'], [/外卖|配送/, 'bag'],
+  [/早餐|食物|饭|菜|餐/, 'bowl'], [/零食|饼干/, 'cookie'], [/甜|蛋糕|面包/, 'cake'],
+  [/房租|房贷|租房|住房|房/, 'home'], [/物业/, 'building'], [/保险/, 'shield'],
+  [/电话|网络|宽带|流量/, 'wifi'], [/燃气|煤气|气费/, 'flame'],
+  [/日用|洗护|清洁/, 'basket'], [/购|买|超市|山姆/, 'cart'], [/衣|鞋|袜|裤/, 'shirt'],
+  [/餐厨|锅|餐具/, 'utensils'], [/电器|插座|电费/, 'plug'], [/家具|沙发|床垫/, 'sofa'],
+  [/收纳|杂货|箱|盒/, 'box'],
+  [/按摩|养生|spa/i, 'leaf'], [/医|药|挂号|体检/, 'medical'], [/美容|美发|理发|剪/, 'scissors'],
+  [/运动|健身|游泳|瑜伽/, 'dumbbell'],
+  [/数码|电脑|手机|相机|耳机/, 'laptop'], [/文具|笔|本子|书/, 'pen'],
+  [/谷|手办|周边|立牌/, 'sparkle'], [/游戏/, 'gamepad'],
+  [/充电/, 'bolt'], [/加油|油费|汽油/, 'fuel'], [/保养|维修|洗车/, 'wrench'],
+  [/停车/, 'parking'], [/交通|地铁|公交|打车|车费/, 'bus'],
+  [/酒店|住宿|民宿|度假/, 'bed'], [/演唱|音乐会|live/i, 'mic'], [/电影|影院/, 'film'],
+  [/会员|订阅|内容/, 'play'], [/景区|门票|旅游|旅行|公园/, 'mountain'],
+  [/猫砂|猫清洁/, 'cat'], [/猫粮|鱼|宠物/, 'fish'],
+  [/工资|薪|奖金/, 'wallet'], [/理财|基金|股票|投资|利息/, 'chart'],
+  [/差额|转账|退款/, 'arrows'], [/人情|礼|红包|请客/, 'gift']
+];
+
+function iconKeyForSub(sub, category) {
+  const s = String(sub || '').trim();
+  if (SUB_ICON[s]) return SUB_ICON[s];
+  for (const [re, key] of ICON_RULES) if (re.test(s)) return key;
+  const c = String(category || '').trim();
+  if (CAT_ICON[c]) return CAT_ICON[c];
+  for (const [re, key] of ICON_RULES) if (re.test(c)) return key;
+  return 'tag';
+}
+
+function tplIconKey(t) {
+  const e = String((t && t.emoji) || '');
+  if (e.indexOf('i:') === 0 && ICON_LIB[e.slice(2)]) return e.slice(2);
+  return iconKeyForSub(t && t.sub, t && t.category);
+}
+
+function iconSVG(key, cls) {
+  const def = ICON_LIB[key] || ICON_LIB.tag;
+  return '<svg class="' + (cls || 'ui-ico') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + def.svg + '</svg>';
+}
+
+/* 模板图标：优先所选图标；旧 emoji 仅在无法推断图标时保留 */
+function tplIconHTML(t, cls) {
+  const e = String((t && t.emoji) || '');
+  if (e && e.indexOf('i:') !== 0) {
+    const key = iconKeyForSub(t.sub, t.category);
+    if (key !== 'tag') return iconSVG(key, cls);
+    return '<span class="legacy-emoji">' + esc(e) + '</span>';
+  }
+  return iconSVG(tplIconKey(t), cls);
+}
+
 const PALETTE = ['#3B82F6', '#34D399', '#F97316', '#0EA5E9', '#10B981', '#F59E0B', '#6366F1', '#84CC16', '#14B8A6', '#94A3B8'];
 
 /* ---------- 工具 ---------- */

@@ -1694,3 +1694,40 @@ mark{background:#FEF3C7;color:inherit;border-radius:3px;padding:0 1px}
 @media (prefers-reduced-motion: reduce){
   .hp-rec-enter{animation:none}
 }
+
+/* ============ 小类图标库 / 模板图标选择 ============ */
+.ui-ico{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
+.chip .ui-ico{width:14px;height:14px;margin-top:-1px}
+.qemoji .ui-ico{width:26px;height:26px;color:var(--primary)}
+.qemoji .legacy-emoji{font-size:26px;line-height:1}
+.hp-sub{gap:4px}
+.hp-sub .hp-ico{width:12px;height:12px;opacity:.9}
+.hp-sub.on .hp-ico{opacity:1;color:#7B5D33}
+.icon-field{display:flex;gap:8px;align-items:center}
+.icon-trigger{
+  display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;
+  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);
+  transition:border-color .16s,background .16s;
+}
+.icon-trigger:hover{border-color:#BFDBFE;background:var(--primary-soft)}
+.icon-trigger-ico{display:inline-flex;color:var(--primary)}
+.icon-trigger-ico .ui-ico{width:19px;height:19px}
+.icon-trigger-txt{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.icon-trigger-arrow{margin-left:auto;color:var(--muted);font-size:16px;line-height:1}
+.icon-trigger-sm{height:38px;flex:0 0 auto}
+.icon-trigger-sm .icon-trigger-txt{max-width:86px;overflow:hidden;text-overflow:ellipsis}
+.icon-picker-tip{font-size:12px;color:var(--muted);margin:-4px 0 12px}
+.icon-picker{
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;
+  max-height:340px;overflow:auto;padding:2px;
+}
+.icon-opt{
+  display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 7px;
+  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text);
+  font-size:10px;transition:all .16s ease;
+}
+.icon-opt .ui-ico{width:20px;height:20px;color:var(--primary)}
+.icon-opt:hover{border-color:#BFDBFE;background:var(--primary-soft)}
+.icon-opt.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);font-weight:700;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+.icon-opt span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:720px){.icon-picker{grid-template-columns:repeat(5,minmax(0,1fr))}}
