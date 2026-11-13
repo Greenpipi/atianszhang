@@ -2118,26 +2118,26 @@ input,select,textarea{font-family:inherit}
 
 /* 记账本列表（分组） */
 .ledger-list{padding-top:2px}
-.list-sum{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:1px 3px 9px;border-bottom:1px dashed rgba(88,82,72,.12);font-size:9.5px;color:var(--faint)}
-.list-sum b{font-family:"DM Mono",monospace;font-size:10px;color:var(--ink2);font-weight:500}
+.list-sum{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:1px 3px 9px;border-bottom:1px dashed rgba(88,82,72,.12);font-size:11.5px;color:var(--faint)}
+.list-sum b{font-family:"DM Mono",monospace;font-size:12px;color:var(--ink2);font-weight:500}
 .list-sort{display:flex;align-items:center;gap:5px;padding:8px 2px 2px;flex-wrap:wrap}
-.list-sort span{font-size:9.5px;color:var(--faint);margin-right:2px}
-.list-sort button{height:22px;padding:0 9px;border-radius:6px;font-size:9.5px;color:var(--muted);border:1px solid transparent}
+.list-sort span{font-size:11.5px;color:var(--faint);margin-right:2px}
+.list-sort button{height:24px;padding:0 9px;border-radius:6px;font-size:11.5px;color:var(--muted);border:1px solid transparent}
 .list-sort button.on{background:var(--primary-soft);color:#6B4F27;border-color:#E4D7C0}
 .list-group{margin-top:11px}
 .list-group-head{display:flex;align-items:center;justify-content:space-between;padding:0 3px 5px}
 .list-group-head .lg-date{display:flex;align-items:center;gap:7px}
-.list-group-head b{font-size:11px;color:var(--ink2)}
-.list-group-head small{font-family:"DM Mono",monospace;font-size:8.5px;color:var(--faint)}
-.list-group-head .lg-total{font-family:"DM Mono",monospace;font-size:9px;color:var(--faint)}
+.list-group-head b{font-size:13px;color:var(--ink2)}
+.list-group-head small{font-family:"DM Mono",monospace;font-size:10.5px;color:var(--faint)}
+.list-group-head .lg-total{font-family:"DM Mono",monospace;font-size:11px;color:var(--faint)}
 .lrow{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:10px;padding:7px 7px;border-radius:10px;cursor:pointer}
 .lrow:hover{background:rgba(255,255,255,.6)}
 .lrow .rec-ico{width:30px;height:30px}
 .lrow .rec-main{min-width:0}
-.lrow .rec-main b{display:block;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lrow .rec-main span{display:block;font-size:9px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-.lrow .rec-amt{font-size:10.5px;font-family:"DM Mono",monospace}
-.lrow .lrow-time{font-family:"DM Mono",monospace;font-size:8px;color:var(--faint);margin-left:6px}
+.lrow .rec-main b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .rec-main span{display:block;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.lrow .rec-amt{font-size:12.5px;font-family:"DM Mono",monospace}
+.lrow .lrow-time{font-family:"DM Mono",monospace;font-size:10px;color:var(--faint);margin-left:6px}
 .list-more{display:flex;justify-content:center;padding:14px 0 2px}
 
 /* 待办账单：合并为一张清单卡 */
