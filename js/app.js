@@ -2411,56 +2411,6 @@ const App = {
     return '<div class="alert-strip ' + cls + '">' + icon + '<span>' + parts.join('；') + '</span></div>';
   },
 
-  /* 好物无图时的线稿插画（按名称/标签自动匹配） */
-  goodsArtHTML(r) {
-    const t = [r.note, r.category, r.sub].concat(recTags(r)).join(' ');
-    const bg = '#F2E9D8', line = '#8B6B3F', fill = '#E4D3B4', sage = '#8A9A8C', pale = '#FBF6EC';
-    let art = '';
-    if (/咖啡|coffee/i.test(t)) {
-      art = '<rect x="300" y="206" width="300" height="260" rx="26" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
-        + '<rect x="338" y="244" width="224" height="44" rx="10" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<rect x="356" y="312" width="150" height="54" rx="10" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M506 330h52a18 18 0 0 1 0 36h-52" fill="'+line+'"/>'
-        + '<path d="M396 420h108l-12 58h-84z" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M368 500h164M386 524h128" stroke="'+line+'" stroke-width="4" stroke-linecap="round"/>'
-        + '<path d="M612 300c22-20 22-44 0-64M646 320c30-28 30-64 0-92" stroke="'+sage+'" stroke-width="5" stroke-linecap="round" opacity=".75"/>';
-    } else if (/耳机|键盘|数码|电子|headphone|keyboard/i.test(t)) {
-      art = '<path d="M330 380v-44c0-86 68-154 150-154s150 68 150 154v44" stroke="'+line+'" stroke-width="12" stroke-linecap="round"/>'
-        + '<rect x="286" y="356" width="82" height="140" rx="40" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
-        + '<rect x="592" y="356" width="82" height="140" rx="40" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
-        + '<rect x="306" y="384" width="42" height="84" rx="21" fill="'+pale+'"/>'
-        + '<rect x="612" y="384" width="42" height="84" rx="21" fill="'+pale+'"/>';
-    } else if (/猫|宠物|cat/i.test(t)) {
-      art = '<rect x="330" y="470" width="300" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<rect x="360" y="360" width="220" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<rect x="300" y="250" width="180" height="24" rx="12" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M392 494v78M570 494v78M470 384v86" stroke="'+line+'" stroke-width="7" stroke-linecap="round"/>'
-        + '<path d="M592 360h52l-18 26h-34z" fill="'+sage+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M560 214c-26 0-42 20-42 46 0 30 22 50 48 50s48-20 48-50c0-26-16-46-42-46z" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M532 236l-8-30 26 16M596 236l8-30-26 16" fill="'+pale+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<circle cx="548" cy="258" r="3" fill="'+line+'"/><circle cx="578" cy="258" r="3" fill="'+line+'"/>';
-    } else if (/大衣|外套|衣|服|coat/i.test(t)) {
-      art = '<path d="M480 180v42" stroke="'+line+'" stroke-width="5" stroke-linecap="round"/>'
-        + '<path d="M480 222c-54 0-96 22-112 64l-42 112 66 26 30-74v220h116V350l30 74 66-26-42-112c-16-42-58-64-112-64z" fill="'+fill+'" stroke="'+line+'" stroke-width="4" stroke-linejoin="round"/>'
-        + '<path d="M480 224v350M438 224l42 70 42-70" stroke="'+line+'" stroke-width="3"/>'
-        + '<circle cx="470" cy="330" r="5" fill="'+line+'"/><circle cx="470" cy="382" r="5" fill="'+line+'"/>';
-    } else if (/灯|台灯|lamp/i.test(t)) {
-      art = '<path d="M382 320c0-64 44-112 98-112s98 48 98 112z" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
-        + '<path d="M480 320v168" stroke="'+line+'" stroke-width="8" stroke-linecap="round"/>'
-        + '<path d="M410 500h140" stroke="'+line+'" stroke-width="8" stroke-linecap="round"/>'
-        + '<circle cx="480" cy="242" r="10" fill="#F6D9A0"/>'
-        + '<path d="M414 298h132" stroke="'+line+'" stroke-width="3" opacity=".5"/>';
-    } else {
-      art = '<path d="M420 470h120l-14 70h-92z" fill="'+fill+'" stroke="'+line+'" stroke-width="4"/>'
-        + '<path d="M480 470V290" stroke="'+line+'" stroke-width="5" stroke-linecap="round"/>'
-        + '<path d="M480 366c-40 0-66-26-66-60 36 0 66 24 66 60z" fill="'+sage+'" opacity=".8"/>'
-        + '<path d="M480 330c38-2 60-28 58-62-34 2-58 26-58 62z" fill="'+fill+'" stroke="'+line+'" stroke-width="3"/>'
-        + '<path d="M452 540h56" stroke="'+line+'" stroke-width="4" stroke-linecap="round"/>';
-    }
-    return '<svg class="goods-art" viewBox="0 0 960 720" fill="none" aria-hidden="true"><rect width="960" height="720" fill="'+bg+'"/>'
-      + '<circle cx="480" cy="360" r="230" fill="#FFFDF8" opacity=".55"/>' + art + '</svg>';
-  },
-
   /* ---------- 视图：好物仓库（多标签） ---------- */
   renderWishlist() {
     const el = document.getElementById('view-wishlist');
@@ -2587,20 +2537,22 @@ const App = {
       const imgs = this.recImages(r);
       return `
       <div class="wish-card" data-wid="${r.id}">
-        <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
-          ${imgs.length
-            ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
-            : (r._imgLoaded === true
-                ? this.goodsArtHTML(r) + '<span class="wi-add">＋ 图片</span>'
-                : '<span class="wi-loading"><i></i>图片加载中</span>')}
-        </div>
         <div class="wish-body">
-          <div class="wish-top-line">
-            <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
-            <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
+          <div class="wish-head">
+            <div class="wish-head-main">
+              <div class="wish-top-line">
+                <div class="wish-name"><span class="wn-txt">${esc(name)}</span></div>
+                <button type="button" class="wst st-${st.cls}" data-act="status" title="点击切换状态">${st.key}</button>
+              </div>
+              <div class="wish-amount">${fmtMoney(r.amount)}</div>
+              ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
+            </div>
+            <div class="wish-imgbox" data-act="img" title="${imgs.length ? '点击查看大图' : '点击添加图片'}">
+              ${imgs.length
+                ? '<img src="' + esc(imgs[0]) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">' + (imgs.length > 1 ? '<span class="wi-cnt">1/' + imgs.length + '</span>' : '')
+                : '<span class="wi-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.4-2h6.8l1.4 2h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="12.5" r="3.2"/></svg>添加图片</span>'}
+            </div>
           </div>
-          <div class="wish-amount">${fmtMoney(r.amount)}</div>
-          ${r.attribute ? '<div class="wish-attr">' + esc(r.attribute) + '</div>' : ''}
           <div class="wish-meta">${this.wishMetaHTML(r)}</div>
           <div class="wish-tags" data-act="tags" title="点击编辑标签">${this.wishTagsHTML(recTags(r))}</div>
         </div>
@@ -2633,7 +2585,7 @@ const App = {
       });
     });
     // 图片按需加载：卡片先用占位图成型（打开即见），图片到位后原地补图
-    this.ensureImages(items).then(() => { this._paintWishImages(); this._paintWishArt(); });
+    this.ensureImages(items).then(() => this._paintWishImages());
   },
 
   /* ---------- 好物卡片：图片/状态/标签辅助与浮层 ---------- */
@@ -2740,20 +2692,6 @@ const App = {
     }
     this.toast('已添加 ' + added.length + ' 张图片', 'ok');
   },
-  /* 确认无图后，把加载占位补成线稿，避免误以为图片被删除 */
-  _paintWishArt() {
-    document.querySelectorAll('.wish-card').forEach(card => {
-      const rec = this.state.records.find(r => r.id === card.dataset.wid);
-      const box = card.querySelector('.wish-imgbox');
-      if (!rec || !box || box.querySelector('img')) return;
-      if (this.recImages(rec).length) return;
-      if (rec._imgLoaded !== true) return;   // 图还没取到（含取图失败）：保持「加载中」，别提前画成「没有图」
-      if (!box.querySelector('.wi-loading')) return;
-      box.innerHTML = this.goodsArtHTML(rec) + '<span class="wi-add">＋ 图片</span>';
-      box.title = '点击添加图片';
-    });
-  },
-
   /* 合法图片链接（http/https；拒绝 javascript: 等伪协议） */
   isImgUrl(s) {
     try { const u = new URL(String(s || '').trim()); return u.protocol === 'http:' || u.protocol === 'https:'; }

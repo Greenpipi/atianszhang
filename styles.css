@@ -2160,21 +2160,14 @@ input,select,textarea{font-family:inherit}
 .wish-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
 .wish-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .wish-card{padding:0;background:linear-gradient(180deg,#FFFDF9,#FBF7EF);overflow:hidden}
-.wish-imgbox{
-  width:100%;height:auto;aspect-ratio:4/3;align-self:auto;border-radius:0;border:0;
-  border-bottom:1px solid rgba(88,82,72,.08);background:#F2E9D8;
-}
-.wish-imgbox .goods-art{width:100%;height:100%;display:block}
-.wi-add{position:absolute;right:9px;bottom:9px;z-index:2;padding:2px 8px;border-radius:6px;background:rgba(255,253,249,.86);border:1px solid rgba(165,130,76,.22);color:#7B5D2E;font-size:9px;font-weight:600;letter-spacing:.02em}
-.wi-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;font-size:9.5px;letter-spacing:.08em;color:#B3A995}
-.wi-loading i{width:22px;height:22px;border-radius:50%;border:2px solid rgba(165,130,76,.18);border-top-color:#A5824C;animation:wiSpin .9s linear infinite}
-@keyframes wiSpin{to{transform:rotate(360deg)}}
+/* 图片保持标题右侧的小正方形（不再整块大图） */
+.wish-head{display:flex;gap:10px;align-items:flex-start}
+.wish-head-main{flex:1;min-width:0}
 
 /* 自定义下拉：打开时抬升所在卡片，避免被后面的卡片盖住 */
 .card:has(.csel.open){position:relative;z-index:80}
 .csel.open{z-index:81}
 .csel-pop{z-index:82}
-.wish-imgbox:hover{background:#F2E9D8;border-color:transparent}
 .wish-body{padding:13px 15px 15px;display:flex;flex-direction:column}
 .wish-top-line{display:flex;align-items:flex-start;justify-content:space-between;gap:9px}
 .wish-name{font-size:14px;font-weight:600;line-height:1.45;min-height:0;color:var(--ink);letter-spacing:-.01em}
