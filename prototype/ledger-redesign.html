@@ -207,11 +207,13 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 }
 .amount-row input::placeholder{color:#CFC6B6}
 .kind-tag{font-size:10.5px;font-weight:700;color:var(--gold-deep);background:var(--gold-soft);border:1px solid var(--gold-line);border-radius:999px;padding:4px 10px}
-.single-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.single-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;align-items:start}
 .input-card{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:#fff}
 .input-card span{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--faint)}
 .input-card input{font-size:13px;font-weight:600;padding:2px 0}
 .input-card input:focus{color:var(--ink)}
+.input-card textarea{font-size:13px;font-weight:600;line-height:1.5;padding:2px 0;resize:none;overflow:hidden;min-height:21px;max-height:168px}
+.input-card textarea:focus{color:var(--ink)}
 .wish-toggle-card{
   display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:13px;
   padding:12px 15px;margin-top:12px;background:#fff;
@@ -233,13 +235,31 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .gi-label{flex:none;width:32px;font-size:10.5px;font-weight:700;color:var(--muted)}
 .gi-tags{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:60px}
 .gi-chips{display:flex;gap:5px;flex-wrap:wrap;flex:1}
-.gi-input{flex:1;min-width:120px;border-bottom:1px solid var(--line);padding:5px 2px;font-size:12.5px;font-weight:600}
-.gi-input:focus{border-color:var(--gold)}
+.gi-input{
+  flex:1;min-width:120px;border:1px solid var(--line);border-radius:7px;background:#fff;
+  padding:6px 9px;font-size:12.5px;font-weight:600;transition:border-color .14s,box-shadow .14s;
+}
+.gi-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(165,130,76,.08)}
 .mini-add{font-size:11px;font-weight:700;color:var(--gold-deep);padding:4px 9px;border-radius:999px;background:var(--gold-soft);border:1px solid var(--gold-line)}
-.inline-more{display:flex;align-items:center;gap:16px;margin-top:auto;padding:14px 2px 4px;font-size:11.5px;color:var(--muted)}
-.inline-more .stars{letter-spacing:2px;color:#D8CBB4;font-size:15px}
-.inline-more .stars b{color:var(--gold);font-weight:400}
-.inline-more .mini-link{font-size:11.5px;font-weight:600;color:var(--gold-deep)}
+.inline-more{display:flex;align-items:center;gap:10px;margin-top:14px;padding:4px 2px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.rate-label{font-size:11.5px;color:var(--muted)}
+.rate-sign{
+  font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:#F5F1E8;color:var(--muted);transition:background .14s,color .14s;
+}
+.rate-sign:hover{background:#F1E8D8}
+.rate-sign.neg{background:#F9EDEA;color:var(--danger)}
+.rate-stars{display:inline-flex;gap:1px;--rate-fill:var(--gold)}
+.rate-stars.neg{--rate-fill:var(--danger)}
+.rate-stars .rstar{
+  width:19px;height:19px;font-size:18px;line-height:19px;text-align:center;padding:0;
+  color:transparent;background-image:linear-gradient(90deg,var(--rate-fill) var(--p,0%),#DED6C7 var(--p,0%));
+  -webkit-background-clip:text;background-clip:text;cursor:pointer;transition:transform .1s;
+}
+.rate-stars .rstar:hover{transform:scale(1.08)}
+.rate-value{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);min-width:42px}
+.rate-clear{font-size:10.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px}
+.rate-clear:hover{color:var(--danger)}
 
 /* 标题栏上方间距：可拖动调节 */
 #pane-list{position:relative}
@@ -300,6 +320,7 @@ table.items thead th{
 }
 table.items thead th:first-child{padding-left:14px}
 table.items tbody td{border-top:1px solid var(--line-soft);padding:0;vertical-align:middle}
+table.items tbody td:nth-child(2),table.items tbody td:nth-child(7){padding-right:8px}
 table.items tbody tr:first-child td{border-top:0}
 table.items tbody tr{transition:background .14s}
 table.items tbody tr:hover td{background:#FDFBF6}
@@ -330,8 +351,10 @@ table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inse
   background:var(--gold-soft);color:var(--gold-deep);
 }
 .cell-input.note{font-weight:500;color:var(--muted);font-size:11.5px}
-.price-wrap{display:flex;align-items:center;gap:1px;padding-left:4px;color:var(--faint);font-family:var(--mono);font-size:11px}
-.price-wrap .cell-input{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--ink-2);padding-left:1px}
+.price-wrap{display:flex;align-items:center;gap:1px;padding-left:4px;color:var(--faint);font-family:var(--mono);font-size:11px;border-radius:7px;transition:background .12s,box-shadow .12s}
+.price-wrap:focus-within{background:#FFFDF9;box-shadow:inset 0 0 0 1.5px var(--gold-line)}
+.price-wrap .cell-input{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--ink-2);padding-left:6px}
+.price-wrap .cell-input:focus{background:transparent;box-shadow:none}
 .cell-input.num{font-family:var(--mono);font-weight:500}
 .cell-input.qty{text-align:center;font-size:12px}
 .amount-cell{padding:0 10px!important;font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--ink);white-space:nowrap}
@@ -414,6 +437,14 @@ table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inse
 }
 .add-tag-btn:hover{background:#F1E8D8}
 .plat-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.status-chips{display:flex;flex-wrap:wrap;gap:5px}
+.status-chip{
+  padding:5px 10px;border-radius:7px;background:#F5F1E8;border:1px solid transparent;
+  font-size:10.5px;font-weight:600;color:var(--muted);transition:background .14s,border-color .14s,color .14s;
+}
+.status-chip:hover{background:#F1EBDD}
+.status-chip.on{background:#fff;border-color:var(--gold-line);color:var(--gold-deep)}
+.status-chip[data-status="已弃用"].on,.status-chip[data-status="已磬用"].on{background:#FDF4F2;border-color:#E7C9C1;color:var(--danger)}
 .plat-chip{
   padding:5px 10px;border-radius:7px;background:#F5F1E8;border:1px solid transparent;font-size:10.5px;font-weight:600;color:var(--muted);
   transition:all .14s;
@@ -470,7 +501,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 .img-add:hover{border-color:var(--gold-line);color:var(--gold-deep)}
 .insp-end-hint{padding:3px 0 10px;font-size:9.5px;color:var(--faint)}
 .single-media{
-  margin-top:12px;border:1px solid var(--line);border-radius:13px;background:#fff;padding:11px 14px 12px;
+  margin-top:2px;border-top:1px dashed var(--gold-line);padding:10px 0 0;background:none;
 }
 .media-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
 .media-head span:first-child{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
@@ -827,13 +858,13 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
           <div class="single-grid">
             <label class="input-card"><span>描述</span><input id="singleNote" type="text" maxlength="60" placeholder="例如：IKEA 周末采购"></label>
-            <label class="input-card"><span>备注</span><input id="singleRemark" type="text" maxlength="80" placeholder="选填"></label>
+            <label class="input-card"><span>备注</span><textarea id="singleRemark" rows="1" placeholder="选填"></textarea></label>
           </div>
 
           <div class="wish-toggle-card">
             <div>
               <b>存入好物仓库</b>
-              <p>填写购买平台、规格和标签，记录使用成本</p>
+              <p>填写购买平台、规格、标签和图片，记录使用成本</p>
             </div>
             <button type="button" class="switch-btn" id="singleFav" aria-label="存入好物仓库"><i></i></button>
           </div>
@@ -852,16 +883,18 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
               <div class="gi-label">规格</div>
               <input class="gi-input" id="singleSpec" type="text" placeholder="如 白色 / 200×60×201cm">
             </div>
+            <div class="single-media">
+              <div class="media-head"><span>图片</span><span>支持本地上传或图片链接</span></div>
+              <div class="thumb-grid" id="singleImgs"></div>
+            </div>
           </div>
 
           <div class="inline-more">
-            <span class="stars">★★★★★</span>
-            <span>评分</span>
-          </div>
-
-          <div class="single-media">
-            <div class="media-head"><span>图片</span><span>支持本地上传或图片链接</span></div>
-            <div class="thumb-grid" id="singleImgs"></div>
+            <span class="rate-label">评分</span>
+            <button type="button" class="rate-sign" id="rateSign" title="切换正向 / 负向评分">正向</button>
+            <div class="rate-stars" id="rateStars" aria-label="评分，支持半星"></div>
+            <span class="rate-value" id="rateValue">未评分</span>
+            <button type="button" class="rate-clear" id="rateClear" hidden>清除</button>
           </div>
         </section>
 
@@ -958,6 +991,11 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
             </div>
 
             <div class="insp-field">
+              <div class="insp-label">使用状态</div>
+              <div class="status-chips" id="inspStatus"></div>
+            </div>
+
+            <div class="insp-field">
               <div class="insp-label">图片 <em>本地上传 / 链接</em></div>
               <div class="thumb-grid" id="inspImgs"></div>
             </div>
@@ -966,7 +1004,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
               <div class="insp-label">备注</div>
               <textarea class="insp-input" id="inspRemark" rows="3" placeholder="选填"></textarea>
             </div>
-            <div class="insp-end-hint">修改会即时同步到左侧明细，点右上角 × 收起。</div>
+            <div class="insp-end-hint">改动即时保存，直接关闭不会丢失。</div>
           </div>
         </div>
       </aside>
@@ -1075,6 +1113,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     '餐厨用品': '🍴', '家具': '🛋'
   };
   const BASE_PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下'];
+  const STATUS_LIST = ['使用中', '闲置中', '未使用', '已弃用', '已磬用'];
   const IMG_BG = [
     'linear-gradient(145deg,#E9E1D3,#D5C8B2)',
     'linear-gradient(145deg,#E3E7DE,#C9D0C1)',
@@ -1105,15 +1144,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     catRowId: null,
     imgTarget: null,
     rows: [
-      { id: 1, title: 'PAX 衣柜框架', cat: '购物', sub: '家居', rental: true, price: 1290, qty: 1, note: '白色 200×60×201', wish: true, tags: ['家具'], platform: '宜家', spec: '白色 / 200×60×201cm', remark: '含安装服务', imgs: [0, 1] },
+      { id: 1, title: 'PAX 衣柜框架', cat: '购物', sub: '家居', rental: true, price: 1290, qty: 1, note: '白色 200×60×201', wish: true, status: '使用中', tags: ['家具'], platform: '宜家', spec: '白色 / 200×60×201cm', remark: '含安装服务', imgs: [0, 1] },
       { id: 2, title: 'KOMPLEMENT 搁板', cat: '购物', sub: '家居', rental: false, price: 79, qty: 4, note: '白色 100×58', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 3, title: 'SKUBB 收纳盒', cat: '日用', sub: '收纳', rental: false, price: 19.9, qty: 6, note: '白色 6 件套', wish: true, tags: ['日用品-收纳'], platform: '宜家', spec: '34×51×28cm', remark: '', imgs: [2] },
+      { id: 3, title: 'SKUBB 收纳盒', cat: '日用', sub: '收纳', rental: false, price: 19.9, qty: 6, note: '白色 6 件套', wish: true, status: '闲置中', tags: ['日用品-收纳'], platform: '宜家', spec: '34×51×28cm', remark: '', imgs: [2] },
       { id: 4, title: 'MALM 高箱床架', cat: '购物', sub: '家居', rental: true, price: 899, qty: 1, note: '160×200 白色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
       { id: 5, title: 'FRAKTA 购物袋', cat: '日用', sub: '收纳', rental: false, price: 4.9, qty: 2, note: '蓝色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
       { id: 6, title: 'LED 灯泡 E27', cat: '日用', sub: '超市', rental: false, price: 9.9, qty: 4, note: '暖光 2700K', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
       { id: 7, title: 'OMTÄNKSAM 靠垫', cat: '购物', sub: '家居', rental: false, price: 79, qty: 2, note: '米色 50×50', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 8, title: 'LACK 边桌', cat: '购物', sub: '家居', rental: true, price: 99, qty: 1, note: '白色 55×55', wish: true, tags: ['家具'], platform: '宜家', spec: '55×55×45cm', remark: '', imgs: [] },
-      { id: 9, title: '龟背竹 中号', cat: '购物', sub: '家居', rental: false, price: 128, qty: 1, note: '含水泥盆', wish: true, tags: ['日用品-杂货', '通用-夏季'], platform: '线下', spec: '高约 1.2m', remark: '花市自提', imgs: [3] }
+      { id: 8, title: 'LACK 边桌', cat: '购物', sub: '家居', rental: true, price: 99, qty: 1, note: '白色 55×55', wish: true, status: '使用中', tags: ['家具'], platform: '宜家', spec: '55×55×45cm', remark: '', imgs: [] },
+      { id: 9, title: '龟背竹 中号', cat: '购物', sub: '家居', rental: false, price: 128, qty: 1, note: '含水泥盆', wish: true, status: '未使用', tags: ['日用品-杂货', '通用-夏季'], platform: '线下', spec: '高约 1.2m', remark: '花市自提', imgs: [3] }
     ],
     single: {
       amount: '',
@@ -1121,6 +1160,9 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       remark: '',
       fav: false,
       rental: false,
+      status: '使用中',
+      rating: 0,
+      ratingNeg: false,
       tags: ['家具'],
       platform: '宜家',
       spec: '',
@@ -1246,6 +1288,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     }).join('');
   }
 
+  /* 文本域按内容自适应高度，超过上限后内部滚动 */
+  function autoGrow(el, max) {
+    if (!el) return;
+    el.style.height = 'auto';
+    const h = Math.min(el.scrollHeight, max || 120);
+    el.style.height = h + 'px';
+    el.style.overflowY = el.scrollHeight > (max || 120) ? 'auto' : 'hidden';
+  }
+
   function renderInspector() {
     const r = activeRow();
     if (!r) {
@@ -1269,10 +1320,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
     $('#inspPlatform').innerHTML = platformHTML(r, 'row');
 
+    $('#inspStatus').innerHTML = STATUS_LIST.map(s =>
+      '<button type="button" class="status-chip' + (((r.status || '使用中') === s) ? ' on' : '') + '" data-status="' + s + '">' + s + '</button>'
+    ).join('');
+
     const spec = $('#inspSpec');
     if (document.activeElement !== spec) spec.value = r.spec || '';
     const remark = $('#inspRemark');
     if (document.activeElement !== remark) remark.value = r.remark || '';
+    autoGrow(remark, 132);
 
     $('#inspImgs').innerHTML = imageGridHTML(r);
   }
@@ -1573,6 +1629,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       '<div class="wd-row"><span class="wd-k">分类</span><span class="wd-v">' + esc(r.cat) + '·' + esc(r.sub) + (r.rental ? ' · 出租屋账本' : '') + '</span></div>' +
       '<div class="wd-row"><span class="wd-k">购买平台</span><span class="wd-v">' + (r.platform ? esc(r.platform) : '<span style="color:var(--faint)">未填写</span>') + '</span></div>' +
       '<div class="wd-row"><span class="wd-k">规格</span><span class="wd-v">' + (r.spec ? esc(r.spec) : '<span style="color:var(--faint)">未填写</span>') + '</span></div>' +
+      '<div class="wd-row"><span class="wd-k">使用状态</span><span class="wd-v">' + esc(r.status || '使用中') + '</span></div>' +
       '<div class="wd-row"><span class="wd-k">标签</span><span class="wd-v wd-tags">' + (tags || '<span style="color:var(--faint)">暂无标签</span>') + '</span></div>';
     $('#wdRemark').textContent = r.remark || '暂无备注';
     $('#wdListName').textContent = state.listTitle || '未命名清单';
@@ -1625,6 +1682,41 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#singleImgs').innerHTML = imageGridHTML(state.single);
   }
 
+  /* ---------- 评分：正负向 + 半星 ---------- */
+  const fmtRate = v => String(v).replace(/\.0$/, '');
+
+  function paintRate(mag, neg) {
+    $$('#rateStars .rstar').forEach((star, i) => {
+      let p = 0;
+      if (mag >= i + 1) p = 100;
+      else if (mag >= i + 0.5) p = 50;
+      star.style.setProperty('--p', p + '%');
+    });
+    $('#rateStars').classList.toggle('neg', neg);
+    $('#rateValue').textContent = mag ? ((neg ? '−' : '+') + fmtRate(mag)) : '未评分';
+  }
+
+  function renderRate() {
+    const s = state.single;
+    paintRate(Math.abs(s.rating || 0), !!s.ratingNeg);
+    $('#rateSign').classList.toggle('neg', !!s.ratingNeg);
+    $('#rateSign').textContent = s.ratingNeg ? '负向' : '正向';
+    $('#rateClear').hidden = !s.rating;
+  }
+
+  function rateValAt(e) {
+    const star = e.target.closest('.rstar');
+    if (!star) return null;
+    const rect = star.getBoundingClientRect();
+    return Number(star.dataset.star) + ((e.clientX - rect.left) < rect.width / 2 ? 0.5 : 1);
+  }
+
+  function initRateStars() {
+    $('#rateStars').innerHTML = [0, 1, 2, 3, 4].map(i =>
+      '<button type="button" class="rstar" data-star="' + i + '" title="点左半颗 = 半星">★</button>'
+    ).join('');
+  }
+
   function renderSubChips() {
     const subs = SUB_MAP[state.cat] || [];
     if (subs.indexOf(state.sub) < 0) state.sub = subs[0] || '';
@@ -1656,6 +1748,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     renderTotals();
     renderSingleGood();
     renderSingleMedia();
+    renderRate();
+    if (mode === 'single') autoGrow($('#singleRemark'), 168);
     if (mode === 'list') {
       renderRows();
       renderWishStrip();
@@ -1682,6 +1776,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     renderTotals();
     renderSingleGood();
     renderSingleMedia();
+    initRateStars();
+    renderRate();
     renderInspector();
 
     /* 模式 */
@@ -1771,7 +1867,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
     /* 新增行 */
     $('#addRow').addEventListener('click', () => {
-      const r = { id: ++seq, title: '', cat: state.cat, sub: state.sub, rental: false, price: '', qty: 1, note: '', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] };
+      const r = { id: ++seq, title: '', cat: state.cat, sub: state.sub, rental: false, price: '', qty: 1, note: '', wish: false, status: '使用中', tags: [], platform: '', spec: '', remark: '', imgs: [] };
       state.rows.push(r);
       renderRows();
       renderTotals();
@@ -1875,6 +1971,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         renderInspector();
         return;
       }
+      const st = e.target.closest('#inspStatus [data-status]');
+      if (st) {
+        const r = activeRow();
+        if (!r) return;
+        r.status = st.dataset.status;
+        renderInspector();
+        toast('使用状态已更新：' + r.status);
+        return;
+      }
       const up = e.target.closest('[data-img-upload]');
       if (up) {
         openFileUpload(activeRow());
@@ -1891,7 +1996,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       const r = activeRow();
       if (!r) return;
       if (e.target.id === 'inspSpec') r.spec = e.target.value;
-      if (e.target.id === 'inspRemark') r.remark = e.target.value;
+      if (e.target.id === 'inspRemark') {
+        r.remark = e.target.value;
+        autoGrow(e.target, 132);
+      }
     });
 
     /* 购买平台（抽屉 / 单笔共用） */
@@ -2007,7 +2115,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       renderTotals();
     });
     $('#singleNote').addEventListener('input', e => { state.single.note = e.target.value; });
-    $('#singleRemark').addEventListener('input', e => { state.single.remark = e.target.value; });
+    $('#singleRemark').addEventListener('input', e => {
+      state.single.remark = e.target.value;
+      autoGrow(e.target, 168);
+    });
     $('#singleFav').addEventListener('click', () => {
       state.single.fav = !state.single.fav;
       renderSingleGood();
@@ -2019,6 +2130,27 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       if (!btn) return;
       state.single.tags = state.single.tags.filter(t => t !== btn.dataset.singleTag);
       renderSingleGood();
+    });
+    /* 单笔：评分（正负向 + 半星） */
+    $('#rateStars').addEventListener('pointermove', e => {
+      const v = rateValAt(e);
+      if (v != null) paintRate(v, !!state.single.ratingNeg);
+    });
+    $('#rateStars').addEventListener('pointerleave', renderRate);
+    $('#rateStars').addEventListener('click', e => {
+      const v = rateValAt(e);
+      if (v == null) return;
+      state.single.rating = state.single.ratingNeg ? -v : v;
+      renderRate();
+    });
+    $('#rateSign').addEventListener('click', () => {
+      state.single.ratingNeg = !state.single.ratingNeg;
+      state.single.rating = -state.single.rating;
+      renderRate();
+    });
+    $('#rateClear').addEventListener('click', () => {
+      state.single.rating = 0;
+      renderRate();
     });
     /* 单笔：归入出租屋账本 */
     $('#rentalCheck').addEventListener('change', e => {
