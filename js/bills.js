@@ -184,7 +184,11 @@
       if (!card || !acts) return;
       row.dataset.swipe = '1';
       acts.style.pointerEvents = 'none';
-      const panelW = () => acts.offsetWidth || 0;
+      // 平移量取自 CSS 变量（.bill-row{--acts-w}），保证与操作区实际宽度分毫不差
+      const panelW = () => {
+        const v = parseFloat(getComputedStyle(row).getPropertyValue('--acts-w'));
+        return Number.isFinite(v) && v > 0 ? v : (acts.offsetWidth || 0);
+      };
 
       let startX = 0, startY = 0, startT = 0, base = 0, cur = 0;
       let dragging = false, axis = null;
