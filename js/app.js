@@ -1116,13 +1116,17 @@ const App = {
     try { return new URLSearchParams(location.search).get('quick') === '1'; } catch (e) { return false; }
   },
 
-  /* 登录且数据就绪后才弹；参数用完立刻从地址栏抹掉，刷新/回退不会重复弹 */
+  /* 登录且数据就绪后才弹；参数用完立刻从地址栏抹掉，刷新/回退不会重复弹。
+     ?scan=支付页OCR文本 → 识别结果确认卡；?quick=1 → 手动快速记账面板 */
   maybeOpenQuick() {
-    if (!this.quickWanted()) return;
+    const scan = this.scanText();
+    const wantQuick = this.quickWanted();
+    if (!scan && !wantQuick) return;
     if (!Store.user || !this.state.currentLedgerId) return;
     if (document.querySelector('.modal.quick-modal')) return;
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
-    this.openQuickEntry();
+    if (scan) this.openScanEntry(scan);
+    else this.openQuickEntry();
   },
 
   /* 最近用过的「大类::小类」：按日期、创建时间倒序去重，分类已删除或小类失效的跳过 */
@@ -1227,6 +1231,214 @@ const App = {
     m.querySelector('#qk-save').onclick = save;
     amt.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
     note.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  },
+
+  /* ---------- 截图识别记账（快捷指令 ?scan=OCR文本 唤起） ---------- */
+  scanText() {
+    try { return new URLSearchParams(location.search).get('scan') || ''; } catch (e) { return ''; }
+  },
+
+  /* 从支付页 OCR 文本里抽金额 / 日期 / 商户 / 支付方式，再按关键词给分类。
+     只做启发式解析：认不出的部分留空或落到最近一次的分类，交给用户在卡片上改。 */
+  parseReceipt(raw, ledgerId) {
+    const text = String(raw || '').slice(0, 4000).replace(/\r/g, '');
+    const lines = text.split('\n').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const flat = lines.join(' ');
+
+    // 金额：优先 -10.00 / ¥10.00；限制位数，避免把 12 位交易单号认成金额
+    let amount = 0;
+    for (const re of [/-[¥￥]?\s*(\d{1,6}(?:\.\d{1,2})?)/, /[¥￥]\s*(\d{1,6}(?:\.\d{1,2})?)/, /(?:金额|实付|付款)[^\d]{0,6}(\d{1,6}(?:\.\d{1,2})?)/]) {
+      const m = flat.match(re);
+      if (m) { amount = parseFloat(m[1]); break; }
+    }
+    if (!(amount > 0 && amount < 1000000)) amount = 0;
+
+    // 日期：2026年7月21日 / 2026-07-21；认不到就记今天
+    let date = todayStr();
+    const dm = flat.match(/(\d{4})\s*[-年/.]\s*(\d{1,2})\s*[-月/.]\s*(\d{1,2})/);
+    if (dm) {
+      const y = +dm[1], mo = +dm[2], d = +dm[3];
+      if (y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+        date = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      }
+    }
+
+    // 支付方式：零钱 / 花呗 / 银行卡 …
+    const payLine = lines.find(l => /支付方式|付款方式/.test(l)) || '';
+    const pay = payLine.replace(/^.*?(支付方式|付款方式)[:：\s]*/, '').trim();
+
+    // 商户：先取金额上方那行店铺名，没有再退到「商户全称 / 收款方」字段
+    const noise = /支付成功|付款成功|收款成功|当前状态|支付时间|交易单号|商户单号|订单号|收单机构|账单服务|申请电子|对订单|发起群|返回|首页/;
+    const cleanName = v => v
+      .replace(/^(商户全称|商户名称|收款方|收款人|商户|商品|付款给|转账给)[:：\s]*/, '')
+      .replace(/^商户[_:：\s]*/, '')
+      .trim();
+    let note = '';
+    for (const l of lines) {
+      if (l.length < 2 || l.length > 24) continue;
+      if (noise.test(l) || /^[¥￥\-−]/.test(l) || /\d{3,}/.test(l)) continue;
+      const v = cleanName(l);
+      if (v && !/^(成功|完成|已支付|支付)$/.test(v)) { note = v; break; }
+    }
+    if (!note) {
+      const ml = lines.find(l => /(商户全称|商户名称|收款方|收款人|付款给|转账给)/.test(l));
+      if (ml) note = cleanName(ml);
+    }
+
+    // 分类：大类名 + 常见商户关键词打分，小类优先命中文本里的名字
+    const cats = this.catsOf(ledgerId);
+    const kindWord = /退款|收入|到账|收款/.test(flat) ? 'income' : 'expense';
+    const SYN = {
+      '饮食': ['餐', '饭', '食', '外卖', '咖啡', '奶茶', '炸', '烧烤', '火锅', '面', '粉', '小吃', '早餐', '甜', '零食', '饮料', '茶', '饼', '肉', '星巴克', '瑞幸', '喜茶', '蜜雪', '麦当劳', '肯德基', '华莱士', '塔斯汀', '海底捞'],
+      '日常': ['超市', '便利店', '日用', '淘宝', '天猫', '京东', '拼多多', '山姆', '盒马', '永辉', '罗森', '全家', '名创', '百货', '网购', '商城'],
+      '养车': ['加油', '充电', '停车', '洗车', '保养', '滴滴', '打车', '地铁', '公交', '高铁', '航空', '机票', '交通', '出租车'],
+      '健康': ['医院', '药', '诊所', '体检', '健身', '按摩', '美容', '理发', '牙'],
+      '兴趣': ['数码', '电脑', '手机', '游戏', '文具', '潮玩', '手办', '谷子'],
+      '娱乐': ['电影', '演出', '演唱会', '景区', '门票', '酒店', '旅游', '度假', '猫眼', '大麦', '携程', '去哪儿'],
+      '光酱': ['猫', '狗', '宠物', '猫粮', '猫砂'],
+      '固定': ['房租', '物业', '水费', '电费', '燃气', '话费', '宽带', '保险', '房贷'],
+      '收入': ['工资', '收入', '报销', '退款', '转入', '到账', '红包', '利息']
+    };
+    const pool = cats.filter(c => (c.kind || 'expense') === kindWord);
+    const candidates = pool.length ? pool : cats;
+    let best = null, bestScore = 0;
+    candidates.forEach(c => {
+      const hints = Object.keys(SYN)
+        .filter(k => c.name.indexOf(k) >= 0)
+        .reduce((a, k) => a.concat(SYN[k]), []);
+      let s = 0;
+      if (note && note.indexOf(c.name) >= 0) s += 3;
+      if (flat.indexOf(c.name) >= 0) s += 2;
+      hints.forEach(k => { if (flat.indexOf(k) >= 0) s += 1; });
+      if (s > bestScore) { bestScore = s; best = c; }
+    });
+    const recent = this.recentCombos(ledgerId, 1)[0];
+    if (!best) best = (recent && cats.find(c => c.name === recent.category)) || candidates[0] || cats[0];
+
+    let sub = '';
+    const subs = (best && best.subs) || [];
+    if (subs.length) {
+      sub = subs.find(s => flat.indexOf(s) >= 0) || '';
+      if (!sub) {
+        sub = /外卖/.test(flat) && subs.indexOf('外卖') >= 0
+          ? '外卖'
+          : (['外出就餐', '其他', '杂项'].find(s => subs.indexOf(s) >= 0) || subs[0]);
+      }
+    }
+    return { amount, date, note, remark: pay, category: best ? best.name : '', sub, confidence: bestScore > 0 };
+  },
+
+  openScanEntry(raw) {
+    const lid = this.state.currentLedgerId;
+    const ledger = this.curLedger();
+    const cats = this.catsOf(lid);
+    if (!ledger || !cats.length) { this.toast('分类还没加载好，请稍后再试', 'err'); return; }
+    const r = this.parseReceipt(raw, lid);
+    let cat = r.category, sub = r.sub;
+
+    const m = this.openModal(`
+      <div class="qk-head">
+        <div>
+          <div class="qk-title">确认这笔账</div>
+          <div class="qk-sub">${r.confidence ? '已自动识别分类' : '没认出商户，分类请确认'} · ${esc(ledger.name)}</div>
+        </div>
+        <button type="button" class="icon-btn qk-close" data-close aria-label="关闭">✕</button>
+      </div>
+      <div class="sc-rows">
+        <button type="button" class="sc-row" id="sc-cat">
+          <span class="sc-k">分类</span><span class="sc-v" id="sc-cat-v"></span>
+        </button>
+        <label class="sc-row"><span class="sc-k">金额</span><span class="sc-v sc-money">¥<input id="sc-amt" type="number" step="0.01" inputmode="decimal" placeholder="0.00"></span></label>
+        <label class="sc-row"><span class="sc-k">日期</span><span class="sc-v"><input id="sc-date" class="cal-input sc-inline" type="text" readonly data-date="${r.date}" value="${r.date}"></span></label>
+        <label class="sc-row"><span class="sc-k">描述</span><span class="sc-v"><input id="sc-note" type="text" placeholder="商户 / 用途"></span></label>
+        <label class="sc-row"><span class="sc-k">备注</span><span class="sc-v"><input id="sc-remark" type="text" placeholder="选填"></span></label>
+      </div>
+      <p class="sc-tip">识别有偏差，直接点上面任意一行就能改</p>
+      <div class="sc-acts">
+        <button type="button" class="sc-no" id="sc-cancel">错误 不记了</button>
+        <button type="button" class="sc-yes" id="sc-save">计入账单</button>
+      </div>
+      <button type="button" class="sc-manual" id="sc-manual">识别不对？改用手动记一笔</button>
+    `, false, 'quick-modal scan-modal', 'quick-mask');
+
+    const amt = m.querySelector('#sc-amt'), note = m.querySelector('#sc-note'), remark = m.querySelector('#sc-remark');
+    if (r.amount) amt.value = r.amount.toFixed(2);
+    note.value = r.note || '';
+    remark.value = r.remark || '';
+
+    const paintCat = () => {
+      const kind = this.kindOf(lid, cat);
+      m.querySelector('#sc-cat-v').innerHTML = (kind === 'income' ? '收入' : '支出') +
+        '【' + esc(cat) + (sub ? ' · ' + esc(sub) : '') + '】<i>›</i>';
+    };
+    paintCat();
+
+    m.querySelector('#sc-cat').onclick = async () => {
+      const picked = await this.pickCategoryDialog(lid, cat, sub);
+      if (!picked) return;
+      cat = picked.category; sub = picked.sub;
+      paintCat();
+    };
+    const dateInp = m.querySelector('#sc-date');
+    dateInp.onclick = () => this.openCalendar(dateInp);
+    m.querySelector('#sc-cancel').onclick = () => this.closeModal();
+    m.querySelector('#sc-manual').onclick = () => { this.closeModal(); this.openQuickEntry(); };
+    if (!r.amount) setTimeout(() => { try { amt.focus(); } catch (e) { /* ignore */ } }, 80);
+
+    const save = () => {
+      const amount = parseFloat(amt.value);
+      if (!amount || !isFinite(amount)) { this.toast('请输入正确金额', 'err'); amt.focus(); return; }
+      this.optimisticAdd({
+        ledger_id: lid, category: cat, sub, amount,
+        note: note.value.trim(), remark: remark.value.trim(),
+        favorite: false, tags: [], rating: 0,
+        date: dateInp.dataset.date || todayStr(), image: null,
+        kind: this.kindOf(lid, cat)
+      });
+      this.closeModal();
+      this.toast('已记 ' + fmtMoney(amount) + ' · ' + cat + (sub ? ' / ' + sub : ''), 'ok');
+    };
+    m.querySelector('#sc-save').onclick = save;
+    amt.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+    note.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  },
+
+  /* 分类选择弹窗：返回 Promise<{category, sub}|null>，取消为 null */
+  pickCategoryDialog(ledgerId, catName, subName) {
+    return new Promise(resolve => {
+      const cats = this.catsOf(ledgerId);
+      if (!cats.length) { resolve(null); return; }
+      let cat = catName || cats[0].name;
+      let sub = subName || '';
+      const subsOf = n => ((this.catByName(ledgerId, n) || {}).subs || []);
+      const m = this.openModal(`
+        <div class="modal-title">选择分类<button class="icon-btn" type="button" data-close>✕</button></div>
+        <div class="qk-block"><div class="qk-label">大类</div><div class="qk-chips" id="pc-cats"></div></div>
+        <div class="qk-block"><div class="qk-label">小类</div><div class="qk-chips" id="pc-subs"></div></div>
+        <div class="modal-acts">
+          <button class="btn btn-ghost" type="button" data-close>取消</button>
+          <button class="btn btn-primary" type="button" id="pc-ok">确定</button>
+        </div>
+      `, false, 'quick-modal picker-modal', 'quick-mask');
+
+      const done = v => { this.closeModal(); resolve(v); };
+      m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => done(null); });
+      const catsBox = m.querySelector('#pc-cats'), subsBox = m.querySelector('#pc-subs');
+      const paintCats = () => {
+        catsBox.innerHTML = cats.map(c => '<button type="button" class="qk-chip' + (c.name === cat ? ' on' : '') + '" data-cat="' + esc(c.name) + '">' + esc(c.name) + '</button>').join('');
+        catsBox.querySelectorAll('[data-cat]').forEach(b => {
+          b.onclick = () => { cat = b.dataset.cat; sub = subsOf(cat)[0] || ''; paintCats(); paintSubs(); };
+        });
+      };
+      const paintSubs = () => {
+        const subs = subsOf(cat);
+        if (!subs.length) { subsBox.innerHTML = '<span class="qk-empty">该大类没有小类</span>'; return; }
+        subsBox.innerHTML = subs.map(s => '<button type="button" class="qk-chip' + (s === sub ? ' on' : '') + '" data-sub="' + esc(s) + '">' + esc(s) + '</button>').join('');
+        subsBox.querySelectorAll('[data-sub]').forEach(b => { b.onclick = () => { sub = b.dataset.sub; paintSubs(); }; });
+      };
+      paintCats(); paintSubs();
+      m.querySelector('#pc-ok').onclick = () => done({ category: cat, sub });
+    });
   },
 
   /* ---------- 记录列表 ---------- */
