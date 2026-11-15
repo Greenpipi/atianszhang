@@ -250,6 +250,8 @@ const App = {
     // 季节自动切换：打开应用时执行一次（不阻塞渲染，后台完成）
     this.applySeasonStatus().catch(e => console.warn('季节自动切换失败', e));
     this.route();
+    // 快捷指令带 ?quick=1 进来：数据已就绪，直接弹快速记账面板
+    this.maybeOpenQuick();
     // 自动付：打开应用先补算一次（服务端 pg_cron 之外的兜底），再展示「已自动支付」通知
     this.startAutoPayWatch();
   },
@@ -1105,6 +1107,126 @@ const App = {
       this.toast('已记账 ' + fmtMoney(amount), 'ok');
       reset();
     };
+  },
+
+  /* ---------- 快速记账（快捷指令 ?quick=1 唤起） ---------- */
+  /* 轻点背面三下 → 快捷指令打开 线上地址/?quick=1 → 这里直接弹面板。
+     只覆盖日常短记账：大类 → 小类 → 金额 → 描述/备注 → 保存，日期固定今天。 */
+  quickWanted() {
+    try { return new URLSearchParams(location.search).get('quick') === '1'; } catch (e) { return false; }
+  },
+
+  /* 登录且数据就绪后才弹；参数用完立刻从地址栏抹掉，刷新/回退不会重复弹 */
+  maybeOpenQuick() {
+    if (!this.quickWanted()) return;
+    if (!Store.user || !this.state.currentLedgerId) return;
+    if (document.querySelector('.modal.quick-modal')) return;
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
+    this.openQuickEntry();
+  },
+
+  /* 最近用过的「大类::小类」：按日期、创建时间倒序去重，分类已删除或小类失效的跳过 */
+  recentCombos(ledgerId, limit) {
+    const recs = this.recsOf(ledgerId).slice().sort((a, b) =>
+      String(b.date || '').localeCompare(String(a.date || ''))
+      || String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    const seen = new Set(), out = [];
+    for (const r of recs) {
+      const c = this.catByName(ledgerId, r.category);
+      if (!c) continue;
+      if (r.sub && !(c.subs || []).includes(r.sub)) continue;
+      const key = r.category + '::' + (r.sub || '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ category: r.category, sub: r.sub || '' });
+      if (out.length >= (limit || 5)) break;
+    }
+    return out;
+  },
+
+  openQuickEntry() {
+    const lid = this.state.currentLedgerId;
+    const ledger = this.curLedger();
+    const cats = this.catsOf(lid);
+    if (!ledger || !cats.length) { this.toast('分类还没加载好，请稍后再试', 'err'); return; }
+
+    const subsOf = name => ((this.catByName(lid, name) || {}).subs || []);
+    const recent = this.recentCombos(lid, 5);
+    // 默认落在最近用过的组合上，省一步；其余用户点一下就换
+    let selCat = recent.length ? recent[0].category : cats[0].name;
+    let selSub = recent.length ? recent[0].sub : (subsOf(cats[0].name)[0] || '');
+
+    const m = this.openModal(`
+      <div class="qk-head">
+        <div>
+          <div class="qk-title">快速记一笔</div>
+          <div class="qk-sub">${esc(ledger.name)} · ${todayStr().slice(5).replace('-', ' 月 ')} 日</div>
+        </div>
+        <button type="button" class="icon-btn qk-close" data-close aria-label="关闭">✕</button>
+      </div>
+      ${recent.length ? '<div class="qk-block"><div class="qk-label">最近用过的</div><div class="qk-chips" id="qk-recent"></div></div>' : ''}
+      <div class="qk-block"><div class="qk-label">大类</div><div class="qk-chips" id="qk-cats"></div></div>
+      <div class="qk-block"><div class="qk-label">小类</div><div class="qk-chips" id="qk-subs"></div></div>
+      <label class="qk-amt"><span>¥</span>
+        <input id="qk-amt" type="number" step="0.01" inputmode="decimal" enterkeyhint="done" placeholder="0.00" autocomplete="off">
+      </label>
+      <div class="qk-fields">
+        <input id="qk-note" type="text" placeholder="描述（选填）" autocomplete="off">
+        <input id="qk-remark" type="text" placeholder="备注（选填）" autocomplete="off">
+      </div>
+      <button type="button" class="qk-save" id="qk-save">保存记账</button>
+    `, false, 'quick-modal', 'quick-mask');
+
+    const catsBox = m.querySelector('#qk-cats');
+    const subsBox = m.querySelector('#qk-subs');
+    const recentBox = m.querySelector('#qk-recent');
+    const amt = m.querySelector('#qk-amt'), note = m.querySelector('#qk-note'), remark = m.querySelector('#qk-remark');
+
+    const paintCats = () => {
+      catsBox.innerHTML = cats.map(c => '<button type="button" class="qk-chip' + (c.name === selCat ? ' on' : '') + '" data-cat="' + esc(c.name) + '">' + esc(c.name) + '</button>').join('');
+      catsBox.querySelectorAll('[data-cat]').forEach(b => {
+        b.onclick = () => { selCat = b.dataset.cat; selSub = subsOf(selCat)[0] || ''; paintCats(); paintSubs(); amt.focus(); };
+      });
+    };
+    const paintSubs = () => {
+      const subs = subsOf(selCat);
+      if (!subs.length) { subsBox.innerHTML = '<span class="qk-empty">该大类没有小类</span>'; return; }
+      subsBox.innerHTML = subs.map(s => '<button type="button" class="qk-chip' + (s === selSub ? ' on' : '') + '" data-sub="' + esc(s) + '">' + esc(s) + '</button>').join('');
+      subsBox.querySelectorAll('[data-sub]').forEach(b => {
+        b.onclick = () => { selSub = b.dataset.sub; paintSubs(); amt.focus(); };
+      });
+    };
+    paintCats();
+    paintSubs();
+
+    if (recentBox) {
+      recentBox.innerHTML = recent.map((c, i) => '<button type="button" class="qk-chip rc" data-rc="' + i + '">' + esc(c.category) + (c.sub ? ' · ' + esc(c.sub) : '') + '</button>').join('');
+      recentBox.querySelectorAll('[data-rc]').forEach(b => {
+        b.onclick = () => {
+          const c = recent[Number(b.dataset.rc)];
+          if (!c) return;
+          selCat = c.category; selSub = c.sub;
+          paintCats(); paintSubs(); amt.focus();
+        };
+      });
+    }
+
+    // 日常一笔就记到今天，不提供日期选择；金额或描述回车直接保存
+    const save = () => {
+      const amount = parseFloat(amt.value);
+      if (!amount || !isFinite(amount)) { this.toast('请输入正确金额', 'err'); amt.focus(); return; }
+      this.optimisticAdd({
+        ledger_id: lid, category: selCat, sub: selSub, amount,
+        note: note.value.trim(), remark: remark.value.trim(),
+        favorite: false, tags: [], rating: 0, date: todayStr(), image: null,
+        kind: this.kindOf(lid, selCat)
+      });
+      this.closeModal();
+      this.toast('已记 ' + fmtMoney(amount) + ' · ' + selCat + (selSub ? ' / ' + selSub : ''), 'ok');
+    };
+    m.querySelector('#qk-save').onclick = save;
+    amt.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+    note.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
   },
 
   /* ---------- 记录列表 ---------- */
