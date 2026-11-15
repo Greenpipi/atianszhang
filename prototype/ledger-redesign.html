@@ -241,6 +241,18 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .inline-more .stars b{color:var(--gold);font-weight:400}
 .inline-more .mini-link{font-size:11.5px;font-weight:600;color:var(--gold-deep)}
 
+/* 标题栏上方间距：可拖动调节 */
+#pane-list{position:relative}
+#pane-list .list-head{margin-top:var(--list-gap,0px)}
+.list-gap{
+  position:absolute;top:-18px;left:0;right:0;height:18px;z-index:5;
+  display:flex;align-items:center;justify-content:center;
+  cursor:ns-resize;touch-action:none;opacity:0;transition:opacity .15s;
+}
+#pane-list:hover .list-gap,.list-gap.dragging{opacity:1}
+.list-gap i{width:30px;height:3px;border-radius:999px;background:var(--line);transition:background .15s}
+.list-gap:hover i{background:var(--gold-line)}
+.list-gap.dragging i{background:var(--gold)}
 /* 清单模式 */
 .list-head{flex:none;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:11px}
 .list-title-wrap{display:flex;align-items:baseline;gap:9px;min-width:0;flex:1}
@@ -254,13 +266,14 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .count{font-size:11px;font-weight:600;color:var(--faint);white-space:nowrap}
 .list-head-actions{display:flex;align-items:center;gap:10px;flex:none}
 .list-date{
-  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);
-  border-radius:9px;background:#fff;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);
+  display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--line);
+  border-radius:9px;background:#fff;font-family:var(--mono);font-size:13px;font-weight:500;color:var(--ink-2);
   transition:border-color .15s,background .15s;
 }
 .list-date:hover{border-color:var(--gold-line);background:#FEFBF5}
-.list-date span{font-family:var(--sans);font-size:10px;color:var(--faint)}
-.calc-hint{font-size:10.5px;color:var(--faint);font-weight:500}
+.list-date span{font-family:var(--sans);font-size:12px;color:var(--faint)}
+.calc-hint{font-size:12.5px;color:var(--faint);font-weight:500}
+.list-head-actions #addRow{font-size:13.5px;padding:8px 14px}
 .btn-ghost{
   border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:700;color:var(--ink-2);
   transition:border-color .15s,background .15s;
@@ -677,6 +690,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   .main{padding:13px 15px 0}
   .list-title{font-size:19px;max-width:180px}
   .calc-hint{display:none}
+  .list-gap{display:none}
+  #pane-list .list-head{margin-top:0}
   .list-tip{display:none}
   .table-scroll{border-radius:11px}
   .inspector{
@@ -863,7 +878,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         </section>
 
         <!-- 清单 -->
-        <section class="pane" id="pane-list">
+        <section class="pane" id="pane-list" style="--list-gap:0px">
+          <div class="list-gap" id="listGap" title="上下拖动，调整标题栏上方间距；双击复位"><i></i></div>
           <div class="list-head">
             <div class="list-title-wrap">
               <span class="eyebrow">清单</span>
@@ -880,15 +896,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
           <div class="table-scroll">
             <table class="items">
               <colgroup>
-                <col style="width:28px">
-                <col>
-                <col style="width:96px">
-                <col style="width:66px">
-                <col style="width:42px">
-                <col style="width:80px">
-                <col style="width:82px">
-                <col style="width:62px">
-                <col style="width:24px">
+                <col style="width:3%">
+                <col style="width:27%">
+                <col style="width:13%">
+                <col style="width:8%">
+                <col style="width:5.5%">
+                <col style="width:9.5%">
+                <col style="width:23.5%">
+                <col style="width:8%">
+                <col style="width:2.5%">
               </colgroup>
               <thead>
                 <tr>
@@ -1782,6 +1798,38 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
     /* 清单名称 */
     $('#listTitle').addEventListener('input', e => { state.listTitle = e.target.value; });
+
+    /* 标题栏上方间距：拖动调节，双击复位 */
+    (() => {
+      const pane = $('#pane-list');
+      const grip = $('#listGap');
+      const DEF = 0;
+      let startY = 0, startGap = DEF, dragging = false;
+      const cur = () => parseFloat(getComputedStyle(pane).getPropertyValue('--list-gap')) || 0;
+      const apply = v => pane.style.setProperty('--list-gap', Math.max(-12, Math.min(48, v)) + 'px');
+      grip.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        dragging = true;
+        startY = e.clientY;
+        startGap = cur();
+        grip.classList.add('dragging');
+        grip.setPointerCapture(e.pointerId);
+        document.body.style.userSelect = 'none';
+      });
+      grip.addEventListener('pointermove', e => {
+        if (dragging) apply(startGap + (e.clientY - startY));
+      });
+      const end = e => {
+        if (!dragging) return;
+        dragging = false;
+        grip.classList.remove('dragging');
+        document.body.style.userSelect = '';
+        try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+      grip.addEventListener('dblclick', () => apply(DEF));
+    })();
 
     /* 抽屉 */
     $('#inspClose').addEventListener('click', closeDrawer);
