@@ -33,7 +33,8 @@
   --sans:'Instrument Sans',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
   --serif:'Fraunces','Songti SC',Georgia,serif;
 }
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{display:none;width:0;height:0}
 html,body{height:100%}
 body{
   font-family:var(--sans);background:var(--bg);color:var(--ink);
@@ -117,10 +118,6 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .eyebrow{display:block;font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
 .mh-title{display:flex;align-items:baseline;gap:10px;margin-top:3px}
 .mh-title h1{font-family:var(--serif);font-size:26px;font-weight:500;letter-spacing:-.01em;line-height:1.15}
-.ledger-tag{
-  font-size:10.5px;font-weight:700;color:var(--sage-deep);background:var(--sage-soft);
-  border-radius:999px;padding:3px 8px;letter-spacing:.02em;
-}
 .mode-switch{flex:none;display:flex;gap:2px;padding:4px;background:#F1ECE2;border-radius:999px;border:1px solid #EAE3D7}
 .mode-switch button{
   min-width:66px;padding:7px 15px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--muted);
@@ -128,8 +125,6 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 }
 .mode-switch button.on{background:#fff;color:var(--ink);box-shadow:0 1px 5px rgba(64,60,52,.13)}
 .mh-right{flex:none;display:flex;align-items:center;gap:12px}
-.cloud{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--sage-deep)}
-.cloud::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--sage);box-shadow:0 0 0 3px rgba(124,140,114,.14)}
 .icon-btn{
   width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--muted);
   transition:background .15s,color .15s;font-size:15px;
@@ -139,11 +134,9 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 /* 主体三栏 */
 .mb{flex:1;min-height:0;display:flex;position:relative}
 .rail{
-  flex:none;width:232px;padding:18px 17px 16px;overflow-y:auto;overflow-x:hidden;
+  flex:none;width:228px;padding:18px 17px 16px;overflow-y:auto;overflow-x:hidden;
   border-right:1px solid var(--line-soft);background:linear-gradient(180deg,#FDFBF6 0%,#FBF8F1 100%);
 }
-.rail::-webkit-scrollbar{width:3px}
-.rail::-webkit-scrollbar-thumb{background:#DDD4C5;border-radius:4px}
 .rail-block{margin-bottom:18px}
 .rail-block:last-child{margin-bottom:0}
 .rail-label{
@@ -176,6 +169,9 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
   transition:background .14s,color .14s;
 }
 .sub-chip.on{background:var(--gold-soft);color:var(--gold-deep);box-shadow:inset 0 0 0 1px var(--gold-line)}
+.rail-hint{display:none;margin-top:7px;font-size:9.5px;line-height:1.45;color:var(--faint)}
+.modal.list-mode .rail-hint{display:block}
+.modal.list-mode .rail-more{display:none}
 .date-btn{
   width:100%;display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:11px;
   background:#fff;border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink-2);text-align:left;
@@ -273,11 +269,7 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
   flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;
   box-shadow:0 1px 3px rgba(64,60,52,.03);
 }
-.table-scroll::-webkit-scrollbar{width:9px;height:9px}
-.table-scroll::-webkit-scrollbar-track{background:transparent}
-.table-scroll::-webkit-scrollbar-thumb{background:#E2DACB;border-radius:8px;border:2px solid #fff}
-.table-scroll::-webkit-scrollbar-thumb:hover{background:#D2C7B3}
-table.items{width:100%;min-width:590px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+table.items{width:100%;min-width:600px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 table.items thead th{
   position:sticky;top:0;z-index:2;background:#FAF7F0;text-align:left;
   font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);
@@ -301,6 +293,18 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 .title-cell{display:flex;align-items:center;gap:2px}
 .title-cell .cell-input{flex:1;min-width:0}
 .good-mark{flex:none;margin-left:7px;font-size:9px;color:var(--gold);line-height:1}
+.cat-pill{
+  display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:5px 7px;border-radius:6px;
+  background:#F5F1E8;border:1px solid transparent;font-size:10px;font-weight:600;color:var(--muted);
+  transition:all .14s;white-space:nowrap;
+}
+.cat-pill span{overflow:hidden;text-overflow:ellipsis}
+.cat-pill:hover{background:#F8F3E9;border-color:var(--line)}
+.cat-pill.rental{background:var(--gold-soft);border-color:var(--gold-line);color:var(--gold-deep)}
+.cat-pill i{
+  font-style:normal;flex:none;font-size:8px;line-height:1;padding:2px 3px;border-radius:3px;
+  background:rgba(165,130,76,.18);color:var(--gold-deep);
+}
 .cell-input.note{font-weight:500;color:var(--muted);font-size:11.5px}
 .price-wrap{display:flex;align-items:center;gap:1px;padding-left:4px;color:var(--faint);font-family:var(--mono);font-size:11px}
 .price-wrap .cell-input{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--ink-2);padding-left:1px}
@@ -333,8 +337,8 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
   border-left:1px solid transparent;
   transition:width .34s cubic-bezier(.2,.8,.2,1),opacity .22s ease;
 }
-.modal.drawer-open .inspector{width:348px;opacity:1;border-left-color:var(--line-soft)}
-.insp-inner{width:348px;height:100%;display:flex;flex-direction:column;padding:18px 19px 0}
+.modal.drawer-open .inspector{width:340px;opacity:1;border-left-color:var(--line-soft)}
+.insp-inner{width:340px;height:100%;display:flex;flex-direction:column;padding:18px 19px 0}
 .insp-head{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:11px}
 .insp-head b{display:block;font-family:var(--serif);font-size:18px;font-weight:500;line-height:1.2;margin-top:3px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wish-strip{
@@ -352,9 +356,7 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 .ws-idx{font-family:var(--mono);font-size:9px;color:var(--faint)}
 .ws-chip.on .ws-idx{color:var(--gold)}
 .ws-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.insp-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:16px}
-.insp-scroll::-webkit-scrollbar{width:4px}
-.insp-scroll::-webkit-scrollbar-thumb{background:#DDD4C5;border-radius:4px}
+.insp-scroll{flex:1;min-height:0;overflow-y:auto;padding-bottom:6px}
 .good-summary{
   display:flex;align-items:center;gap:11px;padding:10px;border:1px solid var(--line);border-radius:12px;
   background:#fff;margin-bottom:15px;
@@ -390,13 +392,40 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
   transition:background .14s;
 }
 .add-tag-btn:hover{background:#F1E8D8}
-.plat-chips{display:flex;flex-wrap:wrap;gap:5px}
+.plat-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .plat-chip{
   padding:5px 10px;border-radius:7px;background:#F5F1E8;border:1px solid transparent;font-size:10.5px;font-weight:600;color:var(--muted);
   transition:all .14s;
 }
 .plat-chip:hover{background:#F8F3E9}
 .plat-chip.on{background:#fff;border-color:var(--gold-line);color:var(--gold-deep);box-shadow:0 1px 4px rgba(165,130,76,.09)}
+.plat-chip.other{border-style:dashed;border-color:var(--line);color:var(--faint)}
+.plat-chip.other:hover{border-color:var(--gold-line);color:var(--gold-deep)}
+.plat-tag{
+  display:inline-flex;align-items:center;gap:2px;padding:0 8px 0 0;border-radius:7px;
+  background:#F5F1E8;border:1px solid transparent;transition:all .14s;
+}
+.plat-tag:hover{background:#F8F3E9}
+.plat-tag.on{background:#fff;border-color:var(--gold-line);box-shadow:0 1px 4px rgba(165,130,76,.09)}
+.plat-tag .plat-chip{padding:5px 4px 5px 8px;background:transparent;border:0;box-shadow:none}
+.plat-tag .plat-chip.on{background:transparent;border:0;box-shadow:none}
+.plat-del{
+  color:#BDB5A7;font-size:11px;line-height:1;padding:2px 1px;border-radius:3px;
+}
+.plat-del:hover{color:var(--danger);background:#F9EDEA}
+.plat-input-row{display:flex;gap:5px;width:100%;margin-top:6px}
+.plat-input-row input{
+  flex:1;min-width:0;border:1px solid var(--gold-line);border-radius:7px;background:#fff;
+  padding:6px 8px;font-size:11px;font-weight:600;
+}
+.plat-input-row button{
+  flex:none;border-radius:7px;background:var(--gold-soft);border:1px solid var(--gold-line);
+  padding:6px 10px;font-size:10.5px;font-weight:700;color:var(--gold-deep);
+}
+.plat-edit-input{
+  width:96px;border:1px solid var(--gold);border-radius:7px;background:#fff;
+  padding:5px 7px;font-size:10.5px;font-weight:600;
+}
 .insp-input{
   width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;
   font-size:12px;font-weight:600;transition:border-color .14s,box-shadow .14s;
@@ -405,25 +434,33 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 .thumb-grid{display:flex;gap:7px;flex-wrap:wrap}
 .img-tile{
-  position:relative;width:66px;height:66px;border-radius:9px;display:grid;place-items:center;font-size:20px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5);overflow:hidden;
+  position:relative;width:64px;height:64px;border-radius:9px;display:grid;place-items:center;font-size:20px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5);overflow:hidden;flex:none;
 }
+.img-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.img-tile.broken{background:linear-gradient(145deg,#EDE6D8,#DCD2C0)}
 .img-tile button{
   position:absolute;top:3px;right:3px;width:15px;height:15px;border-radius:50%;background:rgba(43,39,33,.55);
-  color:#fff;font-size:9px;display:grid;place-items:center;line-height:1;
+  color:#fff;font-size:9px;display:grid;place-items:center;line-height:1;z-index:2;
 }
 .img-add{
-  width:66px;height:66px;border-radius:9px;border:1px dashed var(--line);display:flex;flex-direction:column;
+  width:64px;height:64px;border-radius:9px;border:1px dashed var(--line);display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2px;color:var(--faint);font-size:16px;background:#FCFAF5;
-  transition:border-color .14s,color .14s;
+  transition:border-color .14s,color .14s;flex:none;
 }
+.img-add svg{width:15px;height:15px}
 .img-add small{font-size:9px}
 .img-add:hover{border-color:var(--gold-line);color:var(--gold-deep)}
-.insp-foot{
-  flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  border-top:1px solid var(--line-soft);padding:11px 0 13px;background:linear-gradient(180deg,rgba(252,248,241,0),#FCF8F1 30%);
+.insp-end-hint{padding:3px 0 10px;font-size:9.5px;color:var(--faint)}
+.single-media{
+  margin-top:12px;border:1px solid var(--line);border-radius:13px;background:#fff;padding:11px 14px 12px;
 }
-.insp-foot span{font-size:9.5px;color:var(--faint)}
+.media-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.media-head span:first-child{font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.media-head span:last-child{font-size:9.5px;color:var(--faint)}
+.single-media .thumb-grid{gap:6px}
+.single-media .img-tile,.single-media .img-add{width:58px;height:58px}
+.insp-end-hint{padding:3px 0 10px;font-size:9.5px;color:var(--faint)}
 
 /* 底部 */
 .mf{
@@ -454,8 +491,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 }
 .tp-search:focus{border-color:var(--gold-line);background:#fff}
 .tp-body{max-height:298px;overflow-y:auto;padding:0 12px 6px}
-.tp-body::-webkit-scrollbar{width:4px}
-.tp-body::-webkit-scrollbar-thumb{background:#DDD4C5;border-radius:4px}
 .tp-group{padding:7px 0 8px;border-top:1px dashed var(--line-soft)}
 .tp-group:first-child{border-top:0}
 .tp-group-name{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--faint);margin-bottom:6px}
@@ -471,6 +506,57 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 .tp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid var(--line-soft);background:#FCF9F3}
 .tp-foot span{font-size:9.5px;color:var(--faint)}
 
+/* ---------- 单行分类气泡 ---------- */
+.cat-pop{
+  position:fixed;z-index:205;display:none;flex-direction:column;
+  width:304px;background:#FFFDF9;border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 24px 64px -16px rgba(64,60,52,.34);overflow:hidden;
+}
+.cat-pop.show{display:flex;animation:pop .14s ease}
+.cp-head{display:flex;align-items:center;gap:7px;padding:12px 14px 9px;font-size:12px;font-weight:700}
+.cp-head em{font-style:normal;font-family:var(--mono);font-size:10px;font-weight:500;color:var(--gold-deep);background:var(--gold-soft);border-radius:5px;padding:2px 5px}
+.cp-head .icon-btn{margin-left:auto;width:24px;height:24px;font-size:12px}
+.cp-body{padding:0 14px 13px}
+.cp-label{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--faint);margin:9px 0 6px}
+.cp-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.cp-chip{
+  display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;
+  background:#F5F1E8;border:1px solid transparent;font-size:11px;font-weight:600;color:var(--ink-2);text-align:left;
+  transition:all .13s;
+}
+.cp-chip svg{width:13px;height:13px;flex:none;opacity:.75}
+.cp-chip:hover{background:#F8F3E9}
+.cp-chip.on{background:#fff;border-color:var(--gold-line);color:var(--gold-deep);box-shadow:0 1px 5px rgba(165,130,76,.1)}
+.cp-chips{display:flex;flex-wrap:wrap;gap:5px}
+.cp-sub{padding:4.5px 9px;border-radius:999px;background:#F5F1E8;font-size:10.5px;font-weight:600;color:var(--muted)}
+.cp-sub.on{background:var(--gold-soft);color:var(--gold-deep);box-shadow:inset 0 0 0 1px var(--gold-line)}
+.cp-divider{height:1px;background:var(--line-soft);margin:11px 0 9px}
+.cp-rent{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;font-weight:600;color:var(--ink-2)}
+.cp-rent small{display:block;font-size:9.5px;font-weight:500;color:var(--faint);margin-top:1px}
+.switch-btn.sm{width:34px;height:20px}
+.switch-btn.sm i{width:14px;height:14px;top:3px;left:3px}
+.switch-btn.sm.on i{transform:translateX(14px)}
+
+/* ---------- 图片链接气泡 ---------- */
+.link-pop{
+  position:fixed;z-index:210;display:none;flex-direction:column;
+  width:306px;background:#FFFDF9;border:1px solid var(--line);border-radius:13px;
+  box-shadow:0 24px 64px -16px rgba(64,60,52,.34);overflow:hidden;
+}
+.link-pop.show{display:flex;animation:pop .14s ease}
+.lp-head{padding:12px 14px 4px;font-size:12px;font-weight:700}
+.lp-tip{padding:0 14px 9px;font-size:9.5px;color:var(--faint)}
+.lp-body{padding:0 14px}
+.lp-body input{
+  width:100%;border:1px solid var(--line);border-radius:8px;background:#FBF8F2;
+  padding:8px 10px;font-size:11px;font-weight:500;
+}
+.lp-body input:focus{border-color:var(--gold-line);background:#fff}
+.lp-foot{display:flex;justify-content:flex-end;gap:7px;padding:10px 14px 12px}
+.lp-foot button{border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700}
+.lp-foot .cancel{color:var(--muted)}
+.lp-foot .cancel:hover{color:var(--ink)}
+
 /* Toast */
 #toastRoot{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:7px}
 .toast{
@@ -485,19 +571,19 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   .modal.list-mode{width:96vw}
   /* 中小屏：好物抽屉改为浮层，不再挤压清单宽度 */
   .inspector{
-    position:absolute;top:0;right:0;bottom:0;width:348px;opacity:0;
+    position:absolute;top:0;right:0;bottom:0;width:340px;opacity:0;
     transform:translateX(26px);pointer-events:none;z-index:25;box-shadow:none;
   }
   .modal.drawer-open .inspector{
-    width:348px;opacity:1;transform:none;pointer-events:auto;
+    width:340px;opacity:1;transform:none;pointer-events:auto;
     border-left-color:var(--line-soft);box-shadow:-30px 0 64px -40px rgba(64,60,52,.4);
   }
   .insp-inner{width:100%}
 }
 @media (max-width:1100px){
   .rail{width:212px}
-  .inspector{width:340px}
-  .modal.drawer-open .inspector{width:340px}
+  .inspector{width:330px}
+  .modal.drawer-open .inspector{width:330px}
   .proto-hint{display:none}
 }
 @media (max-width:900px){
@@ -581,11 +667,11 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   <div class="notes-panel" id="notesPanel" hidden>
     <h4>这次改了什么</h4>
     <ul>
-      <li><i>01</i><span><b>固定高度工作台</b>：弹窗本身不滚，只有清单和抽屉内部滚动。</span></li>
-      <li><i>02</i><span><b>清单只占中间一列</b>：序号 / 标题 / 单价 / 数量 / 金额 / 备注，金额自动算。</span></li>
+      <li><i>01</i><span><b>固定高度工作台</b>：弹窗本身不滚，只有清单和抽屉内部滚动，滚动条全部隐藏。</span></li>
+      <li><i>02</i><span><b>清单每行独立</b>：序号 / 标题 / 分类 / 单价 / 数量 / 金额 / 备注，分类和出租屋都能逐行改。</span></li>
       <li><i>03</i><span><b>好物字段横向进抽屉</b>：标签、平台、规格、图片在右侧展开，不再把表单往下撑。</span></li>
-      <li><i>04</i><span><b>标签改成气泡</b>：按需打开、可搜索、内部滚动，绝不改变弹窗高度。</span></li>
-      <li><i>05</i><span><b>多件好物横向切换</b>：抽屉顶部一排小卡，点谁编辑谁。</span></li>
+      <li><i>04</i><span><b>平台可自定义</b>：点「其他」输入即成为标签，可删除、双击改名。</span></li>
+      <li><i>05</i><span><b>图片双入口</b>：本地上传和图片链接都能加缩略图。</span></li>
     </ul>
   </div>
 
@@ -595,7 +681,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         <span class="eyebrow" id="mhDate">2026-11-15 · 周六</span>
         <div class="mh-title">
           <h1>记一笔</h1>
-          <span class="ledger-tag">个人账本</span>
         </div>
       </div>
       <div class="mode-switch" role="group" aria-label="记账方式">
@@ -603,18 +688,12 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         <button type="button" data-mode="list" class="on">清单</button>
       </div>
       <div class="mh-right">
-        <span class="cloud">云端账本</span>
         <button type="button" class="icon-btn" id="closeModal" title="关闭">✕</button>
       </div>
     </header>
 
     <div class="mb">
       <aside class="rail">
-        <div class="rail-block">
-          <div class="rail-label">账本</div>
-          <button type="button" class="ledger-btn"><span class="dot"></span>个人账本<span class="chev">▾</span></button>
-        </div>
-
         <div class="rail-block">
           <div class="rail-label">收支</div>
           <div class="type-switch" id="typeSwitch">
@@ -624,7 +703,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         </div>
 
         <div class="rail-block">
-          <div class="rail-label">大类</div>
+          <div class="rail-label"><span id="catLabel">大类</span></div>
           <div class="cat-grid" id="catGrid">
             <button type="button" class="cat-chip" data-cat="餐饮">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5v6.4a2.3 2.3 0 0 1-2.3 2.3h-.2A2.3 2.3 0 0 1 2.2 9.9V3.5"/><path d="M4.6 3.5v17"/><path d="M17.5 3.5c-1.9 1.5-3 4-3 6.9 0 1.9 1.2 3.1 3 3.1s3-1.2 3-3.1c0-2.9-1.1-5.4-3-6.9Z"/><path d="M17.5 13.5v7"/></svg>
@@ -654,8 +733,9 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         </div>
 
         <div class="rail-block">
-          <div class="rail-label">小类 <em id="subCount"></em></div>
+          <div class="rail-label"><span id="subLabel">小类</span> <em id="subCount"></em></div>
           <div class="sub-chips" id="subChips"></div>
+          <div class="rail-hint" id="catHint">清单里每一行都可以单独改分类，这里只作为新增行的默认值。</div>
         </div>
 
         <div class="rail-block">
@@ -675,7 +755,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
             <div class="amount-label">金额</div>
             <div class="amount-row">
               <span class="cny">¥</span>
-              <input id="singleAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" aria-label="金额">
+              <input id="singleAmount" type="text" inputmode="decimal" placeholder="0.00" aria-label="金额">
               <span class="kind-tag" id="singleKind">支出</span>
             </div>
           </div>
@@ -711,8 +791,12 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
           <div class="inline-more">
             <span class="stars">★★★★★</span>
-            <label class="mini-check"><input type="checkbox">归入出租屋</label>
-            <button type="button" class="mini-link" id="singleImgBtn">＋ 上传图片</button>
+            <span>评分</span>
+          </div>
+
+          <div class="single-media">
+            <div class="media-head"><span>图片</span><span>支持本地上传或图片链接</span></div>
+            <div class="thumb-grid" id="singleImgs"></div>
           </div>
         </section>
 
@@ -733,19 +817,21 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
           <div class="table-scroll">
             <table class="items">
               <colgroup>
-                <col style="width:34px">
+                <col style="width:28px">
                 <col>
+                <col style="width:96px">
+                <col style="width:66px">
+                <col style="width:42px">
+                <col style="width:80px">
                 <col style="width:82px">
-                <col style="width:50px">
-                <col style="width:88px">
-                <col style="width:116px">
-                <col style="width:76px">
-                <col style="width:30px">
+                <col style="width:62px">
+                <col style="width:24px">
               </colgroup>
               <thead>
                 <tr>
                   <th>#</th>
                   <th>标题</th>
+                  <th>分类</th>
                   <th>单价</th>
                   <th>数量</th>
                   <th>金额</th>
@@ -802,7 +888,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
             </div>
 
             <div class="insp-field">
-              <div class="insp-label">图片</div>
+              <div class="insp-label">图片 <em>本地上传 / 链接</em></div>
               <div class="thumb-grid" id="inspImgs"></div>
             </div>
 
@@ -810,11 +896,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
               <div class="insp-label">备注</div>
               <textarea class="insp-input" id="inspRemark" rows="3" placeholder="选填"></textarea>
             </div>
-          </div>
-
-          <div class="insp-foot">
-            <span>修改即时同步到左侧明细</span>
-            <button type="button" class="btn-primary sm" id="inspDone">完成</button>
+            <div class="insp-end-hint">修改会即时同步到左侧明细，点右上角 × 收起。</div>
           </div>
         </div>
       </aside>
@@ -827,7 +909,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         <span class="mf-sub" id="mfSub">9 项 · 4 件好物</span>
       </div>
       <div class="mf-actions">
-        <button type="button" class="btn-ghost" id="saveTemplate">存为模板</button>
         <button type="button" class="btn-ghost" id="saveNext">保存并继续</button>
         <button type="button" class="btn-primary" id="save">保存</button>
       </div>
@@ -842,6 +923,32 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   <div class="tp-body" id="tpBody"></div>
   <div class="tp-foot"><span>可多选 · 不改弹窗高度</span><button type="button" class="btn-primary sm" id="tpDone">完成</button></div>
 </div>
+
+<!-- 单行分类气泡 -->
+<div class="cat-pop" id="catPop" role="dialog" aria-label="设置这一行的分类">
+  <div class="cp-head">这一行的分类 <em id="cpIndex">#1</em><button type="button" class="icon-btn" id="cpClose">✕</button></div>
+  <div class="cp-body">
+    <div class="cp-label">大类</div>
+    <div class="cp-grid" id="cpCats"></div>
+    <div class="cp-label">小类</div>
+    <div class="cp-chips" id="cpSubs"></div>
+    <div class="cp-divider"></div>
+    <div class="cp-rent">
+      <div><span id="cpRentLabel">归入出租屋账本</span><small>只影响这一件物品</small></div>
+      <button type="button" class="switch-btn sm" id="cpRental" aria-label="归入出租屋账本"><i></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- 图片链接气泡 -->
+<div class="link-pop" id="imgLinkPop" role="dialog" aria-label="添加图片链接">
+  <div class="lp-head">添加图片链接</div>
+  <div class="lp-tip">粘贴 http/https 图片地址，添加后会作为缩略图显示</div>
+  <div class="lp-body"><input id="imgLinkInput" type="url" placeholder="https://example.com/photo.jpg" autocomplete="off"></div>
+  <div class="lp-foot"><button type="button" class="cancel" id="imgLinkCancel">取消</button><button type="button" class="btn-primary sm" id="imgLinkAdd">添加</button></div>
+</div>
+
+<input type="file" id="imgFileInput" accept="image/*" multiple hidden>
 
 <div id="toastRoot"></div>
 
@@ -868,7 +975,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     '美容美发': '💦', '杂货': '📔', '家电': '⚡', '收纳': '🧺', '文创': '🖊️',
     '餐厨用品': '🍴', '家具': '🛋'
   };
-  const PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下', '其他'];
+  const BASE_PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下'];
   const IMG_BG = [
     'linear-gradient(145deg,#E9E1D3,#D5C8B2)',
     'linear-gradient(145deg,#E3E7DE,#C9D0C1)',
@@ -894,25 +1001,32 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     date: '2026-11-15',
     listTitle: '宜家采购',
     activeId: null,
+    platforms: BASE_PLATFORMS.slice(),
+    platInputFor: null,
+    platEdit: null,
+    catRowId: null,
+    imgTarget: null,
     rows: [
-      { id: 1, title: 'PAX 衣柜框架', price: 1290, qty: 1, note: '白色 200×60×201', wish: true, tags: ['家具'], platform: '宜家', spec: '白色 / 200×60×201cm', remark: '含安装服务', imgs: [0, 1] },
-      { id: 2, title: 'KOMPLEMENT 搁板', price: 79, qty: 4, note: '白色 100×58', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 3, title: 'SKUBB 收纳盒', price: 19.9, qty: 6, note: '白色 6 件套', wish: true, tags: ['日用品-收纳'], platform: '宜家', spec: '34×51×28cm', remark: '', imgs: [2] },
-      { id: 4, title: 'MALM 高箱床架', price: 899, qty: 1, note: '160×200 白色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 5, title: 'FRAKTA 购物袋', price: 4.9, qty: 2, note: '蓝色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 6, title: 'LED 灯泡 E27', price: 9.9, qty: 4, note: '暖光 2700K', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 7, title: 'OMTÄNKSAM 靠垫', price: 79, qty: 2, note: '米色 50×50', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
-      { id: 8, title: 'LACK 边桌', price: 99, qty: 1, note: '白色 55×55', wish: true, tags: ['家具'], platform: '宜家', spec: '55×55×45cm', remark: '', imgs: [] },
-      { id: 9, title: '龟背竹 中号', price: 128, qty: 1, note: '含水泥盆', wish: true, tags: ['日用品-杂货', '通用-夏季'], platform: '线下', spec: '高约 1.2m', remark: '花市自提', imgs: [3] }
+      { id: 1, title: 'PAX 衣柜框架', cat: '购物', sub: '家居', rental: true, price: 1290, qty: 1, note: '白色 200×60×201', wish: true, tags: ['家具'], platform: '宜家', spec: '白色 / 200×60×201cm', remark: '含安装服务', imgs: [0, 1] },
+      { id: 2, title: 'KOMPLEMENT 搁板', cat: '购物', sub: '家居', rental: false, price: 79, qty: 4, note: '白色 100×58', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
+      { id: 3, title: 'SKUBB 收纳盒', cat: '日用', sub: '收纳', rental: false, price: 19.9, qty: 6, note: '白色 6 件套', wish: true, tags: ['日用品-收纳'], platform: '宜家', spec: '34×51×28cm', remark: '', imgs: [2] },
+      { id: 4, title: 'MALM 高箱床架', cat: '购物', sub: '家居', rental: true, price: 899, qty: 1, note: '160×200 白色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
+      { id: 5, title: 'FRAKTA 购物袋', cat: '日用', sub: '收纳', rental: false, price: 4.9, qty: 2, note: '蓝色', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
+      { id: 6, title: 'LED 灯泡 E27', cat: '日用', sub: '超市', rental: false, price: 9.9, qty: 4, note: '暖光 2700K', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
+      { id: 7, title: 'OMTÄNKSAM 靠垫', cat: '购物', sub: '家居', rental: false, price: 79, qty: 2, note: '米色 50×50', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] },
+      { id: 8, title: 'LACK 边桌', cat: '购物', sub: '家居', rental: true, price: 99, qty: 1, note: '白色 55×55', wish: true, tags: ['家具'], platform: '宜家', spec: '55×55×45cm', remark: '', imgs: [] },
+      { id: 9, title: '龟背竹 中号', cat: '购物', sub: '家居', rental: false, price: 128, qty: 1, note: '含水泥盆', wish: true, tags: ['日用品-杂货', '通用-夏季'], platform: '线下', spec: '高约 1.2m', remark: '花市自提', imgs: [3] }
     ],
     single: {
       amount: '',
       note: '',
       remark: '',
       fav: false,
+      rental: false,
       tags: ['家具'],
       platform: '宜家',
-      spec: ''
+      spec: '',
+      imgs: []
     }
   };
 
@@ -928,6 +1042,52 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   const total = () => state.rows.reduce((sum, r) => sum + rowAmount(r), 0);
   const activeRow = () => state.rows.find(r => r.id === state.activeId) || null;
   const rowIndex = id => state.rows.findIndex(r => r.id === id);
+  const isCustomPlatform = p => state.platforms.indexOf(p) >= 0 && BASE_PLATFORMS.indexOf(p) < 0;
+
+  function catPillHTML(r) {
+    return '<button type="button" class="cat-pill' + (r.rental ? ' rental' : '') + '" data-act="cat" title="修改这一行的分类">' +
+      '<span>' + esc(r.cat) + '·' + esc(r.sub) + '</span>' + (r.rental ? '<i>租</i>' : '') + '</button>';
+  }
+
+  function platformHTML(target, ctx) {
+    const chips = state.platforms.map(p => {
+      const on = p === target.platform ? ' on' : '';
+      if (state.platEdit && state.platEdit.ctx === ctx && state.platEdit.name === p) {
+        return '<input class="plat-edit-input" data-plat-edit-input="' + ctx + '" value="' + esc(p) + '">';
+      }
+      if (isCustomPlatform(p)) {
+        return '<span class="plat-tag' + on + '" title="双击可修改">' +
+          '<button type="button" class="plat-chip' + on + '" data-plat="' + esc(p) + '" data-plat-ctx="' + ctx + '">' + esc(p) + '</button>' +
+          '<button type="button" class="plat-del" data-plat-del="' + esc(p) + '" title="删除这个平台">×</button>' +
+          '</span>';
+      }
+      return '<button type="button" class="plat-chip' + on + '" data-plat="' + esc(p) + '" data-plat-ctx="' + ctx + '">' + esc(p) + '</button>';
+    }).join('');
+    const other = '<button type="button" class="plat-chip other" data-plat-other="' + ctx + '">＋ 其他</button>';
+    const input = state.platInputFor === ctx
+      ? '<div class="plat-input-row"><input data-plat-new="' + ctx + '" placeholder="输入平台名称，回车添加" autocomplete="off"><button type="button" data-plat-add="' + ctx + '">添加</button></div>'
+      : '';
+    return chips + other + input;
+  }
+
+  function imageGridHTML(target) {
+    const tiles = (target.imgs || []).map((img, i) => {
+      if (typeof img === 'string') {
+        return '<div class="img-tile"><img src="' + esc(img) + '" alt="" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'broken\')">' +
+          '<button type="button" data-img-del="' + i + '" title="删除">×</button></div>';
+      }
+      return '<div class="img-tile" style="background:' + IMG_BG[img % IMG_BG.length] + '">' +
+        (tagEmoji(target.tags && target.tags[0]) || '🪑') +
+        '<button type="button" data-img-del="' + i + '" title="删除">×</button></div>';
+    }).join('');
+    return tiles +
+      '<button type="button" class="img-add" data-img-upload title="上传本地图片">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M5 14.5v4a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-4"/></svg>' +
+      '<small>上传</small></button>' +
+      '<button type="button" class="img-add" data-img-link title="添加图片链接">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7l-1.1 1.1"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 0 0 5.7 5.7l1.1-1.1"/></svg>' +
+      '<small>链接</small></button>';
+  }
 
   /* ---------- 清单渲染 ---------- */
   function wishPillHTML(r) {
@@ -945,6 +1105,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       return '<tr data-id="' + r.id + '"' + (r.wish ? ' class="good"' : '') + '>' +
         '<td class="idx">' + (i + 1) + '</td>' +
         '<td><div class="title-cell"><input class="cell-input title" data-f="title" value="' + esc(r.title) + '" placeholder="物品名称">' + (r.wish ? '<span class="good-mark">★</span>' : '') + '</div></td>' +
+        '<td>' + catPillHTML(r) + '</td>' +
         '<td><div class="price-wrap"><span>¥</span><input class="cell-input num" data-f="price" inputmode="decimal" value="' + esc(r.price) + '" placeholder="0"></div></td>' +
         '<td><input class="cell-input num qty" data-f="qty" inputmode="numeric" value="' + esc(r.qty) + '" placeholder="1"></td>' +
         '<td class="amount-cell">¥' + money(rowAmount(r)) + '</td>' +
@@ -977,7 +1138,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       const amt = parseFloat(state.single.amount) || 0;
       $('#mfLabel').textContent = '金额';
       $('#mfNum').textContent = '¥' + money(amt);
-      $('#mfSub').textContent = state.single.fav ? '单笔 · 存入好物仓库' : '单笔记账';
+      $('#mfSub').textContent = '单笔记账' + (state.single.fav ? ' · 存入好物仓库' : '') + (state.single.rental ? ' · 出租屋' : '');
     }
   }
 
@@ -1016,22 +1177,14 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       ? r.tags.map(t => '<span class="tag-chip">' + (tagEmoji(t) ? '<span class="emo">' + tagEmoji(t) + '</span>' : '') + esc(tagShort(t)) + '<button type="button" data-remove-tag="' + esc(t) + '" title="移除">×</button></span>').join('')
       : '<span class="muted">还没有标签</span>';
 
-    const opts = PLATFORMS.indexOf(r.platform) >= 0 || !r.platform
-      ? PLATFORMS.slice()
-      : PLATFORMS.concat([r.platform]);
-    $('#inspPlatform').innerHTML = opts.map(p =>
-      '<button type="button" class="plat-chip' + (p === r.platform ? ' on' : '') + '" data-plat="' + esc(p) + '">' + esc(p) + '</button>'
-    ).join('');
+    $('#inspPlatform').innerHTML = platformHTML(r, 'row');
 
     const spec = $('#inspSpec');
     if (document.activeElement !== spec) spec.value = r.spec || '';
     const remark = $('#inspRemark');
     if (document.activeElement !== remark) remark.value = r.remark || '';
 
-    $('#inspImgs').innerHTML = r.imgs.map((g, i) =>
-      '<div class="img-tile" style="background:' + IMG_BG[g % IMG_BG.length] + '">' + (tagEmoji(r.tags[0]) || '🪑') +
-      '<button type="button" data-img-del="' + i + '" title="删除">×</button></div>'
-    ).join('') + '<button type="button" class="img-add" data-img-add>＋<small>上传</small></button>';
+    $('#inspImgs').innerHTML = imageGridHTML(r);
   }
 
   function openDrawer() {
@@ -1043,6 +1196,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   function closeDrawer() {
     $('#modal').classList.remove('drawer-open');
     state.activeId = null;
+    state.platInputFor = null;
+    state.platEdit = null;
+    closeCatPop();
+    closeImgLink();
     renderInspector();
     renderWishStrip();
   }
@@ -1097,6 +1254,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
   function openTagPop(anchor, target) {
     if (!target) return;
+    closeCatPop();
     tagAnchor = anchor;
     tagTarget = target;
     $('#tpSearch').value = '';
@@ -1128,6 +1286,213 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     }
   }
 
+  /* ---------- 单行分类气泡 ---------- */
+  let catAnchor = null;
+
+  function catRow() {
+    return state.rows.find(r => r.id === state.catRowId) || null;
+  }
+
+  function renderCatPop() {
+    const r = catRow();
+    if (!r) return;
+    $('#cpIndex').textContent = '#' + (rowIndex(r.id) + 1);
+    $('#cpCats').innerHTML = Object.keys(SUB_MAP).map(c =>
+      '<button type="button" class="cp-chip' + (c === r.cat ? ' on' : '') + '" data-cp-cat="' + esc(c) + '">' + esc(c) + '</button>'
+    ).join('');
+    $('#cpSubs').innerHTML = (SUB_MAP[r.cat] || []).map(s =>
+      '<button type="button" class="cp-sub' + (s === r.sub ? ' on' : '') + '" data-cp-sub="' + esc(s) + '">' + esc(s) + '</button>'
+    ).join('');
+    $('#cpRental').classList.toggle('on', !!r.rental);
+  }
+
+  function syncCatPill(r) {
+    const tr = $('#rows tr[data-id="' + r.id + '"]');
+    if (!tr) return;
+    const pill = tr.querySelector('.cat-pill');
+    if (!pill) return;
+    pill.classList.toggle('rental', !!r.rental);
+    pill.innerHTML = '<span>' + esc(r.cat) + '·' + esc(r.sub) + '</span>' + (r.rental ? '<i>租</i>' : '');
+  }
+
+  function positionCatPop() {
+    if (!catAnchor) return;
+    const pop = $('#catPop');
+    const rect = catAnchor.getBoundingClientRect();
+    const w = 304;
+    const h = pop.offsetHeight || 360;
+    let left = rect.left;
+    if (left + w > window.innerWidth - 12) left = window.innerWidth - w - 12;
+    if (left < 12) left = 12;
+    let top = rect.bottom + 8;
+    if (top + h > window.innerHeight - 12) top = Math.max(12, rect.top - h - 8);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function openCatPop(anchor, r) {
+    closeTagPop();
+    closeImgLink();
+    state.catRowId = r.id;
+    catAnchor = anchor;
+    renderCatPop();
+    $('#catPop').classList.add('show');
+    positionCatPop();
+  }
+
+  function closeCatPop() {
+    $('#catPop').classList.remove('show');
+    state.catRowId = null;
+    catAnchor = null;
+  }
+
+  /* ---------- 图片链接气泡 ---------- */
+  let imgLinkAnchor = null;
+
+  function positionImgLink() {
+    if (!imgLinkAnchor) return;
+    const pop = $('#imgLinkPop');
+    const rect = imgLinkAnchor.getBoundingClientRect();
+    const w = 306;
+    const h = pop.offsetHeight || 170;
+    let left = rect.right - w;
+    if (left < 12) left = 12;
+    if (left + w > window.innerWidth - 12) left = window.innerWidth - w - 12;
+    let top = rect.bottom + 8;
+    if (top + h > window.innerHeight - 12) top = Math.max(12, rect.top - h - 8);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function openImgLink(anchor, target) {
+    closeTagPop();
+    closeCatPop();
+    state.imgTarget = target;
+    imgLinkAnchor = anchor;
+    $('#imgLinkInput').value = '';
+    $('#imgLinkPop').classList.add('show');
+    positionImgLink();
+    setTimeout(() => $('#imgLinkInput').focus(), 30);
+  }
+
+  function closeImgLink() {
+    $('#imgLinkPop').classList.remove('show');
+    imgLinkAnchor = null;
+  }
+
+  function renderImgTarget() {
+    if (!state.imgTarget) return;
+    if (state.imgTarget === state.single) renderSingleMedia();
+    else renderInspector();
+  }
+
+  function addImgLink() {
+    if (!state.imgTarget) return;
+    const url = $('#imgLinkInput').value.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      toast('请输入 http / https 开头的图片链接', 'err');
+      return;
+    }
+    state.imgTarget.imgs.push(url);
+    renderImgTarget();
+    closeImgLink();
+    toast('已添加图片链接');
+  }
+
+  function openFileUpload(target) {
+    state.imgTarget = target;
+    const input = $('#imgFileInput');
+    input.value = '';
+    input.click();
+  }
+
+  /* ---------- 购买平台：选择 / 自定义 / 删除 / 重命名 ---------- */
+  function platTarget(ctx) {
+    return ctx === 'single' ? state.single : activeRow();
+  }
+
+  function rerenderPlatform(ctx) {
+    if (ctx === 'single') renderSingleGood();
+    else renderInspector();
+  }
+
+  function addPlatform(ctx) {
+    const input = $('[data-plat-new="' + ctx + '"]');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) { toast('请先输入平台名称', 'err'); return; }
+    if (state.platforms.indexOf(name) >= 0) { toast('「' + name + '」已经在列表里了', 'err'); return; }
+    state.platforms.push(name);
+    const target = platTarget(ctx);
+    if (target) target.platform = name;
+    state.platInputFor = null;
+    state.platEdit = null;
+    rerenderPlatform(ctx);
+    toast('已添加平台「' + name + '」');
+  }
+
+  function removePlatform(name) {
+    state.platforms = state.platforms.filter(p => p !== name);
+    state.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
+    if (state.single.platform === name) state.single.platform = '';
+    state.platEdit = null;
+    state.platInputFor = null;
+    renderInspector();
+    renderSingleGood();
+  }
+
+  function commitPlatEdit(ctx) {
+    if (!state.platEdit) return;
+    const input = $('[data-plat-edit-input="' + ctx + '"]');
+    if (!input) return;
+    const oldName = state.platEdit.name;
+    const name = input.value.trim();
+    if (!name) { toast('平台名称不能为空', 'err'); return; }
+    if (name !== oldName && state.platforms.indexOf(name) >= 0) { toast('「' + name + '」已经在列表里了', 'err'); return; }
+    state.platforms = state.platforms.map(p => p === oldName ? name : p);
+    state.rows.forEach(r => { if (r.platform === oldName) r.platform = name; });
+    if (state.single.platform === oldName) state.single.platform = name;
+    state.platEdit = null;
+    rerenderPlatform(ctx);
+  }
+
+  function bindPlatformClicks(root, ctx) {
+    if (!root) return;
+    root.addEventListener('click', e => {
+      if (e.target.closest('[data-plat-other]')) {
+        state.platInputFor = ctx;
+        state.platEdit = null;
+        rerenderPlatform(ctx);
+        const input = $('[data-plat-new="' + ctx + '"]');
+        if (input) input.focus();
+        return;
+      }
+      const add = e.target.closest('[data-plat-add]');
+      if (add) { addPlatform(ctx); return; }
+      const del = e.target.closest('[data-plat-del]');
+      if (del) { removePlatform(del.dataset.platDel); return; }
+      const chip = e.target.closest('[data-plat]');
+      if (!chip) return;
+      const target = platTarget(ctx);
+      if (!target) return;
+      target.platform = chip.dataset.plat;
+      state.platInputFor = null;
+      state.platEdit = null;
+      rerenderPlatform(ctx);
+    });
+    root.addEventListener('dblclick', e => {
+      const chip = e.target.closest('[data-plat]');
+      if (!chip) return;
+      const name = chip.dataset.plat;
+      if (!isCustomPlatform(name)) return;
+      state.platEdit = { ctx, name };
+      state.platInputFor = null;
+      rerenderPlatform(ctx);
+      const input = $('[data-plat-edit-input="' + ctx + '"]');
+      if (input) { input.focus(); input.select(); }
+    });
+  }
+
   /* ---------- 单笔模式 ---------- */
   function renderSingleGood() {
     const s = state.single;
@@ -1138,11 +1503,13 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#singleTags').innerHTML = s.tags.length
       ? s.tags.map(t => '<span class="tag-chip">' + (tagEmoji(t) ? '<span class="emo">' + tagEmoji(t) + '</span>' : '') + esc(tagShort(t)) + '<button type="button" data-single-tag="' + esc(t) + '">×</button></span>').join('')
       : '<span class="muted">未选择</span>';
-    $('#singlePlatform').innerHTML = PLATFORMS.map(p =>
-      '<button type="button" class="plat-chip' + (p === s.platform ? ' on' : '') + '" data-single-plat="' + esc(p) + '">' + esc(p) + '</button>'
-    ).join('');
+    $('#singlePlatform').innerHTML = platformHTML(s, 'single');
     const spec = $('#singleSpec');
     if (document.activeElement !== spec) spec.value = s.spec || '';
+  }
+
+  function renderSingleMedia() {
+    $('#singleImgs').innerHTML = imageGridHTML(state.single);
   }
 
   function renderSubChips() {
@@ -1158,15 +1525,25 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     state.mode = mode;
     const modal = $('#modal');
     modal.classList.toggle('list-mode', mode === 'list');
+    state.platInputFor = null;
+    state.platEdit = null;
+    closeTagPop();
+    closeCatPop();
+    closeImgLink();
     if (mode !== 'list') {
       modal.classList.remove('drawer-open');
       state.activeId = null;
-      closeTagPop();
     }
     $('#pane-single').hidden = mode !== 'single';
     $('#pane-list').hidden = mode !== 'list';
+    $('#catLabel').textContent = mode === 'list' ? '默认大类' : '大类';
+    $('#subLabel').textContent = mode === 'list' ? '默认小类' : '小类';
+    $('#catHint').style.display = mode === 'list' ? 'block' : 'none';
+    $('#rentalCheck').checked = !!state.single.rental;
     $$('.mode-switch button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
     renderTotals();
+    renderSingleGood();
+    renderSingleMedia();
     if (mode === 'list') {
       renderRows();
       renderWishStrip();
@@ -1192,6 +1569,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     renderRows();
     renderTotals();
     renderSingleGood();
+    renderSingleMedia();
     renderInspector();
 
     /* 模式 */
@@ -1252,6 +1630,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       const tr = btn.closest('tr');
       const r = state.rows.find(x => String(x.id) === tr.dataset.id);
       if (!r) return;
+      if (btn.dataset.act === 'cat') {
+        openCatPop(btn, r);
+        return;
+      }
       if (btn.dataset.act === 'wish') {
         if (!r.wish) r.wish = true;
         state.activeId = r.id;
@@ -1266,6 +1648,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
           state.activeId = null;
           $('#modal').classList.remove('drawer-open');
         }
+        closeCatPop();
         renderRows();
         renderTotals();
         renderWishStrip();
@@ -1276,7 +1659,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
     /* 新增行 */
     $('#addRow').addEventListener('click', () => {
-      const r = { id: ++seq, title: '', price: '', qty: 1, note: '', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] };
+      const r = { id: ++seq, title: '', cat: state.cat, sub: state.sub, rental: false, price: '', qty: 1, note: '', wish: false, tags: [], platform: '', spec: '', remark: '', imgs: [] };
       state.rows.push(r);
       renderRows();
       renderTotals();
@@ -1293,7 +1676,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
     /* 抽屉 */
     $('#inspClose').addEventListener('click', closeDrawer);
-    $('#inspDone').addEventListener('click', closeDrawer);
     $('#removeGood').addEventListener('click', () => {
       const r = activeRow();
       if (!r) return;
@@ -1301,6 +1683,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       r.tags = [];
       state.activeId = null;
       $('#modal').classList.remove('drawer-open');
+      closeCatPop();
+      closeImgLink();
       renderRows();
       renderTotals();
       renderWishStrip();
@@ -1314,6 +1698,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       const strip = e.target.closest('[data-wish-id]');
       if (strip) {
         state.activeId = Number(strip.dataset.wishId);
+        state.platInputFor = null;
+        state.platEdit = null;
         renderInspector();
         return;
       }
@@ -1327,14 +1713,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         renderTotals();
         return;
       }
-      const plat = e.target.closest('[data-plat]');
-      if (plat) {
-        const r = activeRow();
-        if (!r) return;
-        r.platform = plat.dataset.plat;
-        renderInspector();
-        return;
-      }
       const del = e.target.closest('[data-img-del]');
       if (del) {
         const r = activeRow();
@@ -1343,11 +1721,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         renderInspector();
         return;
       }
-      if (e.target.closest('[data-img-add]')) {
+      const up = e.target.closest('[data-img-upload]');
+      if (up) {
+        openFileUpload(activeRow());
+        return;
+      }
+      const link = e.target.closest('[data-img-link]');
+      if (link) {
         const r = activeRow();
-        if (!r) return;
-        r.imgs.push(r.imgs.length % IMG_BG.length);
-        renderInspector();
+        if (r) openImgLink(link, r);
         return;
       }
     });
@@ -1357,6 +1739,73 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       if (e.target.id === 'inspSpec') r.spec = e.target.value;
       if (e.target.id === 'inspRemark') r.remark = e.target.value;
     });
+
+    /* 购买平台（抽屉 / 单笔共用） */
+    bindPlatformClicks($('#inspPlatform'), 'row');
+    bindPlatformClicks($('#singlePlatform'), 'single');
+
+    /* ---------- 单行分类气泡 ---------- */
+    $('#cpCats').addEventListener('click', e => {
+      const btn = e.target.closest('[data-cp-cat]');
+      const r = catRow();
+      if (!btn || !r) return;
+      r.cat = btn.dataset.cpCat;
+      const subs = SUB_MAP[r.cat] || [];
+      if (subs.indexOf(r.sub) < 0) r.sub = subs[0] || '';
+      renderCatPop();
+      syncCatPill(r);
+      positionCatPop();
+    });
+    $('#cpSubs').addEventListener('click', e => {
+      const btn = e.target.closest('[data-cp-sub]');
+      const r = catRow();
+      if (!btn || !r) return;
+      r.sub = btn.dataset.cpSub;
+      renderCatPop();
+      syncCatPill(r);
+      positionCatPop();
+    });
+    $('#cpRental').addEventListener('click', () => {
+      const r = catRow();
+      if (!r) return;
+      r.rental = !r.rental;
+      renderCatPop();
+      syncCatPill(r);
+    });
+    $('#cpClose').addEventListener('click', closeCatPop);
+
+    /* ---------- 图片上传 / 链接 ---------- */
+    $('#singleImgs').addEventListener('click', e => {
+      if (e.target.closest('[data-img-upload]')) { openFileUpload(state.single); return; }
+      const link = e.target.closest('[data-img-link]');
+      if (link) { openImgLink(link, state.single); return; }
+      const del = e.target.closest('[data-img-del]');
+      if (del) {
+        state.single.imgs.splice(Number(del.dataset.imgDel), 1);
+        renderSingleMedia();
+      }
+    });
+    $('#imgFileInput').addEventListener('change', e => {
+      const files = Array.prototype.slice.call(e.target.files || []);
+      if (!files.length || !state.imgTarget) return;
+      let added = 0;
+      files.forEach(f => {
+        if (!/^image\//.test(f.type)) return;
+        state.imgTarget.imgs.push(URL.createObjectURL(f));
+        added++;
+      });
+      if (added) {
+        renderImgTarget();
+        toast('已添加 ' + added + ' 张图片');
+      }
+      e.target.value = '';
+    });
+    $('#imgLinkAdd').addEventListener('click', addImgLink);
+    $('#imgLinkCancel').addEventListener('click', closeImgLink);
+    $('#imgLinkInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addImgLink(); }
+    });
+    $('#singleSpec').addEventListener('input', e => { state.single.spec = e.target.value; });
 
     /* 标签气泡 */
     $('#tpSearch').addEventListener('input', e => filterTagPop(e.target.value.trim().toLowerCase()));
@@ -1371,9 +1820,42 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       if (e.target.closest('#tagPop') || e.target.closest('#inspAddTag') || e.target.closest('#singleAddTag')) return;
       closeTagPop();
     });
+    document.addEventListener('mousedown', e => {
+      if ($('#catPop').classList.contains('show') && !e.target.closest('#catPop') && !e.target.closest('.cat-pill')) closeCatPop();
+      if ($('#imgLinkPop').classList.contains('show') && !e.target.closest('#imgLinkPop') && !e.target.closest('[data-img-link]')) closeImgLink();
+    });
     window.addEventListener('resize', () => {
       if ($('#tagPop').classList.contains('show')) positionTagPop();
+      if ($('#catPop').classList.contains('show')) positionCatPop();
+      if ($('#imgLinkPop').classList.contains('show')) positionImgLink();
     });
+
+    /* 平台输入：回车新增 / 回车保存改名 / Escape 取消 */
+    $('#modal').addEventListener('keydown', e => {
+      const t = e.target;
+      if (t.matches('[data-plat-new]')) {
+        if (e.key === 'Enter') { e.preventDefault(); addPlatform(t.dataset.platNew); }
+        else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          state.platInputFor = null;
+          rerenderPlatform(t.dataset.platNew);
+        }
+      } else if (t.matches('[data-plat-edit-input]')) {
+        if (e.key === 'Enter') { e.preventDefault(); commitPlatEdit(t.dataset.platEditInput); }
+        else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          const ctx = t.dataset.platEditInput;
+          state.platEdit = null;
+          rerenderPlatform(ctx);
+        }
+      }
+    });
+
+    /* 滚动时关闭锚定气泡，避免跟丢位置 */
+    $('.table-scroll').addEventListener('scroll', closeCatPop, { passive: true });
+    $('.insp-scroll').addEventListener('scroll', closeImgLink, { passive: true });
 
     /* 单笔 */
     $('#singleAmount').addEventListener('input', e => {
@@ -1394,19 +1876,15 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       state.single.tags = state.single.tags.filter(t => t !== btn.dataset.singleTag);
       renderSingleGood();
     });
-    $('#singlePlatform').addEventListener('click', e => {
-      const btn = e.target.closest('[data-single-plat]');
-      if (!btn) return;
-      state.single.platform = btn.dataset.singlePlat;
-      renderSingleGood();
+    /* 单笔：归入出租屋账本 */
+    $('#rentalCheck').addEventListener('change', e => {
+      state.single.rental = e.target.checked;
+      renderTotals();
     });
-    $('#singleSpec').addEventListener('input', e => { state.single.spec = e.target.value; });
-    $('#singleImgBtn').addEventListener('click', () => toast('原型：图片上传入口保留在「更多」'));
 
     /* 底部动作 */
     $('#save').addEventListener('click', () => save(false));
     $('#saveNext').addEventListener('click', () => save(true));
-    $('#saveTemplate').addEventListener('click', () => toast('原型：存为模板入口'));
     $('#closeModal').addEventListener('click', () => toast('原型：关闭弹窗'));
     $('#dateBtn').addEventListener('click', () => toast('原型：日历选择器保持原样'));
 
@@ -1426,6 +1904,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         if ($('#tagPop').classList.contains('show')) closeTagPop();
+        else if ($('#catPop').classList.contains('show')) closeCatPop();
+        else if ($('#imgLinkPop').classList.contains('show')) closeImgLink();
         else if ($('#modal').classList.contains('drawer-open')) closeDrawer();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(false);
