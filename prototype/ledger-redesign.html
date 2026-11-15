@@ -214,6 +214,12 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .input-card input:focus{color:var(--ink)}
 .input-card textarea{font-size:13px;font-weight:600;line-height:1.5;padding:2px 0;resize:none;overflow:hidden;min-height:21px;max-height:168px}
 .input-card textarea:focus{color:var(--ink)}
+.input-card .ic-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.note-expand{
+  font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--gold-deep);
+  padding:2px 4px;border-radius:5px;transition:background .14s;
+}
+.note-expand:hover{background:var(--gold-soft)}
 .wish-toggle-card{
   display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:13px;
   padding:12px 15px;margin-top:12px;background:#fff;
@@ -605,6 +611,27 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 .lp-foot .cancel{color:var(--muted)}
 .lp-foot .cancel:hover{color:var(--ink)}
 
+/* ---------- 备注展开编辑 ---------- */
+.note-pop{
+  position:fixed;z-index:215;display:none;flex-direction:column;
+  width:min(420px,calc(100vw - 32px));padding:14px;
+  background:#FFFDF9;border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 28px 76px -20px rgba(64,60,52,.38);
+}
+.note-pop.show{display:flex;animation:pop .14s ease}
+.np-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.np-head span:first-child{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--muted)}
+.np-count{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.note-pop textarea{
+  width:100%;min-height:176px;max-height:300px;resize:none;overflow-y:auto;
+  border:1px solid var(--line);border-radius:10px;background:#FBF8F2;
+  padding:10px 12px;font-size:12.5px;line-height:1.72;
+}
+.note-pop textarea:focus{border-color:var(--gold-line);background:#fff;box-shadow:0 0 0 3px rgba(165,130,76,.1)}
+.np-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.np-foot span{font-size:9.5px;color:var(--faint)}
+.np-foot .btn-primary{border-radius:8px;padding:7px 14px;font-size:11.5px}
+
 /* ---------- 好物仓库详情浮层 ---------- */
 .wd-mask{position:fixed;inset:0;z-index:240;background:rgba(43,39,33,.26);backdrop-filter:blur(2px)}
 .wd{
@@ -858,7 +885,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
           <div class="single-grid">
             <label class="input-card"><span>描述</span><input id="singleNote" type="text" maxlength="60" placeholder="例如：IKEA 周末采购"></label>
-            <label class="input-card"><span>备注</span><textarea id="singleRemark" rows="1" placeholder="选填"></textarea></label>
+            <div class="input-card">
+              <div class="ic-head"><span>备注</span><button type="button" class="note-expand" id="noteExpand" hidden>展开编辑</button></div>
+              <textarea id="singleRemark" rows="1" placeholder="选填"></textarea>
+            </div>
           </div>
 
           <div class="wish-toggle-card">
@@ -1057,6 +1087,13 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 </div>
 
 <input type="file" id="imgFileInput" accept="image/*" multiple hidden>
+
+<!-- 备注展开编辑 -->
+<div class="note-pop" id="notePop" role="dialog" aria-label="编辑备注">
+  <div class="np-head"><span>备注</span><span class="np-count" id="npCount">0 字</span></div>
+  <textarea id="npInput" placeholder="写点备注…"></textarea>
+  <div class="np-foot"><span>输入即时保存</span><button type="button" class="btn-primary sm" id="npDone">完成</button></div>
+</div>
 
 <!-- 好物仓库详情 -->
 <div class="wd-mask" id="wdMask" hidden></div>
@@ -1295,6 +1332,36 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     const h = Math.min(el.scrollHeight, max || 120);
     el.style.height = h + 'px';
     el.style.overflowY = el.scrollHeight > (max || 120) ? 'auto' : 'hidden';
+  }
+
+  /* 备注超过三行时，出现「展开编辑」，避免长文本把整块表单撑高 */
+  function syncNoteExpand() {
+    const ta = $('#singleRemark');
+    if (!ta) return;
+    $('#noteExpand').hidden = ta.scrollHeight <= 70;
+  }
+
+  function closeNotePop() {
+    $('#notePop').classList.remove('show');
+  }
+
+  function openNotePop() {
+    const ta = $('#singleRemark');
+    const pop = $('#notePop');
+    const input = $('#npInput');
+    input.value = state.single.remark || '';
+    $('#npCount').textContent = input.value.length + ' 字';
+    pop.classList.add('show');
+    const r = ta.closest('.input-card').getBoundingClientRect();
+    const w = pop.offsetWidth || 420;
+    const h = pop.offsetHeight || 300;
+    const left = Math.max(16, Math.min(r.left, window.innerWidth - w - 16));
+    let top = r.top;
+    if (top + h > window.innerHeight - 16) top = window.innerHeight - h - 16;
+    pop.style.left = left + 'px';
+    pop.style.top = Math.max(16, top) + 'px';
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 
   function renderInspector() {
@@ -1749,7 +1816,12 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     renderSingleGood();
     renderSingleMedia();
     renderRate();
-    if (mode === 'single') autoGrow($('#singleRemark'), 168);
+    if (mode === 'single') {
+      autoGrow($('#singleRemark'), 66);
+      syncNoteExpand();
+    } else {
+      closeNotePop();
+    }
     if (mode === 'list') {
       renderRows();
       renderWishStrip();
@@ -2117,7 +2189,28 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#singleNote').addEventListener('input', e => { state.single.note = e.target.value; });
     $('#singleRemark').addEventListener('input', e => {
       state.single.remark = e.target.value;
-      autoGrow(e.target, 168);
+      autoGrow(e.target, 66);
+      syncNoteExpand();
+      if ($('#notePop').classList.contains('show')) {
+        $('#npInput').value = e.target.value;
+        $('#npCount').textContent = e.target.value.length + ' 字';
+      }
+    });
+    $('#noteExpand').addEventListener('click', openNotePop);
+    $('#npDone').addEventListener('click', closeNotePop);
+    $('#npInput').addEventListener('input', e => {
+      state.single.remark = e.target.value;
+      const ta = $('#singleRemark');
+      ta.value = e.target.value;
+      autoGrow(ta, 66);
+      syncNoteExpand();
+      $('#npCount').textContent = e.target.value.length + ' 字';
+    });
+    $('#pane-single').addEventListener('scroll', closeNotePop, { passive: true });
+    document.addEventListener('mousedown', e => {
+      if (!$('#notePop').classList.contains('show')) return;
+      if (e.target.closest('#notePop') || e.target.closest('#noteExpand')) return;
+      closeNotePop();
     });
     $('#singleFav').addEventListener('click', () => {
       state.single.fav = !state.single.fav;
@@ -2180,7 +2273,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     /* 键盘 */
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        if (!$('#wdPanel').hidden) closeWishDetail();
+        if ($('#notePop').classList.contains('show')) closeNotePop();
+        else if (!$('#wdPanel').hidden) closeWishDetail();
         else if ($('#tagPop').classList.contains('show')) closeTagPop();
         else if ($('#catPop').classList.contains('show')) closeCatPop();
         else if ($('#imgLinkPop').classList.contains('show')) closeImgLink();
