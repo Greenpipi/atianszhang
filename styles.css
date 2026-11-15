@@ -2140,21 +2140,23 @@ input,select,textarea{font-family:inherit}
 .lrow .lrow-time{font-family:"DM Mono",monospace;font-size:10px;color:var(--faint);margin-left:6px}
 .list-more{display:flex;justify-content:center;padding:14px 0 2px}
 
-/* 待办账单：合并为一张清单卡 */
-#bills-body>.bill-list{
-  background:linear-gradient(180deg,rgba(255,253,248,.88),rgba(250,246,238,.72));
-  border:1px solid rgba(255,255,255,.72);border-radius:16px;box-shadow:var(--shadow);
-  padding:2px 16px;gap:0;
+/* 待办账单：合并为一张清单卡（仅桌面；手机端每张独立成卡，避免透出左滑操作区） */
+@media (min-width:761px){
+  #bills-body>.bill-list{
+    background:linear-gradient(180deg,rgba(255,253,248,.88),rgba(250,246,238,.72));
+    border:1px solid rgba(255,255,255,.72);border-radius:16px;box-shadow:var(--shadow);
+    padding:2px 16px;gap:0;
+  }
+  .bill-list{gap:0}
+  .bill-list .bill-card{
+    background:transparent;border:0;border-bottom:1px dashed rgba(88,82,72,.12);
+    border-radius:0;box-shadow:none;padding:13px 2px;
+  }
+  .bill-list .bill-card:last-child{border-bottom:0}
+  .bill-list .bill-card:hover{background:rgba(255,255,255,.45);box-shadow:none}
+  .bill-list .bill-card.red{background:rgba(180,84,60,.045);box-shadow:inset 3px 0 0 var(--danger)}
+  .bill-list .bill-card.amber{background:rgba(176,118,60,.04);box-shadow:inset 3px 0 0 var(--warn)}
 }
-.bill-list{gap:0}
-.bill-list .bill-card{
-  background:transparent;border:0;border-bottom:1px dashed rgba(88,82,72,.12);
-  border-radius:0;box-shadow:none;padding:13px 2px;
-}
-.bill-list .bill-card:last-child{border-bottom:0}
-.bill-list .bill-card:hover{background:rgba(255,255,255,.45);box-shadow:none}
-.bill-list .bill-card.red{background:rgba(180,84,60,.045);box-shadow:inset 3px 0 0 var(--danger)}
-.bill-list .bill-card.amber{background:rgba(176,118,60,.04);box-shadow:inset 3px 0 0 var(--warn)}
 
 /* 好物仓库：图片在上、信息在下 */
 .wish-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -2571,3 +2573,29 @@ input,select,textarea{font-family:inherit}
 .lgwb .list-date{width:auto;white-space:nowrap;display:inline-block}
 .lgwb .kind-tag.income{color:var(--green-deep);background:var(--green-soft);border-color:#CFD8C8}
 
+
+/* ---------- 待办账单 · 手机端（卡片 / 间距 / 点按） ---------- */
+@media (max-width:760px){
+  /* 汇总卡改两列，压缩高度，给账单列表让出空间 */
+  #view-bills>.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px;margin-bottom:14px!important}
+  #view-bills>.grid-4 .stat-card{padding:12px 14px;border-radius:12px}
+  #view-bills>.grid-4 .stat-value{font-size:21px;margin-top:5px}
+  #view-bills>.grid-4 .stat-foot{margin-top:4px}
+
+  /* 每张账单独立成卡：白底 + 间距，左滑操作区不再透出卡片 */
+  .bill-list{gap:10px}
+  .bill-list .bill-card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:none;padding:13px 14px;gap:12px;align-items:center}
+  .bill-list .bill-card.red{background:#FFF8F8;border-color:#EBCFC8}
+  .bill-list .bill-card.amber,
+  .bill-list .bill-card.green,
+  .bill-list .bill-card.blue,
+  .bill-list .bill-card.red{box-shadow:none}
+  .bill-list .bill-card:last-child{border-bottom:1px solid var(--line)}
+  .bill-list .bill-card.red:last-child{border-bottom-color:#EBCFC8}
+  .bill-list .bill-card.slot{background:#FCFCFD;border-style:dashed}
+  .bill-amt-input{width:96px;height:34px;padding:0 8px;font-size:14px;text-align:center}
+  .bill-amt-input::placeholder{font-size:12px}
+  .bill-name{gap:5px}
+  .bill-meta{font-size:11.5px;margin-top:2px}
+  .bill-act{width:72px;flex:0 0 72px;font-size:12.5px}
+}
