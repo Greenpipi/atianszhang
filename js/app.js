@@ -1119,14 +1119,20 @@ const App = {
   /* 登录且数据就绪后才弹；参数用完立刻从地址栏抹掉，刷新/回退不会重复弹。
      ?scan=支付页OCR文本 → 识别结果确认卡；?quick=1 → 手动快速记账面板 */
   maybeOpenQuick() {
-    const scan = this.scanText();
+    const scan = this.scanText().trim();
+    let hasScan = false;
+    try { hasScan = new URLSearchParams(location.search).has('scan'); } catch (e) { /* ignore */ }
     const wantQuick = this.quickWanted();
-    if (!scan && !wantQuick) return;
+    if (!scan && !hasScan && !wantQuick) return;
     if (!Store.user || !this.state.currentLedgerId) return;
     if (document.querySelector('.modal.quick-modal')) return;
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ignore */ }
-    if (scan) this.openScanEntry(scan);
-    else this.openQuickEntry();
+    // 截屏没认出字（或只认出零星字符）时退回手动面板，不让用户卡在空白页
+    if (scan && scan.replace(/\s/g, '').length >= 2) this.openScanEntry(scan);
+    else {
+      if (hasScan) this.toast('没认出屏幕上的文字，手动记一笔', 'err');
+      this.openQuickEntry();
+    }
   },
 
   /* 最近用过的「大类::小类」：按日期、创建时间倒序去重，分类已删除或小类失效的跳过 */
