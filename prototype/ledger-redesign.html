@@ -107,6 +107,8 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes pop{from{opacity:0;transform:translateY(-5px) scale(.98)}to{opacity:1;transform:none}}
 .modal.list-mode{width:min(1280px,96vw)}
+/* 清单模式不需要左侧分类栏，日期移到清单标题区 */
+.modal.list-mode .rail{display:none}
 
 /* 头部 */
 .mh{
@@ -185,6 +187,7 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 /* 中间主区 */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 22px 0;background:var(--paper)}
 .pane{flex:1;min-height:0;display:flex;flex-direction:column;animation:fadeUp .2s ease}
+#pane-single{overflow-y:auto;padding-bottom:16px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
 /* 单笔模式 */
@@ -250,6 +253,13 @@ input::placeholder,textarea::placeholder{color:#B7B0A3}
 .list-title:focus{border-bottom-color:var(--gold)}
 .count{font-size:11px;font-weight:600;color:var(--faint);white-space:nowrap}
 .list-head-actions{display:flex;align-items:center;gap:10px;flex:none}
+.list-date{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);
+  border-radius:9px;background:#fff;font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);
+  transition:border-color .15s,background .15s;
+}
+.list-date:hover{border-color:var(--gold-line);background:#FEFBF5}
+.list-date span{font-family:var(--sans);font-size:10px;color:var(--faint)}
 .calc-hint{font-size:10.5px;color:var(--faint);font-weight:500}
 .btn-ghost{
   border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:700;color:var(--ink-2);
@@ -280,8 +290,17 @@ table.items tbody td{border-top:1px solid var(--line-soft);padding:0;vertical-al
 table.items tbody tr:first-child td{border-top:0}
 table.items tbody tr{transition:background .14s}
 table.items tbody tr:hover td{background:#FDFBF6}
-table.items tbody tr.good td{background:linear-gradient(90deg,rgba(244,238,227,.78),rgba(255,253,249,.25) 62%,#FFFDF9)}
-table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232,216,.9),rgba(253,250,243,.4) 62%,#FDFBF6)}
+table.items tbody tr.good td{background:#FAF3E6}
+table.items tbody tr.good:hover td{background:#F6EEDE}
+/* 好物行只用一层底色，行内的分类/好物标记不再叠色 */
+table.items tbody tr.good .cat-pill{background:transparent;border-color:transparent;padding-left:0;padding-right:0}
+table.items tbody tr.good .cat-pill:hover{background:transparent;border-color:transparent;color:var(--ink)}
+table.items tbody tr.good .cat-pill.rental{color:var(--gold-deep)}
+table.items tbody tr.good .cat-pill i{background:transparent;padding:0 0 0 1px;color:var(--gold)}
+table.items tbody tr.good .wish-pill{border:0;background:transparent;padding-left:0;padding-right:0;box-shadow:none;color:var(--gold-deep)}
+table.items tbody tr.good .wish-pill:hover{background:transparent;color:var(--gold)}
+table.items tbody tr.good .wish-pill em{background:transparent;padding:0 0 0 2px;color:var(--gold)}
+table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inset 0 -2px 0 rgba(165,130,76,.55)}
 .idx{padding-left:14px!important;font-family:var(--mono);font-size:11px;color:var(--faint)}
 .cell-input{
   width:100%;padding:11px 9px;font-size:12.5px;font-weight:600;color:var(--ink-2);
@@ -371,6 +390,7 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 .mini-link{font-size:10.5px;font-weight:700;color:var(--muted);flex:none}
 .mini-link:hover{color:var(--gold-deep)}
 .mini-link.danger:hover{color:var(--danger)}
+.gs-actions{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
 .insp-field{margin-bottom:14px}
 .insp-label{
   display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;
@@ -402,15 +422,15 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 .plat-chip.other{border-style:dashed;border-color:var(--line);color:var(--faint)}
 .plat-chip.other:hover{border-color:var(--gold-line);color:var(--gold-deep)}
 .plat-tag{
-  display:inline-flex;align-items:center;gap:2px;padding:0 8px 0 0;border-radius:7px;
+  display:inline-flex;align-items:center;gap:3px;padding:0 6px 0 0;border-radius:7px;
   background:#F5F1E8;border:1px solid transparent;transition:all .14s;
 }
 .plat-tag:hover{background:#F8F3E9}
 .plat-tag.on{background:#fff;border-color:var(--gold-line);box-shadow:0 1px 4px rgba(165,130,76,.09)}
-.plat-tag .plat-chip{padding:5px 4px 5px 8px;background:transparent;border:0;box-shadow:none}
+.plat-tag .plat-chip{padding:5px 2px 5px 8px;background:transparent;border:0;box-shadow:none}
 .plat-tag .plat-chip.on{background:transparent;border:0;box-shadow:none}
 .plat-del{
-  color:#BDB5A7;font-size:11px;line-height:1;padding:2px 1px;border-radius:3px;
+  color:#C4BBAD;font-size:12px;line-height:1;padding:3px 2px;border-radius:3px;
 }
 .plat-del:hover{color:var(--danger);background:#F9EDEA}
 .plat-input-row{display:flex;gap:5px;width:100%;margin-top:6px}
@@ -421,10 +441,6 @@ table.items tbody tr.good:hover td{background:linear-gradient(90deg,rgba(240,232
 .plat-input-row button{
   flex:none;border-radius:7px;background:var(--gold-soft);border:1px solid var(--gold-line);
   padding:6px 10px;font-size:10.5px;font-weight:700;color:var(--gold-deep);
-}
-.plat-edit-input{
-  width:96px;border:1px solid var(--gold);border-radius:7px;background:#fff;
-  padding:5px 7px;font-size:10.5px;font-weight:600;
 }
 .insp-input{
   width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;
@@ -556,6 +572,52 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 .lp-foot button{border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700}
 .lp-foot .cancel{color:var(--muted)}
 .lp-foot .cancel:hover{color:var(--ink)}
+
+/* ---------- 好物仓库详情浮层 ---------- */
+.wd-mask{position:fixed;inset:0;z-index:240;background:rgba(43,39,33,.26);backdrop-filter:blur(2px)}
+.wd{
+  position:fixed;z-index:245;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(680px,calc(100vw - 40px));max-height:min(680px,calc(100dvh - 48px));
+  display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);
+  border-radius:18px;box-shadow:var(--shadow);overflow:hidden;
+}
+.wd-head{
+  flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:20px 22px 14px;border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(180deg,#FFFDF9,#FDFAF4);
+}
+.wd-head h2{font-family:var(--serif);font-size:24px;font-weight:500;line-height:1.2;margin-top:3px}
+.wd-body{
+  flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:216px minmax(0,1fr);
+  gap:20px;padding:18px 22px 20px;
+}
+.wd-media{
+  width:100%;aspect-ratio:1;border-radius:14px;overflow:hidden;display:grid;place-items:center;
+  background:linear-gradient(145deg,#EDE6D8,#DCD2C0);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5);
+  font-size:52px;
+}
+.wd-media img{width:100%;height:100%;object-fit:cover;display:block}
+.wd-price{font-family:var(--mono);font-size:23px;color:var(--ink);margin-bottom:12px}
+.wd-price small{font-family:var(--sans);font-size:11px;color:var(--faint);margin-left:6px}
+.wd-row{display:flex;gap:10px;padding:7px 0;border-top:1px dashed var(--line-soft);font-size:11.5px}
+.wd-row:first-child{border-top:0}
+.wd-k{flex:none;width:62px;color:var(--faint);font-weight:600}
+.wd-v{min-width:0;color:var(--ink-2);font-weight:600;word-break:break-word}
+.wd-tags{display:flex;flex-wrap:wrap;gap:4px}
+.wd-tag{padding:3px 7px;border-radius:6px;background:var(--gold-soft);color:var(--gold-deep);font-size:10px;font-weight:600}
+.wd-remark{margin-top:10px;padding:10px 12px;border-radius:10px;background:#FBF7EF;font-size:11.5px;color:var(--muted);line-height:1.6}
+.wd-source{margin-top:16px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:13px 14px}
+.wd-source-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.wd-source-name{font-family:var(--serif);font-size:15px;font-weight:500}
+.wd-source-meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.wd-siblings{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.wd-sib{padding:4px 8px;border-radius:6px;background:#F7F3EA;font-size:10.5px;color:var(--muted);font-weight:600}
+.wd-sib.more{background:transparent;color:var(--faint)}
+.wd-source .btn-ghost{font-size:11px;padding:6px 11px}
+@media (max-width:640px){
+  .wd-body{grid-template-columns:1fr}
+  .wd-media{aspect-ratio:16/9}
+}
 
 /* Toast */
 #toastRoot{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:7px}
@@ -809,6 +871,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
               <span class="count" id="listCount">9 项</span>
             </div>
             <div class="list-head-actions">
+              <button type="button" class="list-date" id="listDateBtn">2026-11-15 <span>周六</span></button>
               <span class="calc-hint">单价 × 数量 = 金额</span>
               <button type="button" class="btn-ghost sm" id="addRow">＋ 添加一行</button>
             </div>
@@ -868,7 +931,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
                 <b id="inspName">PAX 衣柜框架</b>
                 <span id="inspMeta">¥1,290.00 · 1 件</span>
               </div>
-              <button type="button" class="mini-link danger" id="removeGood">移出</button>
+              <div class="gs-actions">
+                <button type="button" class="mini-link" id="openWishDetail">仓库详情 ↗</button>
+                <button type="button" class="mini-link danger" id="removeGood">移出</button>
+              </div>
             </div>
 
             <div class="insp-field">
@@ -950,6 +1016,35 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
 <input type="file" id="imgFileInput" accept="image/*" multiple hidden>
 
+<!-- 好物仓库详情 -->
+<div class="wd-mask" id="wdMask" hidden></div>
+<section class="wd" id="wdPanel" role="dialog" aria-label="好物详情" hidden>
+  <div class="wd-head">
+    <div>
+      <span class="eyebrow">好物仓库 · 单品详情</span>
+      <h2 id="wdName">PAX 衣柜框架</h2>
+    </div>
+    <button type="button" class="icon-btn" id="wdClose" title="关闭">✕</button>
+  </div>
+  <div class="wd-body">
+    <div class="wd-media" id="wdMedia"></div>
+    <div>
+      <div class="wd-price" id="wdPrice"></div>
+      <div id="wdFields"></div>
+      <div class="wd-remark" id="wdRemark"></div>
+      <div class="wd-source">
+        <div class="wd-source-top">
+          <span class="eyebrow">来自清单</span>
+          <span class="wd-source-name" id="wdListName"></span>
+          <span class="wd-source-meta" id="wdListMeta"></span>
+        </div>
+        <div class="wd-siblings" id="wdSiblings"></div>
+        <button type="button" class="btn-ghost" id="wdOpenList">打开清单并定位 →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div id="toastRoot"></div>
 
 <script>
@@ -1003,7 +1098,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     activeId: null,
     platforms: BASE_PLATFORMS.slice(),
     platInputFor: null,
-    platEdit: null,
     catRowId: null,
     imgTarget: null,
     rows: [
@@ -1042,7 +1136,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   const total = () => state.rows.reduce((sum, r) => sum + rowAmount(r), 0);
   const activeRow = () => state.rows.find(r => r.id === state.activeId) || null;
   const rowIndex = id => state.rows.findIndex(r => r.id === id);
-  const isCustomPlatform = p => state.platforms.indexOf(p) >= 0 && BASE_PLATFORMS.indexOf(p) < 0;
 
   function catPillHTML(r) {
     return '<button type="button" class="cat-pill' + (r.rental ? ' rental' : '') + '" data-act="cat" title="修改这一行的分类">' +
@@ -1052,16 +1145,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
   function platformHTML(target, ctx) {
     const chips = state.platforms.map(p => {
       const on = p === target.platform ? ' on' : '';
-      if (state.platEdit && state.platEdit.ctx === ctx && state.platEdit.name === p) {
-        return '<input class="plat-edit-input" data-plat-edit-input="' + ctx + '" value="' + esc(p) + '">';
-      }
-      if (isCustomPlatform(p)) {
-        return '<span class="plat-tag' + on + '" title="双击可修改">' +
-          '<button type="button" class="plat-chip' + on + '" data-plat="' + esc(p) + '" data-plat-ctx="' + ctx + '">' + esc(p) + '</button>' +
-          '<button type="button" class="plat-del" data-plat-del="' + esc(p) + '" title="删除这个平台">×</button>' +
-          '</span>';
-      }
-      return '<button type="button" class="plat-chip' + on + '" data-plat="' + esc(p) + '" data-plat-ctx="' + ctx + '">' + esc(p) + '</button>';
+      return '<span class="plat-tag' + on + '">' +
+        '<button type="button" class="plat-chip' + on + '" data-plat="' + esc(p) + '" data-plat-ctx="' + ctx + '">' + esc(p) + '</button>' +
+        '<button type="button" class="plat-del" data-plat-del="' + esc(p) + '" title="删除这个平台">×</button>' +
+        '</span>';
     }).join('');
     const other = '<button type="button" class="plat-chip other" data-plat-other="' + ctx + '">＋ 其他</button>';
     const input = state.platInputFor === ctx
@@ -1197,7 +1284,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#modal').classList.remove('drawer-open');
     state.activeId = null;
     state.platInputFor = null;
-    state.platEdit = null;
     closeCatPop();
     closeImgLink();
     renderInspector();
@@ -1406,7 +1492,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     input.click();
   }
 
-  /* ---------- 购买平台：选择 / 自定义 / 删除 / 重命名 ---------- */
+  /* ---------- 购买平台：选择 / 自定义 / 删除 ---------- */
   function platTarget(ctx) {
     return ctx === 'single' ? state.single : activeRow();
   }
@@ -1426,7 +1512,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     const target = platTarget(ctx);
     if (target) target.platform = name;
     state.platInputFor = null;
-    state.platEdit = null;
     rerenderPlatform(ctx);
     toast('已添加平台「' + name + '」');
   }
@@ -1435,25 +1520,10 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     state.platforms = state.platforms.filter(p => p !== name);
     state.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
     if (state.single.platform === name) state.single.platform = '';
-    state.platEdit = null;
     state.platInputFor = null;
     renderInspector();
     renderSingleGood();
-  }
-
-  function commitPlatEdit(ctx) {
-    if (!state.platEdit) return;
-    const input = $('[data-plat-edit-input="' + ctx + '"]');
-    if (!input) return;
-    const oldName = state.platEdit.name;
-    const name = input.value.trim();
-    if (!name) { toast('平台名称不能为空', 'err'); return; }
-    if (name !== oldName && state.platforms.indexOf(name) >= 0) { toast('「' + name + '」已经在列表里了', 'err'); return; }
-    state.platforms = state.platforms.map(p => p === oldName ? name : p);
-    state.rows.forEach(r => { if (r.platform === oldName) r.platform = name; });
-    if (state.single.platform === oldName) state.single.platform = name;
-    state.platEdit = null;
-    rerenderPlatform(ctx);
+    toast('已删除平台「' + name + '」');
   }
 
   function bindPlatformClicks(root, ctx) {
@@ -1461,7 +1531,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     root.addEventListener('click', e => {
       if (e.target.closest('[data-plat-other]')) {
         state.platInputFor = ctx;
-        state.platEdit = null;
         rerenderPlatform(ctx);
         const input = $('[data-plat-new="' + ctx + '"]');
         if (input) input.focus();
@@ -1477,20 +1546,61 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       if (!target) return;
       target.platform = chip.dataset.plat;
       state.platInputFor = null;
-      state.platEdit = null;
       rerenderPlatform(ctx);
     });
-    root.addEventListener('dblclick', e => {
-      const chip = e.target.closest('[data-plat]');
-      if (!chip) return;
-      const name = chip.dataset.plat;
-      if (!isCustomPlatform(name)) return;
-      state.platEdit = { ctx, name };
-      state.platInputFor = null;
-      rerenderPlatform(ctx);
-      const input = $('[data-plat-edit-input="' + ctx + '"]');
-      if (input) { input.focus(); input.select(); }
-    });
+  }
+
+  /* ---------- 好物仓库详情 ---------- */
+  function wishMediaHTML(r) {
+    const first = (r.imgs || [])[0];
+    if (typeof first === 'string') {
+      return '<img src="' + esc(first) + '" alt="" onerror="this.style.display=\'none\'">';
+    }
+    return tagEmoji(r.tags && r.tags[0]) || '📦';
+  }
+
+  function renderWishDetail(r) {
+    $('#wdName').textContent = r.title || '未命名好物';
+    $('#wdMedia').innerHTML = wishMediaHTML(r);
+    $('#wdPrice').innerHTML = '¥' + money(rowAmount(r)) + '<small>' + (r.qty || 1) + ' 件</small>';
+    const tags = (r.tags || []).map(t =>
+      '<span class="wd-tag">' + (tagEmoji(t) ? tagEmoji(t) + ' ' : '') + esc(tagShort(t)) + '</span>'
+    ).join('');
+    $('#wdFields').innerHTML =
+      '<div class="wd-row"><span class="wd-k">分类</span><span class="wd-v">' + esc(r.cat) + '·' + esc(r.sub) + (r.rental ? ' · 出租屋账本' : '') + '</span></div>' +
+      '<div class="wd-row"><span class="wd-k">购买平台</span><span class="wd-v">' + (r.platform ? esc(r.platform) : '<span style="color:var(--faint)">未填写</span>') + '</span></div>' +
+      '<div class="wd-row"><span class="wd-k">规格</span><span class="wd-v">' + (r.spec ? esc(r.spec) : '<span style="color:var(--faint)">未填写</span>') + '</span></div>' +
+      '<div class="wd-row"><span class="wd-k">标签</span><span class="wd-v wd-tags">' + (tags || '<span style="color:var(--faint)">暂无标签</span>') + '</span></div>';
+    $('#wdRemark').textContent = r.remark || '暂无备注';
+    $('#wdListName').textContent = state.listTitle || '未命名清单';
+    $('#wdListMeta').textContent = state.date + ' · ' + state.rows.length + ' 项 · ¥' + money(total());
+    const sibs = state.rows.filter(x => x.id !== r.id).slice(0, 4).map(x => {
+      const i = rowIndex(x.id);
+      return '<span class="wd-sib">#' + (i + 1) + ' ' + esc(x.title || '未命名') + '</span>';
+    }).join('');
+    const more = state.rows.length > 5 ? '<span class="wd-sib more">等 ' + state.rows.length + ' 项</span>' : '';
+    $('#wdSiblings').innerHTML = sibs + more;
+  }
+
+  function openWishDetail() {
+    const r = activeRow();
+    if (!r) return;
+    renderWishDetail(r);
+    $('#wdMask').hidden = false;
+    $('#wdPanel').hidden = false;
+  }
+
+  function closeWishDetail() {
+    $('#wdMask').hidden = true;
+    $('#wdPanel').hidden = true;
+  }
+
+  function focusRow(id) {
+    const tr = $('#rows tr[data-id="' + id + '"]');
+    if (!tr) return;
+    tr.scrollIntoView({ block: 'center' });
+    tr.classList.add('flash');
+    setTimeout(() => tr.classList.remove('flash'), 1400);
   }
 
   /* ---------- 单笔模式 ---------- */
@@ -1526,7 +1636,6 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     const modal = $('#modal');
     modal.classList.toggle('list-mode', mode === 'list');
     state.platInputFor = null;
-    state.platEdit = null;
     closeTagPop();
     closeCatPop();
     closeImgLink();
@@ -1694,12 +1803,22 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#inspAddTag').addEventListener('click', e => {
       openTagPop(e.currentTarget, activeRow());
     });
+    /* 好物仓库详情 */
+    $('#openWishDetail').addEventListener('click', openWishDetail);
+    $('#wdClose').addEventListener('click', closeWishDetail);
+    $('#wdMask').addEventListener('click', closeWishDetail);
+    $('#wdOpenList').addEventListener('click', () => {
+      const id = state.activeId;
+      closeWishDetail();
+      closeDrawer();
+      setMode('list');
+      if (id) focusRow(id);
+    });
     $('#inspector').addEventListener('click', e => {
       const strip = e.target.closest('[data-wish-id]');
       if (strip) {
         state.activeId = Number(strip.dataset.wishId);
         state.platInputFor = null;
-        state.platEdit = null;
         renderInspector();
         return;
       }
@@ -1830,26 +1949,16 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       if ($('#imgLinkPop').classList.contains('show')) positionImgLink();
     });
 
-    /* 平台输入：回车新增 / 回车保存改名 / Escape 取消 */
+    /* 平台输入：回车新增 / Escape 取消 */
     $('#modal').addEventListener('keydown', e => {
       const t = e.target;
-      if (t.matches('[data-plat-new]')) {
-        if (e.key === 'Enter') { e.preventDefault(); addPlatform(t.dataset.platNew); }
-        else if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          state.platInputFor = null;
-          rerenderPlatform(t.dataset.platNew);
-        }
-      } else if (t.matches('[data-plat-edit-input]')) {
-        if (e.key === 'Enter') { e.preventDefault(); commitPlatEdit(t.dataset.platEditInput); }
-        else if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          const ctx = t.dataset.platEditInput;
-          state.platEdit = null;
-          rerenderPlatform(ctx);
-        }
+      if (!t.matches('[data-plat-new]')) return;
+      if (e.key === 'Enter') { e.preventDefault(); addPlatform(t.dataset.platNew); }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        state.platInputFor = null;
+        rerenderPlatform(t.dataset.platNew);
       }
     });
 
@@ -1887,6 +1996,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     $('#saveNext').addEventListener('click', () => save(true));
     $('#closeModal').addEventListener('click', () => toast('原型：关闭弹窗'));
     $('#dateBtn').addEventListener('click', () => toast('原型：日历选择器保持原样'));
+    $('#listDateBtn').addEventListener('click', () => toast('原型：日历选择器保持原样'));
 
     /* 设计要点 */
     $('#notesBtn').addEventListener('click', () => {
@@ -1903,7 +2013,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     /* 键盘 */
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        if ($('#tagPop').classList.contains('show')) closeTagPop();
+        if (!$('#wdPanel').hidden) closeWishDetail();
+        else if ($('#tagPop').classList.contains('show')) closeTagPop();
         else if ($('#catPop').classList.contains('show')) closeCatPop();
         else if ($('#imgLinkPop').classList.contains('show')) closeImgLink();
         else if ($('#modal').classList.contains('drawer-open')) closeDrawer();
