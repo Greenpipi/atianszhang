@@ -3381,28 +3381,32 @@ const App = {
         </header>
         <div class="mb">
           <aside class="rail">
-            <div class="rail-block">
+            <div class="rail-block rail-kind">
               <div class="rail-label">收支</div>
               <div class="type-switch" id="lgTypeSwitch">
                 <button type="button" data-kind="expense"${st.kind === 'expense' ? ' class="on"' : ''}>支出</button>
                 <button type="button" data-kind="income"${st.kind === 'income' ? ' class="on"' : ''}>收入</button>
               </div>
             </div>
-            <div class="rail-block">
+            <div class="rail-block rail-cats">
               <div class="rail-label"><span>大类</span><em id="lgCatCount"></em></div>
               <div class="cat-grid" id="lgCatGrid"></div>
             </div>
-            <div class="rail-block">
+            <div class="rail-block rail-subs">
               <div class="rail-label"><span>小类</span></div>
               <div class="sub-chips" id="lgSubChips"></div>
               <div class="rail-hint">清单模式下，每一行可单独选择分类</div>
             </div>
-            <div class="rail-block">
+            <div class="rail-block rail-date">
               <div class="rail-label">日期</div>
               <input class="date-btn cal-input" id="lgDate" type="text" readonly value="${esc(st.date)}" data-date="${esc(st.date)}">
             </div>
             <div class="rail-more">
-              <label class="mini-check"><input type="checkbox" id="lgRental"${st.single.rental ? ' checked' : ''}>归入出租屋账本</label>
+              <label class="mini-check"><input type="checkbox" id="lgRental"${st.single.rental ? ' checked' : ''}><span class="mc-full">归入出租屋账本</span><span class="mc-short">出租屋</span></label>
+            </div>
+            <div class="rail-mobile">
+              <select class="rm-select" id="lgCatSel" aria-label="大类"></select>
+              <select class="rm-select" id="lgSubSel" aria-label="小类"></select>
             </div>
           </aside>
           <div class="main">
@@ -3454,14 +3458,14 @@ const App = {
                 <div class="list-head-actions">
                   <span class="calc-hint">单价 × 数量 = 金额</span>
                   <input class="date-btn list-date cal-input" id="lgListDate" type="text" readonly value="${esc(st.date)}" data-date="${esc(st.date)}">
-                  <button type="button" class="btn-ghost" id="lgAddRow">＋ 添加一行</button>
                 </div>
               </div>
               <div class="table-scroll">
                 <table class="items">
-                  <colgroup><col style="width:38px"><col style="width:23%"><col style="width:15%"><col style="width:96px"><col style="width:56px"><col style="width:92px"><col style="width:18%"><col style="width:74px"><col style="width:28px"></colgroup>
+                  <colgroup><col style="width:38px"><col style="width:23%"><col style="width:132px"><col style="width:96px"><col style="width:56px"><col style="width:92px"><col style="width:18%"><col style="width:74px"><col style="width:28px"></colgroup>
                   <thead><tr><th>#</th><th>标题</th><th>分类</th><th>单价</th><th>数量</th><th>金额</th><th>备注</th><th>好物</th><th></th></tr></thead>
                   <tbody id="lgRows"></tbody>
+                  <tfoot><tr class="row-add"><td colspan="9"><button type="button" id="lgAddRow">＋ 添加一行</button></td></tr></tfoot>
                 </table>
               </div>
               <div class="list-tip"><span class="tip-dot"></span>每一行都会生成一笔独立账单；勾选「好物」的行会同时进入好物仓库</div>
@@ -3516,6 +3520,19 @@ const App = {
       $('lgSubChips').innerHTML = subs.length
         ? subs.map(s => '<button type="button" class="sub-chip' + (s === st.sub ? ' on' : '') + '" data-sub="' + quote(s) + '">' + quote(s) + '</button>').join('')
         : '<span class="lg-muted">无小类</span>';
+      // 手机端：大类 / 小类改用原生下拉，点按面积更大、不会横向滚出屏幕
+      const catSel = $('lgCatSel'), subSel = $('lgSubSel');
+      if (catSel) {
+        catSel.innerHTML = list.map(c => '<option value="' + quote(c.name) + '">' + quote(c.name) + '</option>').join('');
+        catSel.value = st.cat;
+      }
+      if (subSel) {
+        subSel.innerHTML = subs.length
+          ? subs.map(s => '<option value="' + quote(s) + '">' + quote(s) + '</option>').join('')
+          : '<option value="">无小类</option>';
+        subSel.value = st.sub;
+        subSel.disabled = !subs.length;
+      }
       mask.querySelectorAll('#lgTypeSwitch [data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === st.kind));
       const kt = $('lgKindTag');
       if (kt) kt.textContent = st.kind === 'income' ? '收入' : '支出';
@@ -3544,6 +3561,16 @@ const App = {
       if (!b) return;
       st.sub = b.dataset.sub;
       paintRail();
+    };
+    const catSelEl = $('lgCatSel'), subSelEl = $('lgSubSel');
+    if (catSelEl) catSelEl.onchange = e => {
+      st.cat = e.target.value;
+      st.sub = subsOf(st.cat)[0] || '';
+      st.kind = kindOf(st.cat);
+      paintRail();
+    };
+    if (subSelEl) subSelEl.onchange = e => {
+      if (e.target.value) st.sub = e.target.value;
     };
 
     /* ---------- 日期 ---------- */

@@ -2287,6 +2287,8 @@ input,select,textarea{font-family:inherit}
 .lgwb .rail-more{border-top:1px dashed var(--lg-line);padding-top:13px;margin-top:2px}
 .lgwb .mini-check{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--lg-muted);cursor:pointer}
 .lgwb .mini-check input{width:14px;height:14px;accent-color:var(--lg-gold)}
+.lgwb .mini-check .mc-short{display:none}
+.lgwb .rail-mobile{display:none}
 
 /* 中间主区 */
 .lgwb .main{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 22px 0;background:var(--lg-paper)}
@@ -2353,7 +2355,6 @@ input,select,textarea{font-family:inherit}
 .lgwb .list-date{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--lg-line);border-radius:9px;background:#fff;font-family:var(--lg-mono);font-size:13px;font-weight:500;color:var(--lg-ink2);cursor:pointer;transition:border-color .15s,background .15s}
 .lgwb .list-date:hover{border-color:var(--lg-gold-line);background:#FEFBF5}
 .lgwb .calc-hint{font-size:12.5px;color:var(--lg-faint);font-weight:500}
-.lgwb .list-head-actions #lgAddRow{font-size:13.5px;padding:8px 14px}
 .lgwb .table-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--lg-line);border-radius:14px;background:#fff;box-shadow:0 1px 3px rgba(64,60,52,.03)}
 .lgwb table.items{width:100%;min-width:640px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .lgwb table.items thead th{position:sticky;top:0;z-index:2;background:#FAF7F0;text-align:left;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--lg-muted);padding:10px;border-bottom:1px solid var(--lg-line);white-space:nowrap}
@@ -2370,8 +2371,8 @@ input,select,textarea{font-family:inherit}
 .lgwb .cell-input:hover{background:#FBF8F2}
 .lgwb .cell-input:focus{background:#FFFDF9;box-shadow:inset 0 0 0 1.5px var(--lg-gold-line)}
 .lgwb .cell-input.title{font-size:13px;font-weight:700;color:var(--lg-ink)}
-.lgwb .cat-pill{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:2px 0;border-radius:0;background:none;font-size:11.5px;font-weight:600;color:var(--lg-ink2);white-space:nowrap;transition:color .14s}
-.lgwb .cat-pill>span{overflow:hidden;text-overflow:ellipsis}
+.lgwb .cat-pill{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;max-width:100%;padding:2px 0;border-radius:0;background:none;font-size:11.5px;font-weight:600;color:var(--lg-ink2);white-space:normal;line-height:1.3;text-align:left;transition:color .14s}
+.lgwb .cat-pill>span{overflow-wrap:anywhere}
 .lgwb .cat-pill:hover{color:var(--lg-gold-deep)}
 .lgwb .cat-pill i{font-style:normal;flex:none;font-size:8px;line-height:1;padding:2px 3px;border-radius:3px;background:var(--lg-gold-soft);color:var(--lg-gold-deep)}
 .lgwb .cell-input.note{font-weight:500;color:var(--lg-muted);font-size:11.5px}
@@ -2387,6 +2388,9 @@ input,select,textarea{font-family:inherit}
 .lgwb .wish-pill svg{width:11px;height:11px}
 .lgwb .row-del{width:24px;height:24px;border-radius:6px;color:#C9C1B4;font-size:15px;line-height:1;display:grid;place-items:center;transition:background .14s,color .14s}
 .lgwb .row-del:hover{background:#F9EDEA;color:var(--lg-danger)}
+.lgwb .row-add td{padding:8px 10px;border-top:1px solid var(--lg-line-soft)}
+.lgwb .row-add button{width:100%;padding:10px;border:1px dashed var(--lg-gold-line);border-radius:9px;background:#FDFAF4;font-size:12px;font-weight:700;color:var(--lg-gold-deep);transition:background .14s}
+.lgwb .row-add button:hover{background:#F8F1E4}
 .lgwb .list-tip{flex:none;display:flex;align-items:center;gap:7px;padding:10px 2px 12px;font-size:10.5px;color:var(--lg-faint)}
 .lgwb .tip-dot{width:5px;height:5px;border-radius:50%;background:var(--lg-gold);flex:none}
 
@@ -2523,19 +2527,30 @@ input,select,textarea{font-family:inherit}
   .lgwb .mh-title h1{font-size:22px}
   .lgwb .mode-switch button{min-width:56px;padding:6px 11px;font-size:12px}
   .lgwb .mb{flex-direction:column;position:relative;overflow:hidden}
-  .lgwb .rail{width:100%;flex:none;display:flex;align-items:center;gap:14px;overflow-x:auto;overflow-y:hidden;padding:9px 15px;border-right:0;border-bottom:1px solid var(--lg-line-soft);background:#FCF9F3}
+  .lgwb .rail{width:100%;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;padding:10px 15px;border-right:0;border-bottom:1px solid var(--lg-line-soft);background:#FCF9F3}
   .lgwb .rail-block{margin:0;flex:none}
   .lgwb .rail-label{display:none}
-  .lgwb .type-switch{width:104px}
-  .lgwb .cat-grid{display:flex}
-  .lgwb .cat-chip{padding:7px 9px;font-size:11px;white-space:nowrap}
-  .lgwb .sub-chips{flex-wrap:nowrap}
-  .lgwb .sub-chip{white-space:nowrap;font-size:10.5px}
-  .lgwb .date-btn{padding:7px 10px;font-size:11px;white-space:nowrap;width:auto}
-  .lgwb .rail-more{display:flex;align-items:center;margin:0;padding:0;border:0;white-space:nowrap}
-  .lgwb .mini-check{white-space:nowrap;font-size:10.5px}
+  /* 手机端不用横向滚动的分类胶囊，改为原生下拉（整块可点，全部选项可达） */
+  .lgwb .rail-cats,.lgwb .rail-subs{display:none}
+  .lgwb .rail-kind{order:1}
+  .lgwb .rail-kind .type-switch{width:96px}
+  .lgwb .rail-date{order:2;flex:1;min-width:104px}
+  .lgwb .rail-date .date-btn{width:100%;padding:9px 10px;font-size:12px;text-align:center}
+  .lgwb .rail-more{order:3;display:flex;align-items:center;margin:0;padding:0;border:0;white-space:nowrap}
+  .lgwb .mini-check{white-space:nowrap;font-size:11px}
+  .lgwb .mini-check .mc-full{display:none}
+  .lgwb .mini-check .mc-short{display:inline}
+  .lgwb .rail-mobile{order:4;display:flex;gap:8px;flex:1 1 100%}
+  .lgwb .rm-select{flex:1;min-width:0;height:40px;border:1px solid var(--lg-line);border-radius:10px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238A8377' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center/14px;padding:0 32px 0 12px;font-size:13px;font-weight:600;color:var(--lg-ink2);appearance:none;-webkit-appearance:none}
+  .lgwb .rm-select:disabled{opacity:.45}
   .lgwb .main{padding:13px 15px 0}
-  .lgwb .list-title{font-size:19px;max-width:180px}
+  .lgwb table.items{min-width:700px}
+  /* 清单头部改为上下两段，标题独占一行，日期不再压住账单名 */
+  .lgwb .list-head{flex-direction:column;align-items:stretch;gap:8px;margin-bottom:10px}
+  .lgwb .list-title-wrap{width:100%}
+  .lgwb .list-title{max-width:none;min-width:0;flex:1;font-size:20px}
+  .lgwb .list-head-actions{width:100%;justify-content:flex-start}
+  .lgwb .list-date{width:auto}
   .lgwb .calc-hint{display:none}
   .lgwb .list-tip{display:none}
   .lgwb .inspector{position:absolute;left:0;right:0;bottom:0;top:auto;width:100%!important;height:74%;border-left:0;border-top:1px solid var(--lg-line);border-radius:18px 18px 0 0;transform:translateY(101%);opacity:1;z-index:30;pointer-events:none;box-shadow:0 -20px 50px -18px rgba(64,60,52,.28);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
