@@ -305,14 +305,7 @@ table.items tbody tr{transition:background .14s}
 table.items tbody tr:hover td{background:#FDFBF6}
 table.items tbody tr.good td{background:#FAF3E6}
 table.items tbody tr.good:hover td{background:#F6EEDE}
-/* 好物行只用一层底色，行内的分类/好物标记不再叠色 */
-table.items tbody tr.good .cat-pill{background:transparent;border-color:transparent;padding-left:0;padding-right:0}
-table.items tbody tr.good .cat-pill:hover{background:transparent;border-color:transparent;color:var(--ink)}
-table.items tbody tr.good .cat-pill.rental{color:var(--gold-deep)}
-table.items tbody tr.good .cat-pill i{background:transparent;padding:0 0 0 1px;color:var(--gold)}
-table.items tbody tr.good .wish-pill{border:0;background:transparent;padding-left:0;padding-right:0;box-shadow:none;color:var(--gold-deep)}
-table.items tbody tr.good .wish-pill:hover{background:transparent;color:var(--gold)}
-table.items tbody tr.good .wish-pill em{background:transparent;padding:0 0 0 2px;color:var(--gold)}
+/* 分类统一为纯文本，好物统一为同形状按钮，避免同一列出现多种样式 */
 table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inset 0 -2px 0 rgba(165,130,76,.55)}
 .idx{padding-left:14px!important;font-family:var(--mono);font-size:11px;color:var(--faint)}
 .cell-input{
@@ -324,18 +317,17 @@ table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inse
 .cell-input.title{font-size:13px;font-weight:700;color:var(--ink)}
 .title-cell{display:flex;align-items:center;gap:2px}
 .title-cell .cell-input{flex:1;min-width:0}
-.good-mark{flex:none;margin-left:7px;font-size:9px;color:var(--gold);line-height:1}
 .cat-pill{
-  display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:5px 7px;border-radius:6px;
-  background:#F5F1E8;border:1px solid transparent;font-size:10px;font-weight:600;color:var(--muted);
-  transition:all .14s;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:2px 0;border:0;border-radius:0;
+  background:none;font-size:11.5px;font-weight:600;color:var(--ink-2);
+  white-space:nowrap;transition:color .14s;
 }
 .cat-pill span{overflow:hidden;text-overflow:ellipsis}
-.cat-pill:hover{background:#F8F3E9;border-color:var(--line)}
-.cat-pill.rental{background:var(--gold-soft);border-color:var(--gold-line);color:var(--gold-deep)}
+.cat-pill:hover{color:var(--gold-deep);background:none}
+.cat-pill.rental{background:none;border:0;color:var(--ink-2)}
 .cat-pill i{
   font-style:normal;flex:none;font-size:8px;line-height:1;padding:2px 3px;border-radius:3px;
-  background:rgba(165,130,76,.18);color:var(--gold-deep);
+  background:var(--gold-soft);color:var(--gold-deep);
 }
 .cell-input.note{font-weight:500;color:var(--muted);font-size:11.5px}
 .price-wrap{display:flex;align-items:center;gap:1px;padding-left:4px;color:var(--faint);font-family:var(--mono);font-size:11px}
@@ -344,17 +336,13 @@ table.items tbody tr.flash td{box-shadow:inset 0 2px 0 rgba(165,130,76,.55),inse
 .cell-input.qty{text-align:center;font-size:12px}
 .amount-cell{padding:0 10px!important;font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--ink);white-space:nowrap}
 .wish-pill{
-  display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:999px;
-  border:1px dashed var(--line);font-size:10.5px;font-weight:700;color:var(--faint);white-space:nowrap;
-  transition:all .15s;
+  display:inline-flex;align-items:center;gap:5px;padding:2px 0;border:0;border-radius:0;
+  background:none;font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap;
+  transition:color .14s;
 }
-.wish-pill:hover{border-color:var(--gold-line);color:var(--gold-deep);background:#FDF8EE}
-.wish-pill.on{border:1px solid var(--gold-line);background:var(--gold-soft);color:var(--gold-deep);box-shadow:0 1px 4px rgba(165,130,76,.1)}
+.wish-pill:hover{color:var(--gold-deep);background:none}
+.wish-pill.on{color:var(--gold-deep)}
 .wish-pill svg{width:11px;height:11px}
-.wish-pill em{
-  font-style:normal;font-family:var(--mono);font-size:9px;line-height:1;padding:2px 4px;border-radius:4px;
-  background:rgba(165,130,76,.16);color:var(--gold-deep);
-}
 .row-del{
   width:24px;height:24px;border-radius:6px;color:#C9C1B4;font-size:15px;line-height:1;
   display:grid;place-items:center;transition:background .14s,color .14s;
@@ -1194,12 +1182,11 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
   /* ---------- 清单渲染 ---------- */
   function wishPillHTML(r) {
+    const star = '<svg viewBox="0 0 24 24" fill="' + (r.wish ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.6l2.2 5.5 5.9.5-4.5 3.8 1.4 5.8L12 16.1l-5 3.1 1.4-5.8-4.5-3.8 5.9-.5L12 3.6z"/></svg>';
     if (r.wish) {
-      return '<button type="button" class="wish-pill on" data-act="wish" title="打开好物信息">' +
-        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.6l2.2 5.5 5.9.5-4.5 3.8 1.4 5.8L12 16.1l-5 3.1 1.4-5.8-4.5-3.8 5.9-.5L12 3.6z"/></svg>好物' +
-        (r.tags.length ? '<em>' + r.tags.length + '</em>' : '') + '</button>';
+      return '<button type="button" class="wish-pill on" data-act="wish" title="已在好物仓库，点击查看">' + star + '好物</button>';
     }
-    return '<button type="button" class="wish-pill" data-act="wish" title="加入好物仓库">＋ 好物</button>';
+    return '<button type="button" class="wish-pill" data-act="wish" title="加入好物仓库">' + star + '好物</button>';
   }
 
   function renderRows() {
@@ -1207,7 +1194,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     tbody.innerHTML = state.rows.map((r, i) => {
       return '<tr data-id="' + r.id + '"' + (r.wish ? ' class="good"' : '') + '>' +
         '<td class="idx">' + (i + 1) + '</td>' +
-        '<td><div class="title-cell"><input class="cell-input title" data-f="title" value="' + esc(r.title) + '" placeholder="物品名称">' + (r.wish ? '<span class="good-mark">★</span>' : '') + '</div></td>' +
+        '<td><div class="title-cell"><input class="cell-input title" data-f="title" value="' + esc(r.title) + '" placeholder="物品名称"></div></td>' +
         '<td>' + catPillHTML(r) + '</td>' +
         '<td><div class="price-wrap"><span>¥</span><input class="cell-input num" data-f="price" inputmode="decimal" value="' + esc(r.price) + '" placeholder="0"></div></td>' +
         '<td><input class="cell-input num qty" data-f="qty" inputmode="numeric" value="' + esc(r.qty) + '" placeholder="1"></td>' +
