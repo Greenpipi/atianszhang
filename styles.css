@@ -2283,6 +2283,8 @@ input,select,textarea{font-family:inherit}
 .lgwb .rail-hint{display:none;margin-top:7px;font-size:9.5px;line-height:1.45;color:var(--lg-faint)}
 .lgwb.list-mode .rail-hint{display:block}
 .lgwb.list-mode .rail-more{display:none}
+/* 清单模式每行自带分类、日期在清单头部，左侧栏整块都不需要 */
+.lgwb.list-mode .rail{display:none}
 .lgwb .date-btn{width:100%;display:block;padding:10px 11px;border-radius:11px;background:#fff;border:1px solid var(--lg-line);font-family:var(--lg-mono);font-size:12px;font-weight:500;color:var(--lg-ink2);text-align:left;cursor:pointer}
 .lgwb .rail-more{border-top:1px dashed var(--lg-line);padding-top:13px;margin-top:2px}
 .lgwb .mini-check{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--lg-muted);cursor:pointer}
@@ -2556,7 +2558,7 @@ input,select,textarea{font-family:inherit}
   .lgwb .inspector{position:absolute;left:0;right:0;bottom:0;top:auto;width:100%!important;height:74%;border-left:0;border-top:1px solid var(--lg-line);border-radius:18px 18px 0 0;transform:translateY(101%);opacity:1;z-index:30;pointer-events:none;box-shadow:0 -20px 50px -18px rgba(64,60,52,.28);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
   .lgwb.drawer-open .inspector{transform:none;width:100%!important;pointer-events:auto}
   .lgwb .insp-inner{width:100%;padding:16px 16px 0}
-  .lgwb .mf{padding:10px 15px;gap:10px}
+  .lgwb .mf{padding:12px 15px calc(14px + env(safe-area-inset-bottom,0px));gap:10px}
   .lgwb .mf-num{font-size:21px}
   .lgwb .mf-sub{display:none}
   .lgwb .mf-actions .btn-ghost{display:none}
