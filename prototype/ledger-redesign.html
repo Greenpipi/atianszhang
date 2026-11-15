@@ -798,7 +798,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
     </ul>
   </div>
 
-  <div class="modal list-mode" id="modal">
+  <div class="modal" id="modal">
     <header class="mh">
       <div class="mh-left">
         <span class="eyebrow" id="mhDate">2026-11-15 · 周六</span>
@@ -807,8 +807,8 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         </div>
       </div>
       <div class="mode-switch" role="group" aria-label="记账方式">
-        <button type="button" data-mode="single">单笔</button>
-        <button type="button" data-mode="list" class="on">清单</button>
+        <button type="button" data-mode="single" class="on">单笔</button>
+        <button type="button" data-mode="list">清单</button>
       </div>
       <div class="mh-right">
         <button type="button" class="icon-btn" id="closeModal" title="关闭">✕</button>
@@ -873,7 +873,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
       <main class="main">
         <!-- 单笔 -->
-        <section class="pane" id="pane-single" hidden>
+        <section class="pane" id="pane-single">
           <div class="single-amount-card">
             <div class="amount-label">金额</div>
             <div class="amount-row">
@@ -929,7 +929,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
         </section>
 
         <!-- 清单 -->
-        <section class="pane" id="pane-list" style="--list-gap:0px">
+        <section class="pane" id="pane-list" style="--list-gap:0px" hidden>
           <div class="list-gap" id="listGap" title="上下拖动，调整标题栏上方间距；双击复位"><i></i></div>
           <div class="list-head">
             <div class="list-title-wrap">
@@ -1169,7 +1169,7 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
 
   let seq = 100;
   const state = {
-    mode: 'list',
+    mode: 'single',
     type: 'expense',
     cat: '购物',
     sub: '家居',
@@ -2282,6 +2282,9 @@ textarea.insp-input{resize:none;line-height:1.55;font-weight:500}
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(false);
     });
+
+    /* 默认进入单笔记账 */
+    setMode(state.mode);
   }
 
   function save(continuous) {
