@@ -1,6 +1,8 @@
 /* ============ 应用主逻辑 ============ */
 /* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用 → 已磬用（已弃用/已磬用 始终最后） */
 const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3, '已磬用': 4 };
+/* 购买平台：内置标签；用户自定义的只存本地（localStorage），不改表结构 */
+const BASE_PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下'];
 
 /* 旧版季节自动切换会把好物的 status_since 重置为切换当天（已陪伴天数因此显示 1 天）。
  * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
@@ -1138,7 +1140,7 @@ const App = {
       <div class="rec-icon ${inc ? 'inc' : ''}"${rm ? ' style="background:' + rm.color + '1F;color:' + rm.color + '"' : ''}>${inc ? '收' : (rm ? rm.emoji : esc((r.category || '?').slice(0, 1)))}</div>
       <div class="rec-main">
         <div class="rec-title">${esc(r.category)}
-          ${r.rating ? '<span class="rec-stars">' + '★'.repeat(Math.round(r.rating)) + '</span>' : ''}
+          ${this.ratingStars(r)}
           ${r.rental && !hideRentalBadge ? '<span class="badge badge-green" title="归入出租屋">🏠 出租屋</span>' : ''}
           ${r.favorite ? '<span class="badge badge-green">心仪</span>' : ''}</div>
         ${(r.sub || r.note) ? '<div class="rec-note">' + esc(r.sub || '') + (r.sub && r.note ? ' · ' : '') + esc(r.note || '') + '</div>' : ''}
@@ -3283,172 +3285,923 @@ const App = {
     return normGoodsTags(Array.from(document.querySelectorAll(pickerSel + ' input[type=checkbox]:checked')).map(i => i.value));
   },
 
-  /* ---------- 新增记账弹窗 ---------- */
+  /* ---------- 平台标签：内置 + 用户自定义（只存本地，零建表改动） ---------- */
+  platformsOf() {
+    const key = 'fin_platforms_' + ((Store.user && Store.user.email) || 'guest');
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { saved = []; }
+    const seen = {};
+    const out = [];
+    BASE_PLATFORMS.concat(saved, (this.state.records || []).map(r => r.purchase_platform)).forEach(p => {
+      const v = String(p == null ? '' : p).trim();
+      if (!v || seen[v]) return;
+      seen[v] = 1;
+      out.push(v);
+    });
+    return out.slice(0, 14);
+  },
+  savePlatforms(list) {
+    const key = 'fin_platforms_' + ((Store.user && Store.user.email) || 'guest');
+    const custom = (list || []).filter(p => p && !BASE_PLATFORMS.includes(p));
+    try { localStorage.setItem(key, JSON.stringify(custom)); } catch (e) { /* 忽略 */ }
+  },
+
+  /* ---------- 评分编解码 ----------
+   * records.rating 是 integer 列。为不改线上表结构就支持「负向 + 半星」，新值编码：
+   *   0         未评分
+   *   1..5      旧数据（整数星）
+   *   102..110  正向 1~5 星，每 0.5 星 +1（3.5 星 = 107）
+   *   202..210  负向 1~5 星（-3.5 星 = 207）
+   * 旧值（1..5）不会被误读成新编码，无需数据迁移。 */
+  encodeRating(value, negative) {
+    const mag = Math.abs(Number(value) || 0);
+    if (!mag) return 0;
+    const half = Math.max(1, Math.min(10, Math.round(mag * 2)));
+    return (negative ? 200 : 100) + half;
+  },
+  ratingInfo(rec) {
+    const v = Number(rec && rec.rating) || 0;
+    if (v >= 200) return { value: -((v - 200) / 2), mag: (v - 200) / 2, neg: true };
+    if (v >= 100) return { value: (v - 100) / 2, mag: (v - 100) / 2, neg: false };
+    return { value: v, mag: Math.abs(v), neg: v < 0 };
+  },
+  ratingStars(rec) {
+    const info = this.ratingInfo(rec);
+    if (!info.mag) return '';
+    const full = Math.floor(info.mag);
+    const half = info.mag - full >= 0.5;
+    return '<span class="rec-stars' + (info.neg ? ' neg' : '') + '">' + (info.neg ? '−' : '') + '★'.repeat(full) + (half ? '½' : '') + '</span>';
+  },
+
+  /* ---------- 新增记账：工作台（单笔 / 清单） ---------- */
   addRecordModal(ledgerId, date, preCat, preSub, rental, continuous) {
     const cats = this.catsOf(ledgerId);
-    let rating = 0;
-    let adImgs = [];
-    if (rental && !preCat) preCat = RENTAL_CAT;
-    const adMask = this.openModal(`
-      <div class="modal-title"><span id="ad-title">新增记账 · ${esc(date)}</span><button class="icon-btn" style="display:flex" data-close>✕</button></div>
-      <div class="modal-body">
-        <div class="field-row">
-          <div class="field"><label>大类</label><select id="ad-cat">${cats.map(c => '<option value="' + esc(c.name) + '"' + (preCat && c.name === preCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('')}</select></div>
-          <div class="field"><label>小类</label><select id="ad-sub"></select></div>
-          <div class="field"><label>日期</label><input id="ad-date" type="text" class="cal-input" readonly placeholder="选择日期" value="${esc(date)}" data-date="${esc(date)}"></div>
-        </div>
-        <div class="field"><label>金额（元）</label><input id="ad-amt" class="amt-input" type="number" step="0.01" placeholder="0.00"></div>
-        <div class="field"><label>评分</label><div class="stars" id="ad-stars">${[1, 2, 3, 4, 5].map(v => '<button type="button" data-v="' + v + '">★</button>').join('')}</div></div>
-        <div class="field"><label>描述</label><input id="ad-note" type="text" placeholder="选填"></div>
-        <div class="field"><label>备注</label><textarea id="ad-remark" rows="2"></textarea></div>
-        <div class="field-row">
-          <div class="field"><label>购买平台</label><input id="ad-platform" type="text" placeholder="如 淘宝 / 京东"></div>
-          <div class="field"><label>属性</label><input id="ad-attr" type="text" placeholder="如 黑色 128G"></div>
-        </div>
-        <div class="field"><label>标记</label>
-          <label class="fav-check"><input type="checkbox" id="ad-rental" ${rental ? 'checked' : ''}><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>归入出租屋账本</label>
-        </div>
-        <div class="field"><label>心仪物品</label>
-          <label class="fav-check"><input type="checkbox" id="ad-fav"><span class="fav-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg></span>收入好物仓库</label>
-        </div>
-        <div class="field" id="ad-tags-field" style="display:none"><label>好物标签（可多选）</label>
-          <div class="tag-picker" id="ad-tagpicker">${this.goodsTagPickerHTML()}</div>
-        </div>
-        <div class="field" id="ad-img-field" style="display:none"><label>图片（可多张）</label>
-          <div class="rec-img-grid" id="ad-img-grid"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-ghost btn-sm" id="ad-img-up" type="button">上传图片</button>
-            <button class="btn btn-ghost btn-sm" id="ad-img-link" type="button">图片链接</button>
+    if (!cats.length) return this.toast('当前账本还没有分类，请先到设置里添加分类', 'err');
+    const today = todayStr();
+    const wd = d => {
+      const dt = new Date(String(d) + 'T00:00:00');
+      return isNaN(dt.getTime()) ? '' : '周' + '日一二三四五六'[dt.getDay()];
+    };
+    const quote = s => esc(String(s == null ? '' : s));
+    const catOf = name => this.catByName(ledgerId, name);
+    const subsOf = name => { const c = catOf(name); return (c && Array.isArray(c.subs)) ? c.subs.slice() : []; };
+    const kindOf = name => this.kindOf(ledgerId, name) || 'expense';
+    let kind = preCat ? kindOf(preCat) : kindOf(cats[0].name);
+    let cat = (preCat && catOf(preCat)) ? preCat : (cats.find(c => kindOf(c.name) === kind) || cats[0]).name;
+    let sub = (preSub && subsOf(cat).includes(preSub)) ? preSub : (subsOf(cat)[0] || '');
+    if (rental && !preCat && catOf(RENTAL_CAT)) { cat = RENTAL_CAT; sub = subsOf(cat)[0] || ''; }
+    let platforms = this.platformsOf();
+
+    const st = {
+      mode: 'single', kind: kindOf(cat), cat, sub,
+      date: date || today,
+      single: { amount: '', note: '', remark: '', fav: false, rental: !!rental, status: '使用中', rating: 0, neg: false, tags: [], platform: '', spec: '', imgs: [] },
+      listTitle: '', drawer: null, rows: []
+    };
+    let seq = 0;
+    const newRow = (seed) => ({
+      id: ++seq, title: '', cat: (seed && seed.cat) || st.cat, sub: (seed && seed.sub) || st.sub,
+      rental: false, price: '', qty: '1', note: '', wish: false, status: '使用中',
+      tags: [], platform: '', spec: '', remark: '', imgs: []
+    });
+    st.rows.push(newRow());
+
+    const mask = this.openModal(`
+      <div class="lgwb" id="lgwb">
+        <header class="mh">
+          <div class="mh-left">
+            <span class="eyebrow" id="lgDateEyebrow">${esc(st.date)} · ${wd(st.date)}</span>
+            <div class="mh-title"><h1>记一笔</h1></div>
           </div>
+          <div class="mode-switch" id="lgModeSwitch">
+            <button type="button" data-mode="single" class="on">单笔</button>
+            <button type="button" data-mode="list">清单</button>
+          </div>
+          <div class="mh-right"><button type="button" class="icon-btn" data-close title="关闭">✕</button></div>
+        </header>
+        <div class="mb">
+          <aside class="rail">
+            <div class="rail-block">
+              <div class="rail-label">收支</div>
+              <div class="type-switch" id="lgTypeSwitch">
+                <button type="button" data-kind="expense"${st.kind === 'expense' ? ' class="on"' : ''}>支出</button>
+                <button type="button" data-kind="income"${st.kind === 'income' ? ' class="on"' : ''}>收入</button>
+              </div>
+            </div>
+            <div class="rail-block">
+              <div class="rail-label"><span>大类</span><em id="lgCatCount"></em></div>
+              <div class="cat-grid" id="lgCatGrid"></div>
+            </div>
+            <div class="rail-block">
+              <div class="rail-label"><span>小类</span></div>
+              <div class="sub-chips" id="lgSubChips"></div>
+              <div class="rail-hint">清单模式下，每一行可单独选择分类</div>
+            </div>
+            <div class="rail-block">
+              <div class="rail-label">日期</div>
+              <input class="date-btn cal-input" id="lgDate" type="text" readonly value="${esc(st.date)}" data-date="${esc(st.date)}">
+            </div>
+            <div class="rail-more">
+              <label class="mini-check"><input type="checkbox" id="lgRental"${st.single.rental ? ' checked' : ''}>归入出租屋账本</label>
+            </div>
+          </aside>
+          <div class="main">
+            <section class="pane" id="lgPaneSingle">
+              <div class="single-amount-card">
+                <div class="amount-label">金额</div>
+                <div class="amount-row">
+                  <span class="cny">¥</span>
+                  <input id="lgAmt" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00">
+                  <span class="kind-tag" id="lgKindTag">支出</span>
+                </div>
+              </div>
+              <div class="single-grid">
+                <label class="input-card"><span>描述</span><input id="lgNote" type="text" maxlength="60" autocomplete="off" placeholder="选填，例如：周末采购"></label>
+                <div class="input-card">
+                  <div class="ic-head"><span>备注</span><button type="button" class="note-expand" id="lgNoteExpand" hidden>展开编辑</button></div>
+                  <textarea id="lgRemark" rows="1" placeholder="选填，可写长备注"></textarea>
+                </div>
+              </div>
+              <div class="wish-toggle-card">
+                <div><b>存入好物仓库</b><p>填平台、规格、标签与图片，自动统计使用成本</p></div>
+                <button type="button" class="switch-btn" id="lgFav" role="switch" aria-checked="false" aria-label="存入好物仓库"><i></i></button>
+              </div>
+              <div class="good-inline" id="lgGood" hidden>
+                <div class="gi-row"><span class="gi-label">标签</span><div class="gi-tags" id="lgGiTags"></div><button type="button" class="mini-add" id="lgGiTagAdd">＋ 标签</button></div>
+                <div class="gi-row"><span class="gi-label">平台</span><div class="gi-chips" id="lgGiPlats"></div></div>
+                <div class="gi-row"><span class="gi-label">规格</span><input class="gi-input" id="lgGiSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>
+                <div class="gi-row"><span class="gi-label">状态</span><div class="gi-chips" id="lgGiStatus"></div></div>
+                <div class="single-media">
+                  <div class="media-head"><span>图片</span><span>可多张 · 支持上传或链接</span></div>
+                  <div class="thumb-grid" id="lgGiImgs"></div>
+                </div>
+              </div>
+              <div class="inline-more">
+                <span class="rate-label">评分</span>
+                <button type="button" class="rate-sign" id="lgRateSign" title="切换正 / 负向">正向</button>
+                <span class="rate-stars" id="lgRateStars"></span>
+                <span class="rate-value" id="lgRateVal">未评分</span>
+                <button type="button" class="rate-clear" id="lgRateClear">清除</button>
+              </div>
+            </section>
+            <section class="pane" id="lgPaneList" hidden>
+              <div class="list-head">
+                <div class="list-title-wrap">
+                  <span class="eyebrow">清单</span>
+                  <input class="list-title" id="lgListTitle" type="text" maxlength="24" autocomplete="off" placeholder="未命名清单">
+                  <span class="lg-count" id="lgListCount"></span>
+                </div>
+                <div class="list-head-actions">
+                  <span class="calc-hint">单价 × 数量 = 金额</span>
+                  <input class="date-btn list-date cal-input" id="lgListDate" type="text" readonly value="${esc(st.date)}" data-date="${esc(st.date)}">
+                  <button type="button" class="btn-ghost" id="lgAddRow">＋ 添加一行</button>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="items">
+                  <colgroup><col style="width:38px"><col style="width:23%"><col style="width:15%"><col style="width:96px"><col style="width:56px"><col style="width:92px"><col style="width:18%"><col style="width:74px"><col style="width:28px"></colgroup>
+                  <thead><tr><th>#</th><th>标题</th><th>分类</th><th>单价</th><th>数量</th><th>金额</th><th>备注</th><th>好物</th><th></th></tr></thead>
+                  <tbody id="lgRows"></tbody>
+                </table>
+              </div>
+              <div class="list-tip"><span class="tip-dot"></span>每一行都会生成一笔独立账单；勾选「好物」的行会同时进入好物仓库</div>
+            </section>
+          </div>
+          <aside class="inspector" id="lgInspector">
+            <div class="insp-inner">
+              <div class="insp-head">
+                <div><span class="eyebrow">好物</span><b id="lgInspName">—</b></div>
+                <button type="button" class="icon-btn" id="lgInspClose" title="关闭">✕</button>
+              </div>
+              <div class="wish-strip" id="lgWishStrip"></div>
+              <div class="insp-scroll" id="lgInspBody"></div>
+              <div class="insp-end-hint">改动即时保存在这笔记录上，点保存后同步到云端</div>
+            </div>
+          </aside>
         </div>
-      </div>
-      <div class="modal-foot">
-        <div class="modal-acts">
-          <button class="btn btn-ghost" data-close>${continuous ? '完成' : '取消'}</button>
-          <button class="btn btn-primary" id="ad-save">${continuous ? '保存并继续' : '保存'}</button>
-        </div>
-      </div>
-    `, false, 'edit-modal', 'form-mask');
-    const catSel = document.getElementById('ad-cat'), subSel = document.getElementById('ad-sub');
-    const fillSubs = () => {
-      const cc = this.catByName(ledgerId, catSel.value);
-      subSel.innerHTML = ((cc && cc.subs) || []).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
-      this.enhanceSelects(subSel);
+        <footer class="mf">
+          <div class="mf-total"><span class="mf-label">合计</span><span class="mf-num" id="lgTotal">¥0.00</span><span class="mf-sub" id="lgTotalSub"></span></div>
+          <div class="mf-actions">
+            <button type="button" class="btn-ghost" data-close>取消</button>
+            <button type="button" class="btn-primary" id="lgSave">保存</button>
+          </div>
+        </footer>
+      </div>`, false, 'lgwb-modal', 'lgwb-mask');
+
+    const root = mask.querySelector('.lgwb');
+    const modal = mask.querySelector('.modal');
+    const $ = id => mask.querySelector('#' + id);
+    const pops = [];
+    const closePops = () => {
+      while (pops.length) {
+        const p = pops.pop();
+        p.off();
+        p.el.remove();
+      }
     };
-    fillSubs();
-    if (preSub) {
-      const subSel = document.getElementById('ad-sub');
-      if (Array.from(subSel.options).some(o => o.value === preSub)) subSel.value = preSub;
-      this.enhanceSelects(subSel);
-    }
-    catSel.onchange = fillSubs;
-    // 日期字段：点开日历选择，选中后同步弹窗标题
-    const adDate = document.getElementById('ad-date');
-    adDate.onclick = () => this.openCalendar(adDate);
-    adDate.addEventListener('change', () => {
-      const t = document.getElementById('ad-title');
-      if (t) t.textContent = '新增记账 · ' + (adDate.dataset.date || date);
+    const cleanup = () => { closePops(); };
+    mask.addEventListener('click', e => { if (e.target === mask) cleanup(); });
+    root.addEventListener('click', e => { if (e.target.closest('[data-close]')) cleanup(); });
+
+    /* ---------- 分类栏 ---------- */
+    const paintRail = () => {
+      const list = cats.filter(c => kindOf(c.name) === st.kind);
+      const grid = $('lgCatGrid');
+      grid.innerHTML = list.length
+        ? list.map(c => '<button type="button" class="cat-chip' + (c.name === st.cat ? ' on' : '') + '" data-cat="' + quote(c.name) + '">' + this.hpIcon(c.name) + '<span>' + quote(c.name) + '</span></button>').join('')
+        : '<div class="lg-muted">暂无该类目</div>';
+      const cnt = $('lgCatCount');
+      if (cnt) cnt.textContent = list.length + ' 个';
+      const subs = subsOf(st.cat);
+      $('lgSubChips').innerHTML = subs.length
+        ? subs.map(s => '<button type="button" class="sub-chip' + (s === st.sub ? ' on' : '') + '" data-sub="' + quote(s) + '">' + quote(s) + '</button>').join('')
+        : '<span class="lg-muted">无小类</span>';
+      mask.querySelectorAll('#lgTypeSwitch [data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === st.kind));
+      const kt = $('lgKindTag');
+      if (kt) kt.textContent = st.kind === 'income' ? '收入' : '支出';
+    };
+    $('lgTypeSwitch').onclick = e => {
+      const b = e.target.closest('[data-kind]');
+      if (!b || b.dataset.kind === st.kind) return;
+      const k = b.dataset.kind;
+      const c = cats.find(x => kindOf(x.name) === k);
+      if (!c) return this.toast('该账本没有' + (k === 'income' ? '收入' : '支出') + '分类', 'err');
+      st.kind = k;
+      st.cat = c.name;
+      st.sub = subsOf(c.name)[0] || '';
+      paintRail();
+    };
+    $('lgCatGrid').onclick = e => {
+      const b = e.target.closest('[data-cat]');
+      if (!b) return;
+      st.cat = b.dataset.cat;
+      st.sub = subsOf(st.cat)[0] || '';
+      st.kind = kindOf(st.cat);
+      paintRail();
+    };
+    $('lgSubChips').onclick = e => {
+      const b = e.target.closest('[data-sub]');
+      if (!b) return;
+      st.sub = b.dataset.sub;
+      paintRail();
+    };
+
+    /* ---------- 日期 ---------- */
+    const dateInputs = [$('lgDate'), $('lgListDate')].filter(Boolean);
+    dateInputs.forEach(inp => {
+      inp.onclick = () => this.openCalendar(inp);
+      inp.addEventListener('change', () => {
+        const d = inp.dataset.date;
+        if (!d) return;
+        st.date = d;
+        dateInputs.forEach(x => { x.dataset.date = d; x.value = d; });
+        const eb = $('lgDateEyebrow');
+        if (eb) eb.textContent = d + ' · ' + wd(d);
+      });
     });
-    this.bindFavTags(document.getElementById('ad-fav'), document.getElementById('ad-tags-field'), '#ad-tagpicker');
-    this.enhanceSelects(document.getElementById('modal-root'));
-    document.querySelectorAll('#ad-stars button').forEach(b => {
-      b.onclick = () => {
-        const v = Number(b.dataset.v);
-        rating = rating === v ? 0 : v;
-        document.querySelectorAll('#ad-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
+
+    /* ---------- 通用绘制 ---------- */
+    const paintTagChips = (box, tags, onDel) => {
+      if (!box) return;
+      box.innerHTML = tags.length
+        ? tags.map(t => '<span class="tag-chip"><span class="emo">' + goodsTagEmoji(t) + '</span>' + esc(goodsTagShort(t)) + '<button type="button" data-deltag="' + esc(t) + '" title="移除">✕</button></span>').join('')
+        : '<span class="lg-muted">暂无标签</span>';
+      box.onclick = e => {
+        const b = e.target.closest('[data-deltag]');
+        if (b) onDel(b.dataset.deltag);
       };
+    };
+    const paintStatusChips = (box, current, onPick) => {
+      if (!box) return;
+      box.innerHTML = WISH_STATUS_LIST.map(x => '<button type="button" class="status-chip' + (x.key === current ? ' on' : '') + '" data-status="' + esc(x.key) + '">' + esc(x.key) + '</button>').join('');
+      box.onclick = e => {
+        const b = e.target.closest('[data-status]');
+        if (b) onPick(b.dataset.status);
+      };
+    };
+    const icoUp = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>';
+    const icoLink = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>';
+    const paintImgs = (box, imgs, repaint) => {
+      if (!box) return;
+      box.innerHTML = imgs.map((src, i) => '<div class="img-tile"><img src="' + quote(this.thumbUrl(src, 200)) + '" alt=""><button type="button" data-del="' + i + '" title="删除这张">✕</button></div>').join('') +
+        '<button type="button" class="img-add" data-add="up">' + icoUp + '<small>上传</small></button>' +
+        '<button type="button" class="img-add" data-add="link">' + icoLink + '<small>链接</small></button>';
+      box.onclick = async e => {
+        const del = e.target.closest('[data-del]');
+        if (del) { imgs.splice(Number(del.dataset.del), 1); repaint(); return; }
+        const add = e.target.closest('[data-add]');
+        if (!add) return;
+        if (add.dataset.add === 'up') {
+          if (Store.missingCol('records', 'images')) return this.toast('请先到设置页补一次建表 SQL（补 images 列）');
+          this.toast('图片处理中…');
+          const added = await this.pickImages();
+          if (!added.length) return;
+          imgs.push(...added);
+          repaint();
+          this.toast('已添加 ' + added.length + ' 张图片', 'ok');
+        } else {
+          const next = await this.promptImageLink(imgs);
+          if (!next) return;
+          imgs.length = 0;
+          imgs.push(...next);
+          repaint();
+          this.toast('已添加图片链接', 'ok');
+        }
+      };
+    };
+
+    /* ---------- 气泡定位 / 关闭 ---------- */
+    const placePop = (pop, anchor) => {
+      const r = anchor.getBoundingClientRect();
+      const pw = pop.offsetWidth, ph = pop.offsetHeight;
+      const below = r.bottom + 8 + ph <= window.innerHeight - 8 || r.top - ph - 8 <= 8;
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8)) + 'px';
+      pop.style.top = (below ? Math.min(r.bottom + 8, window.innerHeight - ph - 8) : r.top - ph - 8) + 'px';
+    };
+    const bindPopOutside = (pop, anchor) => {
+      const close = ev => {
+        if (pop.contains(ev.target) || anchor.contains(ev.target)) return;
+        closePops();
+      };
+      const key = ev => { if (ev.key === 'Escape') closePops(); };
+      setTimeout(() => {
+        document.addEventListener('pointerdown', close, true);
+        document.addEventListener('keydown', key, true);
+      }, 0);
+      pops.push({ el: pop, off: () => {
+        document.removeEventListener('pointerdown', close, true);
+        document.removeEventListener('keydown', key, true);
+      } });
+    };
+    const openTagPicker = (anchor, get, set) => {
+      closePops();
+      const pop = document.createElement('div');
+      pop.className = 'wish-pop lg-pop';
+      pop.innerHTML = '<div class="wp-title">标签（可多选）</div><div class="tag-picker">' + this.goodsTagPickerHTML() + '</div>';
+      document.body.appendChild(pop);
+      pop.querySelectorAll('.tag-opt input').forEach(i => { i.checked = get().includes(i.value); });
+      pop.addEventListener('change', e => {
+        const t = e.target.value;
+        if (!t) return;
+        const cur = get().slice();
+        const next = e.target.checked ? normGoodsTags(cur.concat(t)) : cur.filter(x => x !== t);
+        set(next);
+      });
+      placePop(pop, anchor);
+      bindPopOutside(pop, anchor);
+    };
+    const inlinePlatInput = (box, done) => {
+      box.innerHTML = '<div class="plat-input-row"><input type="text" maxlength="12" placeholder="平台名称，回车添加"><button type="button" data-ok>添加</button></div>';
+      const inp = box.querySelector('input');
+      const commit = () => {
+        const v = inp.value.trim();
+        if (!v) return done('');
+        if (!platforms.includes(v)) {
+          platforms.push(v);
+          this.savePlatforms(platforms);
+        }
+        done(v);
+      };
+      box.querySelector('[data-ok]').onclick = commit;
+      inp.onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { e.stopPropagation(); done(''); }
+      };
+      inp.focus();
+    };
+
+    /* ---------- 单笔：好物区 ---------- */
+    const paintSinglePlats = () => {
+      const box = $('lgGiPlats');
+      if (!box) return;
+      box.innerHTML = platforms.map(p => '<button type="button" class="plat-chip' + (p === st.single.platform ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>').join('') +
+        '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
+    };
+    $('lgGiPlats').onclick = e => {
+      const b = e.target.closest('[data-plat]');
+      if (!b) return;
+      if (b.dataset.plat === '__add') {
+        inlinePlatInput($('lgGiPlats'), v => {
+          if (v) st.single.platform = v;
+          paintSinglePlats();
+        });
+        return;
+      }
+      st.single.platform = st.single.platform === b.dataset.plat ? '' : b.dataset.plat;
+      paintSinglePlats();
+    };
+    const paintSingleGood = () => {
+      const f = st.single;
+      $('lgGood').hidden = !f.fav;
+      $('lgFav').classList.toggle('on', f.fav);
+      $('lgFav').setAttribute('aria-checked', f.fav ? 'true' : 'false');
+      if (!f.fav) return;
+      paintTagChips($('lgGiTags'), f.tags, t => {
+        f.tags = f.tags.filter(x => x !== t);
+        paintSingleGood();
+      });
+      paintSinglePlats();
+      const spec = $('lgGiSpec');
+      if (spec && document.activeElement !== spec) spec.value = f.spec;
+      paintStatusChips($('lgGiStatus'), f.status, s => {
+        f.status = s;
+        paintSingleGood();
+      });
+      paintImgs($('lgGiImgs'), f.imgs, paintSingleGood);
+    };
+    $('lgFav').onclick = () => {
+      st.single.fav = !st.single.fav;
+      paintSingleGood();
+      paintTotals();
+    };
+    $('lgGiTagAdd').onclick = e => {
+      openTagPicker(e.currentTarget, () => st.single.tags, next => {
+        st.single.tags = next;
+        paintSingleGood();
+      });
+    };
+    $('lgGiSpec').addEventListener('input', e => { st.single.spec = e.target.value; });
+    $('lgRental').addEventListener('change', e => { st.single.rental = e.target.checked; });
+
+    /* ---------- 单笔：金额 / 描述 / 备注 ---------- */
+    $('lgAmt').addEventListener('input', e => {
+      st.single.amount = e.target.value;
+      paintTotals();
     });
-    // 图片区（与编辑弹窗一致：勾选「心仪物品」后出现，图片随记录一起入库）
-    const favEl = document.getElementById('ad-fav');
-    const imgField = document.getElementById('ad-img-field');
-    const imgGrid = document.getElementById('ad-img-grid');
-    const renderImgGrid = () => {
-      imgGrid.innerHTML = adImgs.length
-        ? adImgs.map((src, i) => '<div class="ri-cell"><img src="' + esc(this.thumbUrl(src, 200)) + '" alt=""><button type="button" class="ri-del" data-i="' + i + '" title="删除这张">✕</button></div>').join('')
-        : '<span class="ph">暂无图片</span>';
-      imgGrid.querySelectorAll('.ri-del').forEach(b => {
-        b.onclick = () => { adImgs.splice(Number(b.dataset.i), 1); renderImgGrid(); };
+    $('lgNote').addEventListener('input', e => { st.single.note = e.target.value; });
+    const rem = $('lgRemark');
+    const noteExpand = $('lgNoteExpand');
+    const fitRemark = () => {
+      rem.style.height = 'auto';
+      const h = rem.scrollHeight;
+      rem.style.height = Math.min(168, Math.max(21, h)) + 'px';
+      noteExpand.hidden = h <= 172;
+    };
+    rem.addEventListener('input', () => {
+      st.single.remark = rem.value;
+      fitRemark();
+    });
+    const openNotePop = anchor => {
+      closePops();
+      const pop = document.createElement('div');
+      pop.className = 'lg-note-pop lg-pop show';
+      pop.innerHTML = '<div class="np-head"><span>备注</span><span class="np-count" id="lgNpCount">0 字</span></div>' +
+        '<textarea placeholder="写多长都可以，保存后完整保留"></textarea>' +
+        '<div class="np-foot"><span>Ctrl / ⌘ + Enter 完成</span><button type="button" class="btn-primary" data-done>完成</button></div>';
+      document.body.appendChild(pop);
+      const ta = pop.querySelector('textarea');
+      const cnt = pop.querySelector('#lgNpCount');
+      ta.value = st.single.remark;
+      const sync = () => { cnt.textContent = ta.value.length + ' 字'; };
+      sync();
+      ta.addEventListener('input', () => {
+        st.single.remark = ta.value;
+        rem.value = ta.value;
+        fitRemark();
+        sync();
       });
+      ta.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); closePops(); }
+      });
+      pop.querySelector('[data-done]').onclick = () => closePops();
+      placePop(pop, anchor);
+      bindPopOutside(pop, anchor);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
     };
-    const syncImgField = () => { if (imgField) imgField.style.display = favEl.checked ? '' : 'none'; };
-    favEl.addEventListener('change', syncImgField);
-    syncImgField();
-    renderImgGrid();
-    document.getElementById('ad-img-up').onclick = async () => {
-      if (Store.missingCol('records', 'images')) { this.toast('请先到设置页补一次建表 SQL（补 images 列）'); return; }
-      this.toast('图片处理中…');
-      const added = await this.pickImages();
-      if (!added.length) return;
-      adImgs = [...adImgs, ...added];
-      renderImgGrid();
-      this.toast('已添加 ' + added.length + ' 张图片', 'ok');
+    noteExpand.onclick = e => openNotePop(e.currentTarget);
+
+    /* ---------- 评分（负向 + 半星） ---------- */
+    const paintStars = () => {
+      const v = st.single.rating;
+      const neg = st.single.neg && v > 0;
+      const box = $('lgRateStars');
+      box.classList.toggle('neg', neg);
+      box.innerHTML = [0, 1, 2, 3, 4].map(i => {
+        const fill = Math.max(0, Math.min(1, v - i)) * 100;
+        return '<button type="button" class="rstar" data-i="' + i + '" style="--p:' + fill + '%" aria-label="第' + (i + 1) + '颗星">★</button>';
+      }).join('');
+      const sign = $('lgRateSign');
+      sign.textContent = neg ? '负向' : '正向';
+      sign.classList.toggle('neg', neg);
+      $('lgRateVal').textContent = v ? (neg ? '−' : '') + v.toFixed(1) + ' 星' : '未评分';
     };
-    document.getElementById('ad-img-link').onclick = async () => {
-      const next = await this.promptImageLink(adImgs);
-      if (!next) return;
-      adImgs = next;
-      renderImgGrid();
-      this.toast('已添加图片链接', 'ok');
+    $('lgRateStars').onclick = e => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      const i = Number(b.dataset.i);
+      const r = b.getBoundingClientRect();
+      const half = (e.clientX - r.left) < r.width / 2;
+      st.single.rating = i + (half ? 0.5 : 1);
+      paintStars();
     };
-    // 备注 textarea：高度随内容自适应
-    const remarkEl = document.getElementById('ad-remark');
-    const fitRemark = () => { remarkEl.style.height = 'auto'; remarkEl.style.height = Math.max(64, remarkEl.scrollHeight) + 'px'; };
-    remarkEl.addEventListener('input', fitRemark);
-    fitRemark();
-    // 滚动条：滚动时显示浅灰细线，停止后隐藏
-    const bindThinScroll = (elm) => {
-      if (!elm) return;
-      let tm = null;
-      elm.addEventListener('scroll', () => {
-        elm.classList.add('mscrolling');
-        clearTimeout(tm);
-        tm = setTimeout(() => elm.classList.remove('mscrolling'), 900);
-      }, { passive: true });
+    $('lgRateSign').onclick = () => {
+      st.single.neg = !st.single.neg;
+      paintStars();
     };
-    bindThinScroll(adMask && adMask.querySelector('.modal-body'));
-    bindThinScroll(document.getElementById('ad-tagpicker'));
-    document.getElementById('ad-save').onclick = () => {
-      const amount = parseFloat(document.getElementById('ad-amt').value);
-      if (!amount || !isFinite(amount)) return this.toast('请输入正确金额', 'err');
-      const fav = document.getElementById('ad-fav').checked;
-      // 即存即显：乐观加入内存并立刻刷新日历/列表，云端写入在后台完成
+    $('lgRateClear').onclick = () => {
+      st.single.rating = 0;
+      st.single.neg = false;
+      paintStars();
+    };
+
+    /* ---------- 清单 ---------- */
+    const paintTotals = () => {
+      let total = 0, count = 0, goods = 0;
+      if (st.mode === 'single') {
+        const a = parseFloat(st.single.amount) || 0;
+        total = a;
+        count = a > 0 ? 1 : 0;
+        if (st.single.fav && a > 0) goods = 1;
+      } else {
+        st.rows.forEach(r => {
+          const a = (parseFloat(r.price) || 0) * (parseFloat(r.qty) || 0);
+          total += a;
+          if (a > 0 || String(r.title).trim()) count++;
+          if (r.wish && a > 0) goods++;
+        });
+      }
+      $('lgTotal').textContent = fmtMoney(total);
+      $('lgTotalSub').textContent = total > 0 ? (count > 1 ? count + ' 笔' : '') + (goods ? (count > 1 ? ' · ' : '') + goods + ' 件好物' : '') : '';
+      const lc = $('lgListCount');
+      if (lc) lc.textContent = st.rows.filter(r => String(r.title).trim() || parseFloat(r.price)).length + ' 行';
+      $('lgSave').textContent = continuous ? '保存并继续' : '保存';
+    };
+    const wishIco = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.5a1 1 0 0 1 1-1Z"/></svg>';
+    const paintWishStrip = () => {
+      const strip = $('lgWishStrip');
+      if (!strip) return;
+      const wishes = st.rows.filter(r => r.wish);
+      strip.innerHTML = wishes.length
+        ? wishes.map((r, i) => '<button type="button" class="ws-chip' + (r.id === st.drawer ? ' on' : '') + '" data-wish="' + r.id + '"><span class="ws-idx">' + String(i + 1).padStart(2, '0') + '</span><span class="ws-name">' + quote(r.title || '未命名') + '</span></button>').join('')
+        : '<span class="lg-muted">还没有好物行</span>';
+      strip.onclick = e => {
+        const b = e.target.closest('[data-wish]');
+        if (b) openDrawer(Number(b.dataset.wish));
+      };
+    };
+    const amountOf = r => (parseFloat(r.price) || 0) * (parseFloat(r.qty) || 0);
+    const renderRows = () => {
+      const tb = $('lgRows');
+      if (!tb) return;
+      tb.innerHTML = st.rows.map((r, i) => '<tr data-row="' + r.id + '"' + (r.wish ? ' class="good"' : '') + '>' +
+        '<td class="idx">' + String(i + 1).padStart(2, '0') + '</td>' +
+        '<td><input class="cell-input title" data-f="title" value="' + quote(r.title) + '" placeholder="物品名称" autocomplete="off"></td>' +
+        '<td><button type="button" class="cat-pill" data-act="cat"><span>' + quote(r.cat) + '</span><i>' + quote(r.sub || '—') + '</i></button></td>' +
+        '<td><div class="price-wrap">¥<input class="cell-input num" data-f="price" inputmode="decimal" value="' + quote(r.price) + '" placeholder="0"></div></td>' +
+        '<td><input class="cell-input qty" data-f="qty" inputmode="numeric" value="' + quote(r.qty) + '" placeholder="1"></td>' +
+        '<td class="amount-cell">' + fmtMoney(amountOf(r)) + '</td>' +
+        '<td><input class="cell-input note" data-f="remark" value="' + quote(r.remark) + '" placeholder="选填" autocomplete="off"></td>' +
+        '<td><button type="button" class="wish-pill' + (r.wish ? ' on' : '') + '" data-act="wish" title="存入好物仓库">' + wishIco + '好物</button></td>' +
+        '<td><button type="button" class="row-del" data-act="del" title="删除这一行">✕</button></td>' +
+        '</tr>').join('');
+      paintTotals();
+      paintWishStrip();
+    };
+    const tb = $('lgRows');
+    tb.addEventListener('input', e => {
+      const tr = e.target.closest('tr[data-row]');
+      if (!tr) return;
+      const f = e.target.dataset.f;
+      if (!f) return;
+      const row = st.rows.find(r => r.id === Number(tr.dataset.row));
+      if (!row) return;
+      row[f] = e.target.value;
+      if (f === 'price' || f === 'qty') {
+        const cell = tr.querySelector('.amount-cell');
+        if (cell) cell.textContent = fmtMoney(amountOf(row));
+        paintTotals();
+      }
+      if (f === 'title') paintWishStrip();
+    });
+    tb.addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-row]');
+      if (!tr) return;
+      const row = st.rows.find(r => r.id === Number(tr.dataset.row));
+      if (!row) return;
+      const hit = e.target.closest('[data-act]');
+      if (!hit) return;
+      const act = hit.dataset.act;
+      if (act === 'cat') openRowCat(hit, row);
+      else if (act === 'wish') { row.wish = true; renderRows(); openDrawer(row.id); }
+      else if (act === 'del') {
+        st.rows = st.rows.filter(x => x !== row);
+        if (!st.rows.length) st.rows.push(newRow());
+        if (st.drawer === row.id) closeDrawer();
+        renderRows();
+      }
+    });
+    $('lgAddRow').onclick = () => {
+      st.rows.push(newRow());
+      renderRows();
+      const inputs = $('lgRows').querySelectorAll('tr:last-child .cell-input');
+      if (inputs[0]) inputs[0].focus();
+    };
+
+    /* 单行分类气泡 */
+    const openRowCat = (anchor, row) => {
+      closePops();
+      const pop = document.createElement('div');
+      pop.className = 'lg-cat-pop show lg-pop';
+      const paint = () => {
+        pop.innerHTML = '<div class="cp-head">分类<em>' + (kindOf(row.cat) === 'income' ? '收入' : '支出') + '</em><button type="button" class="icon-btn" data-x title="关闭">✕</button></div>' +
+          '<div class="cp-body">' +
+          '<div class="cp-label">大类</div><div class="cp-grid">' + cats.map(c => '<button type="button" class="cp-chip' + (c.name === row.cat ? ' on' : '') + '" data-c="' + quote(c.name) + '">' + this.hpIcon(c.name) + '<span>' + quote(c.name) + '</span></button>').join('') + '</div>' +
+          '<div class="cp-label">小类</div><div class="cp-chips">' + (subsOf(row.cat).map(s => '<button type="button" class="cp-sub' + (s === row.sub ? ' on' : '') + '" data-s="' + quote(s) + '">' + quote(s) + '</button>').join('') || '<span class="lg-muted">无小类</span>') + '</div>' +
+          '<div class="cp-divider"></div>' +
+          '<div class="cp-rent"><div>归入出租屋<small>这笔不计入日常生活账</small></div><button type="button" class="switch-btn' + (row.rental ? ' on' : '') + '" data-rent title="归入出租屋"><i></i></button></div>' +
+          '</div>';
+      };
+      paint();
+      document.body.appendChild(pop);
+      placePop(pop, anchor);
+      pop.addEventListener('click', e => {
+        if (e.target.closest('[data-x]')) return closePops();
+        const c = e.target.closest('[data-c]');
+        if (c) {
+          row.cat = c.dataset.c;
+          row.sub = subsOf(row.cat)[0] || '';
+          renderRows();
+          return closePops();
+        }
+        const s = e.target.closest('[data-s]');
+        if (s) {
+          row.sub = s.dataset.s;
+          renderRows();
+          return closePops();
+        }
+        if (e.target.closest('[data-rent]')) {
+          row.rental = !row.rental;
+          paint();
+        }
+      });
+      bindPopOutside(pop, anchor);
+    };
+
+    /* ---------- 好物抽屉 ---------- */
+    const closeDrawer = () => {
+      st.drawer = null;
+      root.classList.remove('drawer-open');
+      modal.classList.remove('drawer-open');
+      paintWishStrip();
+    };
+    const openDrawer = id => {
+      const row = st.rows.find(r => r.id === id);
+      if (!row) return;
+      st.drawer = id;
+      root.classList.add('drawer-open');
+      modal.classList.add('drawer-open');
+      renderDrawer();
+    };
+    const renderDrawer = () => {
+      const row = st.rows.find(r => r.id === st.drawer);
+      if (!row) return closeDrawer();
+      $('lgInspName').textContent = row.title || row.cat || '好物';
+      paintWishStrip();
+      const body = $('lgInspBody');
+      const amount = amountOf(row);
+      body.innerHTML =
+        '<div class="good-summary">' +
+          '<div class="lg-thumb">' + (row.imgs.length ? '<img src="' + quote(this.thumbUrl(row.imgs[0], 200)) + '" alt="">' : '🛍') + '</div>' +
+          '<div class="meta"><b>' + quote(row.title || '未命名好物') + '</b><span>' + fmtMoney(amount) + (Number(row.qty) > 1 ? ' · ×' + Number(row.qty) : '') + '</span></div>' +
+          '<div class="gs-actions"><button type="button" class="mini-link danger" id="lgDrUnwish">移出好物</button></div>' +
+        '</div>' +
+        '<div class="insp-field"><div class="insp-label">使用状态</div><div class="status-chips" id="lgDrStatus"></div></div>' +
+        '<div class="insp-field"><div class="insp-label">标签</div><div class="tag-chips" id="lgDrTags"></div><button type="button" class="add-tag-btn" id="lgDrTagAdd">＋ 添加标签</button></div>' +
+        '<div class="insp-field"><div class="insp-label">购买平台</div><div class="plat-chips" id="lgDrPlats"></div></div>' +
+        '<div class="insp-field"><div class="insp-label">规格</div><input class="insp-input" id="lgDrSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>' +
+        '<div class="insp-field"><div class="insp-label">备注</div><textarea class="insp-input" id="lgDrRemark" rows="2" placeholder="选填"></textarea></div>' +
+        '<div class="insp-field"><div class="insp-label">图片 <em>' + row.imgs.length + '</em></div><div class="thumb-grid" id="lgDrImgs"></div></div>';
+
+      paintStatusChips(body.querySelector('#lgDrStatus'), row.status, s => {
+        row.status = s;
+        renderDrawer();
+      });
+      paintTagChips(body.querySelector('#lgDrTags'), row.tags, t => {
+        row.tags = row.tags.filter(x => x !== t);
+        renderDrawer();
+      });
+      body.querySelector('#lgDrTagAdd').onclick = e => {
+        openTagPicker(e.currentTarget, () => row.tags, next => {
+          row.tags = next;
+          renderDrawer();
+        });
+      };
+      const platBox = body.querySelector('#lgDrPlats');
+      const paintPlats = () => {
+        platBox.innerHTML = platforms.map(p => {
+          const on = p === row.platform;
+          return '<span class="plat-tag' + (on ? ' on' : '') + '"><button type="button" class="plat-chip' + (on ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>' +
+            (BASE_PLATFORMS.includes(p) ? '' : '<button type="button" class="plat-del" data-delplat="' + quote(p) + '" title="删除这个平台">✕</button>') + '</span>';
+        }).join('') + '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
+      };
+      paintPlats();
+      platBox.onclick = e => {
+        const del = e.target.closest('[data-delplat]');
+        if (del) {
+          const name = del.dataset.delplat;
+          platforms = platforms.filter(p => p !== name);
+          this.savePlatforms(platforms);
+          st.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
+          paintPlats();
+          return;
+        }
+        const b = e.target.closest('[data-plat]');
+        if (!b) return;
+        if (b.dataset.plat === '__add') {
+          inlinePlatInput(platBox, v => {
+            if (v) row.platform = v;
+            paintPlats();
+          });
+          return;
+        }
+        row.platform = row.platform === b.dataset.plat ? '' : b.dataset.plat;
+        paintPlats();
+      };
+      const spec = body.querySelector('#lgDrSpec');
+      spec.value = row.spec || '';
+      spec.addEventListener('input', () => { row.spec = spec.value; });
+      const ta = body.querySelector('#lgDrRemark');
+      ta.value = row.remark || '';
+      const fit = () => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(120, Math.max(42, ta.scrollHeight)) + 'px';
+      };
+      ta.addEventListener('input', () => {
+        row.remark = ta.value;
+        fit();
+        const cell = mask.querySelector('tr[data-row="' + row.id + '"] [data-f="remark"]');
+        if (cell) cell.value = ta.value;
+      });
+      fit();
+      paintImgs(body.querySelector('#lgDrImgs'), row.imgs, renderDrawer);
+      body.querySelector('#lgDrUnwish').onclick = () => {
+        row.wish = false;
+        closeDrawer();
+        renderRows();
+      };
+    };
+    $('lgInspClose').onclick = () => closeDrawer();
+
+    /* ---------- 模式切换 ---------- */
+    const setMode = m => {
+      st.mode = m;
+      root.classList.toggle('list-mode', m === 'list');
+      modal.classList.toggle('list-mode', m === 'list');
+      $('lgPaneSingle').hidden = m !== 'single';
+      $('lgPaneList').hidden = m !== 'list';
+      mask.querySelectorAll('#lgModeSwitch [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+      if (m === 'list') renderRows();
+      else closeDrawer();
+      paintTotals();
+    };
+    $('lgModeSwitch').onclick = e => {
+      const b = e.target.closest('[data-mode]');
+      if (!b || b.dataset.mode === st.mode) return;
+      setMode(b.dataset.mode);
+    };
+
+    /* ---------- 保存 ---------- */
+    const saveSingle = () => {
+      const f = st.single;
+      const amount = Math.round((parseFloat(f.amount) || 0) * 100) / 100;
+      if (!(amount > 0)) {
+        this.toast('请输入正确金额', 'err');
+        $('lgAmt').focus();
+        return false;
+      }
+      let since = '';
+      if (f.fav) {
+        if (f.status === '未使用') since = '';
+        else if (f.status === '已弃用' || f.status === '已磬用') since = fmtWishSince(todayStr(), 1, amount);
+        else since = todayStr();
+      }
       this.optimisticAdd({
-        ledger_id: ledgerId, category: catSel.value, sub: subSel.value, amount,
-        note: document.getElementById('ad-note').value.trim(),
-        remark: document.getElementById('ad-remark').value.trim(),
-        favorite: fav,
-        tags: fav ? this.pickedTags('#ad-tagpicker') : [],
-        rental: document.getElementById('ad-rental').checked,
-        images: adImgs,
-        purchase_platform: document.getElementById('ad-platform').value.trim(),
-        attribute: document.getElementById('ad-attr').value.trim(),
-        rating, date: document.getElementById('ad-date').dataset.date || date, image: null, kind: this.kindOf(ledgerId, catSel.value)
+        ledger_id: ledgerId, category: st.cat, sub: st.sub, amount,
+        note: String(f.note || '').trim(),
+        remark: String(f.remark || '').trim(),
+        favorite: f.fav,
+        tags: f.fav ? f.tags.slice() : [],
+        rental: f.rental,
+        images: f.fav ? f.imgs.slice() : [],
+        purchase_platform: f.fav ? f.platform : '',
+        attribute: f.fav ? String(f.spec || '').trim() : '',
+        rating: this.encodeRating(f.rating, f.neg),
+        date: st.date, image: null, kind: kindOf(st.cat),
+        status: f.fav ? f.status : '',
+        status_since: f.fav ? since : ''
       });
-      this.touchQuickMru(catSel.value, subSel.value); // 快捷条：最近使用的排最前
+      this.touchQuickMru(st.cat, st.sub);
       this.refreshQuickBar(ledgerId);
       if (continuous) {
-        // 连续记账：重置表单（保留日期/大类/小类），弹窗不关，可继续记下一笔
-        document.getElementById('ad-amt').value = '';
-        document.getElementById('ad-note').value = '';
-        document.getElementById('ad-remark').value = '';
+        st.single.amount = '';
+        st.single.note = '';
+        st.single.remark = '';
+        st.single.fav = false;
+        st.single.rental = false;
+        st.single.rating = 0;
+        st.single.neg = false;
+        st.single.tags = [];
+        st.single.platform = '';
+        st.single.spec = '';
+        st.single.imgs = [];
+        st.single.status = '使用中';
+        $('lgAmt').value = '';
+        $('lgNote').value = '';
+        rem.value = '';
         fitRemark();
-        document.getElementById('ad-platform').value = '';
-        document.getElementById('ad-attr').value = '';
-        adImgs = [];
-        renderImgGrid();
-        document.getElementById('ad-fav').checked = false;
-        document.getElementById('ad-tags-field').style.display = 'none';
-        document.querySelectorAll('#ad-tagpicker input').forEach(i => { i.checked = false; });
-        document.getElementById('ad-rental').checked = false;
-        rating = 0;
-        document.querySelectorAll('#ad-stars button').forEach(x => x.classList.remove('on'));
-        document.getElementById('ad-amt').focus();
+        paintSingleGood();
+        paintStars();
+        paintTotals();
+        $('lgAmt').focus();
         this.toast('已保存，可继续记下一笔', 'ok');
-        return;
+        return true;
       }
       this.closeModal();
       this.toast('已记账 ' + fmtMoney(amount), 'ok');
+      return true;
     };
+    const saveList = () => {
+      const valid = [];
+      for (let i = 0; i < st.rows.length; i++) {
+        const r = st.rows[i];
+        const price = parseFloat(r.price) || 0;
+        if (!price && !String(r.title).trim()) continue;
+        if (!(price > 0)) {
+          this.toast('第 ' + (i + 1) + ' 行还没有单价', 'err');
+          return false;
+        }
+        valid.push(r);
+      }
+      if (!valid.length) {
+        this.toast('至少填写一行明细', 'err');
+        return false;
+      }
+      let total = 0;
+      valid.forEach(r => {
+        const price = Math.round((parseFloat(r.price) || 0) * 100) / 100;
+        const qty = Math.max(1, Math.round(parseFloat(r.qty) || 1));
+        const amount = Math.round(price * qty * 100) / 100;
+        total += amount;
+        let since = '';
+        if (r.wish) {
+          if (r.status === '未使用') since = '';
+          else if (r.status === '已弃用' || r.status === '已磬用') since = fmtWishSince(todayStr(), 1, amount);
+          else since = todayStr();
+        }
+        this.optimisticAdd({
+          ledger_id: ledgerId, category: r.cat, sub: r.sub, amount,
+          note: String(r.title).trim() + (qty > 1 ? '（×' + qty + '）' : ''),
+          remark: String(r.remark || '').trim(),
+          favorite: r.wish,
+          tags: r.wish ? r.tags.slice() : [],
+          rental: r.rental,
+          images: r.wish ? r.imgs.slice() : [],
+          purchase_platform: r.wish ? r.platform : '',
+          attribute: r.wish ? String(r.spec || '').trim() : '',
+          rating: 0,
+          date: st.date, image: null, kind: kindOf(r.cat),
+          status: r.wish ? r.status : '',
+          status_since: since
+        });
+        this.touchQuickMru(r.cat, r.sub);
+      });
+      this.refreshQuickBar(ledgerId);
+      if (continuous) {
+        st.rows = [newRow()];
+        closeDrawer();
+        renderRows();
+        this.toast('已记 ' + valid.length + ' 笔，可继续下一张清单', 'ok');
+        return true;
+      }
+      this.closeModal();
+      this.toast('已记 ' + valid.length + ' 笔 · 合计 ' + fmtMoney(total), 'ok');
+      return true;
+    };
+    $('lgSave').onclick = () => {
+      closePops();
+      if (st.mode === 'single') saveSingle();
+      else saveList();
+    };
+    $('lgAmt').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); closePops(); saveSingle(); }
+    });
+    root.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        closePops();
+        if (st.mode === 'single') saveSingle();
+        else saveList();
+      }
+    });
+
+    /* ---------- 初始绘制 ---------- */
+    paintRail();
+    fitRemark();
+    paintSingleGood();
+    paintStars();
+    paintTotals();
+    setTimeout(() => { const a = $('lgAmt'); if (a) a.focus(); }, 60);
   },
 
   /* ---------- 视图：出租屋（主账本中标记了「出租屋」的记录） ---------- */
@@ -4065,8 +4818,8 @@ const App = {
           if (g.length < 2) continue;
           dupGroups++;
           g.sort((a, b) => {
-            const fa = (a.favorite ? 2 : 0) + ((a.rating || 0) > 0 ? 1 : 0);
-            const fb = (b.favorite ? 2 : 0) + ((b.rating || 0) > 0 ? 1 : 0);
+            const fa = (a.favorite ? 2 : 0) + ((a.rating || 0) !== 0 ? 1 : 0);
+            const fb = (b.favorite ? 2 : 0) + ((b.rating || 0) !== 0 ? 1 : 0);
             if (fa !== fb) return fb - fa;
             return String(a.created_at || '').localeCompare(String(b.created_at || ''));
           });
@@ -4318,7 +5071,9 @@ const App = {
     const r = this.state.records.find(x => x.id === rid);
     if (!r) return;
     const cats = this.catsOf(ledgerId);
-    let rating = r.rating || 0;
+    const ratingMeta = this.ratingInfo(r);
+    let rating = ratingMeta.mag;          // 显示用星数（可能带 .5）
+    let ratingRaw = r.rating || 0;        // 原始存储值：没点星就原样保存，不丢半星/负向
     const edMask = this.openModal(`
       <div class="modal-title">编辑记录<button class="icon-btn" style="display:flex" data-close>✕</button></div>
       <div class="modal-body">
@@ -4455,6 +5210,7 @@ const App = {
       b.onclick = () => {
         const v = Number(b.dataset.v);
         rating = rating === v ? 0 : v;
+        ratingRaw = this.encodeRating(rating, ratingMeta.neg);
         document.querySelectorAll('#ed-stars button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) <= rating));
       };
     });
@@ -4477,7 +5233,7 @@ const App = {
         favorite: fav,
         tags: fav ? this.pickedTags('#ed-tagpicker') : [],
         rental: document.getElementById('ed-rental').checked,
-        rating, kind: this.kindOf(ledgerId, catSel.value),
+        rating: ratingRaw, kind: this.kindOf(ledgerId, catSel.value),
         purchase_platform: document.getElementById('ed-platform').value.trim(),
         attribute: document.getElementById('ed-attr').value.trim()
       };
