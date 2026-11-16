@@ -1261,9 +1261,8 @@ button.sc-row{cursor:pointer}
   transition:border-color .15s,box-shadow .15s;
 }
 .bill-card:hover{box-shadow:var(--shadow-hover)}
-.bill-card.red{border-color:#EBCFC8;background:#FFF8F8;box-shadow:inset 3px 0 0 var(--danger)}
-.bill-card.amber{box-shadow:inset 3px 0 0 var(--warn)}
-.bill-card.green{box-shadow:inset 3px 0 0 var(--green)}
+.bill-card.red{border-color:#EBCFC8;background:#FFF8F8}
+.bill-card.amber,.bill-card.green,.bill-card.blue{box-shadow:none}
 .bill-card.gray{opacity:.86}
 .bill-ico{
   width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;
@@ -1303,7 +1302,6 @@ button.sc-row{cursor:pointer}
 .badge-auto{background:#E0F2FE;color:#0369A1}
 .badge-auto::before{content:'⚡';margin-right:3px;font-size:10px}
 .bill-warn{color:var(--warn)}
-.bill-card.blue{box-shadow:inset 3px 0 0 var(--blue)}
 
 /* 付款方式单选组（原生 radio，样式与表单其它控件一致） */
 .pay-method{display:flex;gap:10px}
@@ -2216,17 +2214,17 @@ input,select,textarea{font-family:inherit}
   #bills-body>.bill-list{
     background:linear-gradient(180deg,rgba(255,253,248,.88),rgba(250,246,238,.72));
     border:1px solid rgba(255,255,255,.72);border-radius:16px;box-shadow:var(--shadow);
-    padding:2px 16px;gap:0;
+    padding:8px 16px;gap:0;
   }
   .bill-list{gap:0}
   .bill-list .bill-card{
     background:transparent;border:0;border-bottom:1px dashed rgba(88,82,72,.12);
-    border-radius:0;box-shadow:none;padding:13px 2px;
+    border-radius:0;box-shadow:none;padding:13px 10px;
   }
   .bill-list .bill-card:last-child{border-bottom:0}
   .bill-list .bill-card:hover{background:rgba(255,255,255,.45);box-shadow:none}
-  .bill-list .bill-card.red{background:rgba(180,84,60,.045);box-shadow:inset 3px 0 0 var(--danger)}
-  .bill-list .bill-card.amber{background:rgba(176,118,60,.04);box-shadow:inset 3px 0 0 var(--warn)}
+  .bill-list .bill-card.red{background:rgba(180,84,60,.045)}
+  .bill-list .bill-card.amber{background:rgba(176,118,60,.04)}
 }
 
 /* 好物仓库：图片在上、信息在下 */
@@ -2336,7 +2334,8 @@ input,select,textarea{font-family:inherit}
 
 /* 主体 */
 .lgwb .mb{flex:1;min-height:0;display:flex;position:relative}
-.lgwb .rail{flex:none;width:228px;padding:18px 17px 16px;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--lg-line-soft);background:linear-gradient(180deg,#FDFBF6 0%,#FBF8F1 100%)}
+.lgwb .rail{flex:none;width:228px;padding:18px 17px 16px;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--lg-line-soft);background:linear-gradient(180deg,#FDFBF6 0%,#FBF8F1 100%);-ms-overflow-style:none;scrollbar-width:none}
+.lgwb .rail::-webkit-scrollbar{width:0;height:0;display:none}
 .lgwb .rail-block{margin-bottom:18px}
 .lgwb .rail-block:last-child{margin-bottom:0}
 .lgwb .rail-label{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:700;letter-spacing:.11em;color:var(--lg-muted);margin-bottom:8px}
