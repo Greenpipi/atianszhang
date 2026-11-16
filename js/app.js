@@ -3986,8 +3986,9 @@ const App = {
       pop.style.top = (below ? Math.min(r.bottom + 8, window.innerHeight - ph - 8) : r.top - ph - 8) + 'px';
     };
     const bindPopOutside = (pop, anchor) => {
+      const anchorEl = typeof anchor === 'function' ? anchor : () => anchor;
       const close = ev => {
-        if (pop.contains(ev.target) || anchor.contains(ev.target)) return;
+        if (pop.contains(ev.target) || anchorEl().contains(ev.target)) return;
         closePops();
       };
       const key = ev => { if (ev.key === 'Escape') closePops(); };
@@ -4268,6 +4269,7 @@ const App = {
     /* 单行分类气泡 */
     const openRowCat = (anchor, row) => {
       closePops();
+      let anchorEl = anchor;
       const pop = document.createElement('div');
       pop.className = 'lg-cat-pop show lg-pop';
       const paint = () => {
@@ -4286,10 +4288,16 @@ const App = {
         if (e.target.closest('[data-x]')) return closePops();
         const c = e.target.closest('[data-c]');
         if (c) {
+          // 先选大类：留在气泡里继续选小类，选完小类才关闭
           row.cat = c.dataset.c;
-          row.sub = subsOf(row.cat)[0] || '';
+          if (!subsOf(row.cat).includes(row.sub)) row.sub = '';
           renderRows();
-          return closePops();
+          paint();
+          if (!subsOf(row.cat).length) return closePops();
+          const tr = $('lgRows').querySelector('tr[data-row="' + row.id + '"]');
+          const next = tr && tr.querySelector('[data-act="cat"]');
+          if (next) { anchorEl = next; placePop(pop, anchorEl); }
+          return;
         }
         const s = e.target.closest('[data-s]');
         if (s) {
@@ -4302,7 +4310,7 @@ const App = {
           paint();
         }
       });
-      bindPopOutside(pop, anchor);
+      bindPopOutside(pop, () => anchorEl);
     };
 
     /* ---------- 好物抽屉 ---------- */
