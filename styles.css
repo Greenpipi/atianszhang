@@ -2413,6 +2413,7 @@ input,select,textarea{font-family:inherit}
 .lgwb .switch-btn.sm i{width:14px;height:14px;top:3px;left:3px}
 .lgwb .switch-btn.sm.on i{transform:translateX(14px)}
 .lgwb .good-inline{border:1px solid var(--lg-gold-line);border-radius:14px;background:linear-gradient(180deg,#FDF8EE,#FFFDF9);padding:12px 14px;margin-top:10px;display:flex;flex-direction:column;gap:10px;animation:lgFadeUp .18s ease}
+.lgwb .single-detail{border:1px solid var(--lg-line);border-radius:13px;background:#fff;padding:11px 14px;margin-top:10px;display:flex;flex-direction:column;gap:9px}
 .lgwb .gi-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .lgwb .gi-label{flex:none;width:32px;font-size:10.5px;font-weight:700;color:var(--lg-muted)}
 .lgwb .gi-tags{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:60px}

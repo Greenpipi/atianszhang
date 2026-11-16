@@ -228,6 +228,8 @@ const App = {
     }
     // 云端数据（主路径）：其它初始化全部并行，不再串行卡首屏
     await this.loadData();
+    // 清单里误填成备注的规格，一次性迁移到 attribute
+    this.migrateListRemarksToSpec().catch(e => console.warn('清单备注转规格失败', e));
     // 本地数据一次性上云：放到首屏之后，完成后自动补一次刷新
     this.migrateLocalIfNeeded()
       .then(n => { if (n) this.loadData(); })
@@ -270,6 +272,34 @@ const App = {
     this._autoPayTimer = setInterval(() => {
       if (document.visibilityState === 'visible') run();
     }, 30 * 60 * 1000);
+  },
+
+  /* 一次性：把「宜家购物清单」里误填在备注的内容转成规格（attribute） */
+  async migrateListRemarksToSpec() {
+    const KEY = 'fin_mig_list_remark_spec_v1';
+    try { if (localStorage.getItem(KEY)) return 0; } catch (e) { return 0; }
+    const targets = this.state.records.filter(r =>
+      String(r.list_title || '').indexOf('宜家') >= 0
+      && String(r.remark || '').trim()
+      && !String(r.attribute || '').trim());
+    if (!targets.length) return 0;
+    let n = 0;
+    for (const r of targets) {
+      const spec = String(r.remark).trim();
+      try {
+        await Store.update('records', r.id, { attribute: spec, remark: '' });
+        r.attribute = spec;
+        r.remark = '';
+        n++;
+      } catch (e) { console.warn('备注转规格失败', e); }
+    }
+    try { localStorage.setItem(KEY, '1'); } catch (e) { /* ignore */ }
+    if (n) {
+      this._cacheSnapshot();
+      this.refreshCurrentView();
+      this.toast('已把 ' + n + ' 条清单备注转为规格', 'ok');
+    }
+    return n;
   },
 
   /* ---------- 本地数据自动上云（一次性，幂等去重） ---------- */
@@ -3826,14 +3856,16 @@ const App = {
                   <textarea id="lgRemark" rows="1" placeholder="选填，可写长备注"></textarea>
                 </div>
               </div>
+              <div class="single-detail">
+                <div class="gi-row"><span class="gi-label">平台</span><div class="gi-chips" id="lgGiPlats"></div></div>
+                <div class="gi-row"><span class="gi-label">规格</span><input class="gi-input" id="lgGiSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>
+              </div>
               <div class="wish-toggle-card">
-                <div><b>存入好物仓库</b><p>填平台、规格、标签与图片，自动统计使用成本</p></div>
+                <div><b>存入好物仓库</b><p>填标签、状态与图片，自动统计使用成本</p></div>
                 <button type="button" class="switch-btn" id="lgFav" role="switch" aria-checked="false" aria-label="存入好物仓库"><i></i></button>
               </div>
               <div class="good-inline" id="lgGood" hidden>
                 <div class="gi-row"><span class="gi-label">标签</span><div class="gi-tags" id="lgGiTags"></div><button type="button" class="mini-add" id="lgGiTagAdd">＋ 标签</button></div>
-                <div class="gi-row"><span class="gi-label">平台</span><div class="gi-chips" id="lgGiPlats"></div></div>
-                <div class="gi-row"><span class="gi-label">规格</span><input class="gi-input" id="lgGiSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>
                 <div class="gi-row"><span class="gi-label">状态</span><div class="gi-chips" id="lgGiStatus"></div></div>
                 <div class="single-media">
                   <div class="media-head"><span>图片</span><span>可多张 · 支持上传或链接</span></div>
@@ -3863,7 +3895,7 @@ const App = {
               <div class="table-scroll">
                 <table class="items">
                   <colgroup><col style="width:38px"><col style="width:23%"><col style="width:132px"><col style="width:96px"><col style="width:56px"><col style="width:92px"><col style="width:18%"><col style="width:74px"><col style="width:28px"></colgroup>
-                  <thead><tr><th>#</th><th>标题</th><th>分类</th><th>单价</th><th>数量</th><th>金额</th><th>备注</th><th>好物</th><th></th></tr></thead>
+                  <thead><tr><th>#</th><th>标题</th><th>分类</th><th>单价</th><th>数量</th><th>金额</th><th>规格</th><th>好物</th><th></th></tr></thead>
                   <tbody id="lgRows"></tbody>
                   <tfoot><tr class="row-add"><td colspan="9"><button type="button" id="lgAddRow">＋ 添加一行</button></td></tr></tfoot>
                 </table>
@@ -4105,10 +4137,27 @@ const App = {
     const paintSinglePlats = () => {
       const box = $('lgGiPlats');
       if (!box) return;
-      box.innerHTML = platforms.map(p => '<button type="button" class="plat-chip' + (p === st.single.platform ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>').join('') +
-        '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
+      box.innerHTML = platforms.map(p => {
+        const on = p === st.single.platform;
+        return '<span class="plat-tag' + (on ? ' on' : '') + '">'
+          + '<button type="button" class="plat-chip' + (on ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>'
+          + (BASE_PLATFORMS.includes(p) ? '' : '<button type="button" class="plat-del" data-delplat="' + quote(p) + '" title="删除这个平台">✕</button>')
+          + '</span>';
+      }).join('') + '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
     };
     $('lgGiPlats').onclick = e => {
+      const del = e.target.closest('[data-delplat]');
+      if (del) {
+        const name = del.dataset.delplat;
+        platforms = platforms.filter(p => p !== name);
+        this.savePlatforms(platforms);
+        if (st.single.platform === name) st.single.platform = '';
+        st.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
+        paintSinglePlats();
+        if (st.mode === 'list') renderRows();
+        if (st.drawer) renderDrawer();
+        return;
+      }
       const b = e.target.closest('[data-plat]');
       if (!b) return;
       if (b.dataset.plat === '__add') {
@@ -4126,14 +4175,15 @@ const App = {
       $('lgGood').hidden = !f.fav;
       $('lgFav').classList.toggle('on', f.fav);
       $('lgFav').setAttribute('aria-checked', f.fav ? 'true' : 'false');
+      // 平台 / 规格不依赖「存入好物仓库」，普通支出也能填
+      paintSinglePlats();
+      const spec = $('lgGiSpec');
+      if (spec && document.activeElement !== spec) spec.value = f.spec;
       if (!f.fav) return;
       paintTagChips($('lgGiTags'), f.tags, t => {
         f.tags = f.tags.filter(x => x !== t);
         paintSingleGood();
       });
-      paintSinglePlats();
-      const spec = $('lgGiSpec');
-      if (spec && document.activeElement !== spec) spec.value = f.spec;
       paintStatusChips($('lgGiStatus'), f.status, s => {
         f.status = s;
         paintSingleGood();
@@ -4284,7 +4334,7 @@ const App = {
         '<td><div class="price-wrap">¥<input class="cell-input num" data-f="price" inputmode="decimal" value="' + quote(r.price) + '" placeholder="0"></div></td>' +
         '<td><input class="cell-input qty" data-f="qty" inputmode="numeric" value="' + quote(r.qty) + '" placeholder="1"></td>' +
         '<td class="amount-cell">' + fmtMoney(amountOf(r)) + '</td>' +
-        '<td><input class="cell-input note" data-f="remark" value="' + quote(r.remark) + '" placeholder="选填" autocomplete="off"></td>' +
+        '<td><input class="cell-input note" data-f="spec" value="' + quote(r.spec) + '" placeholder="颜色 / 尺寸" autocomplete="off"></td>' +
         '<td><button type="button" class="wish-pill' + (r.wish ? ' on' : '') + '" data-act="wish" title="存入好物仓库">' + wishIco + '好物</button></td>' +
         '<td><button type="button" class="row-del" data-act="del" title="删除这一行">✕</button></td>' +
         '</tr>').join('');
@@ -4451,7 +4501,9 @@ const App = {
           platforms = platforms.filter(p => p !== name);
           this.savePlatforms(platforms);
           st.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
+          if (st.single.platform === name) st.single.platform = '';
           paintPlats();
+          paintSinglePlats();
           return;
         }
         const b = e.target.closest('[data-plat]');
@@ -4468,7 +4520,11 @@ const App = {
       };
       const spec = body.querySelector('#lgDrSpec');
       spec.value = row.spec || '';
-      spec.addEventListener('input', () => { row.spec = spec.value; });
+      spec.addEventListener('input', () => {
+        row.spec = spec.value;
+        const cell = mask.querySelector('tr[data-row="' + row.id + '"] [data-f="spec"]');
+        if (cell) cell.value = spec.value;
+      });
       const ta = body.querySelector('#lgDrRemark');
       ta.value = row.remark || '';
       const fit = () => {
@@ -4478,8 +4534,6 @@ const App = {
       ta.addEventListener('input', () => {
         row.remark = ta.value;
         fit();
-        const cell = mask.querySelector('tr[data-row="' + row.id + '"] [data-f="remark"]');
-        if (cell) cell.value = ta.value;
       });
       fit();
       paintImgs(body.querySelector('#lgDrImgs'), row.imgs, renderDrawer);
@@ -4549,8 +4603,8 @@ const App = {
         tags: f.fav ? f.tags.slice() : [],
         rental: f.rental,
         images: f.fav ? f.imgs.slice() : [],
-        purchase_platform: f.fav ? f.platform : '',
-        attribute: f.fav ? String(f.spec || '').trim() : '',
+        purchase_platform: f.platform || '',
+        attribute: String(f.spec || '').trim(),
         rating: this.encodeRating(f.rating, f.neg),
         date: st.date, image: null, kind: kindOf(st.cat),
         status: f.fav ? f.status : '',
@@ -4650,8 +4704,8 @@ const App = {
           tags: r.wish ? r.tags.slice() : [],
           rental: r.rental,
           images: r.wish ? r.imgs.slice() : [],
-          purchase_platform: r.wish ? r.platform : '',
-          attribute: r.wish ? String(r.spec || '').trim() : '',
+          purchase_platform: r.platform || '',
+          attribute: String(r.spec || '').trim(),
           rating: orig ? (Number(orig.rating) || 0) : 0,
           date: st.date, image: null, kind: kindOf(r.cat),
           status: r.wish ? r.status : '',
