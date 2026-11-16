@@ -13,16 +13,16 @@
 
   const THEMES = [
     { id: 'bloom', name: '山茶', desc: '山茶粉调 · 苔绿点缀' },
-    { id: 'paper', name: '暖纸', desc: '奶油纸感 · 陶土红' },
+    { id: 'paper', name: '金灰', desc: '米金纸感 · 苔绿点缀' },
     { id: 'ocean', name: '海盐', desc: '海雾青蓝 · 珊瑚橙' },
     { id: 'ink', name: '墨夜', desc: '夜墨底色 · 鎏金线条' }
   ];
 
   const THEME_COLORS = {
     bloom: { bg: '#f8ece9', surface: '#fff8f5', ink: '#3a2628', soft: '#7c5c5e', faint: '#a98a8c', line: 'rgba(58,38,40,.16)', accent: '#a34a5a', accent2: '#6d7f6a', sun: '#d9a05a' },
-    paper: { bg: '#f2ebdd', surface: '#fbf6e9', ink: '#23251c', soft: '#5c5b4b', faint: '#8d8876', line: 'rgba(35,37,28,.16)', accent: '#bf4f2a', accent2: '#2e5c4e', sun: '#d9a02a' },
+    paper: { bg: '#f3efe7', surface: '#fbf8f2', ink: '#37342d', soft: '#6f685c', faint: '#9c9486', line: 'rgba(55,52,45,.16)', accent: '#a5824c', accent2: '#7c8c72', sun: '#c09a5e' },
     ocean: { bg: '#eaf2f2', surface: '#fbfefe', ink: '#17323b', soft: '#4e6b73', faint: '#7d969d', line: 'rgba(23,50,59,.16)', accent: '#2f6d78', accent2: '#c07a4a', sun: '#7fa8a3' },
-    ink: { bg: '#15181a', surface: '#1f2427', ink: '#f0e9da', soft: '#b8b2a4', faint: '#8b867b', line: 'rgba(240,233,218,.18)', accent: '#d9b46a', accent2: '#8fa89b', sun: '#d9b46a' }
+    ink: { bg: '#1a1e20', surface: '#262b2e', ink: '#f7f1e3', soft: '#c6bfb0', faint: '#a79f8f', line: 'rgba(247,241,227,.20)', accent: '#e5c481', accent2: '#9fbfaf', sun: '#e5c481' }
   };
 
   const MOODS = [

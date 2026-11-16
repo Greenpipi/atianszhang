@@ -60,15 +60,15 @@
 
 /* ---------------- 主题 ---------------- */
 #view-travel .tv-app[data-theme="paper"] {
-  --tv-bg: #f2ebdd; --tv-surface: #fbf6e9; --tv-surface2: #f7f1e2; --tv-paper: #fffdf4;
-  --tv-ink: #23251c; --tv-soft: #5c5b4b; --tv-faint: #8d8876;
-  --tv-line: rgba(35, 37, 28, .14); --tv-line-strong: rgba(35, 37, 28, .26);
-  --tv-accent: #bf4f2a; --tv-accent-soft: #f0d9cd; --tv-accent2: #2e5c4e; --tv-sun: #d9a02a;
-  --tv-tape: rgba(224, 205, 168, .66);
+  --tv-bg: #f3efe7; --tv-surface: #fbf8f2; --tv-surface2: #f6f1e7; --tv-paper: #fffcf5;
+  --tv-ink: #37342d; --tv-soft: #6f685c; --tv-faint: #9c9486;
+  --tv-line: rgba(55, 52, 45, .14); --tv-line-strong: rgba(55, 52, 45, .26);
+  --tv-accent: #a5824c; --tv-accent-soft: #ede3d2; --tv-accent2: #7c8c72; --tv-sun: #c09a5e;
+  --tv-tape: rgba(219, 203, 172, .62);
   background:
-    radial-gradient(circle at 1px 1px, rgba(35, 37, 28, .05) 1px, transparent 0) 0 0 / 22px 22px,
-    radial-gradient(90% 60% at 94% -8%, rgba(217, 160, 42, .18), transparent 62%),
-    radial-gradient(70% 50% at 0% 100%, rgba(46, 92, 78, .10), transparent 58%),
+    radial-gradient(circle at 1px 1px, rgba(55, 52, 45, .05) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(165, 130, 76, .20), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(124, 140, 114, .13), transparent 58%),
     var(--tv-bg);
 }
 #view-travel .tv-app[data-theme="ocean"] {
@@ -84,21 +84,41 @@
     var(--tv-bg);
 }
 #view-travel .tv-app[data-theme="ink"] {
-  --tv-bg: #15181a; --tv-surface: #1f2427; --tv-surface2: #242a2e; --tv-paper: #22282b;
-  --tv-ink: #f0e9da; --tv-soft: #b8b2a4; --tv-faint: #8b867b;
-  --tv-line: rgba(240, 233, 218, .16); --tv-line-strong: rgba(240, 233, 218, .32);
-  --tv-accent: #d9b46a; --tv-accent-soft: rgba(217, 180, 106, .16); --tv-accent2: #8fa89b; --tv-sun: #d9b46a;
-  --tv-tape: rgba(217, 180, 106, .22);
+  --tv-bg: #1a1e20; --tv-surface: #262b2e; --tv-surface2: #2c3235; --tv-paper: #2a3033;
+  --tv-ink: #f7f1e3; --tv-soft: #c6bfb0; --tv-faint: #a79f8f;
+  --tv-line: rgba(247, 241, 227, .20); --tv-line-strong: rgba(247, 241, 227, .38);
+  --tv-accent: #e5c481; --tv-accent-soft: rgba(229, 196, 129, .18); --tv-accent2: #9fbfaf; --tv-sun: #e5c481;
+  --tv-tape: rgba(229, 196, 129, .26);
   background:
-    radial-gradient(circle at 1px 1px, rgba(240, 233, 218, .05) 1px, transparent 0) 0 0 / 22px 22px,
-    radial-gradient(90% 60% at 94% -8%, rgba(217, 180, 106, .16), transparent 62%),
-    radial-gradient(70% 50% at 0% 100%, rgba(143, 168, 155, .12), transparent 58%),
+    radial-gradient(circle at 1px 1px, rgba(247, 241, 227, .055) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(229, 196, 129, .20), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(159, 191, 175, .14), transparent 58%),
     var(--tv-bg);
   box-shadow: 0 30px 70px -44px rgba(0, 0, 0, .9);
 }
 #view-travel .tv-app[data-theme="ink"]::before { mix-blend-mode: screen; opacity: .06; }
 #view-travel .tv-app[data-theme="ink"] .tv-book-cover img,
-#view-travel .tv-app[data-theme="ink"] .tv-polaroid img { filter: saturate(.82) contrast(1.04) brightness(.92); }
+#view-travel .tv-app[data-theme="ink"] .tv-polaroid img { filter: saturate(.88) contrast(1.02) brightness(.96); }
+/* 墨夜下的小图标：提亮分类色，避免深色底上看不清 */
+#view-travel .tv-app[data-theme="ink"] .tv-catmark,
+#view-travel .tv-app[data-theme="ink"] .tv-bud-mark {
+  background: color-mix(in srgb, var(--c, #e5c481) 32%, transparent);
+  color: color-mix(in srgb, var(--c, #e5c481) 46%, #f7f1e3);
+  border-color: color-mix(in srgb, var(--c, #e5c481) 60%, transparent);
+}
+#view-travel .tv-app[data-theme="ink"] .tv-catbar-track i,
+#view-travel .tv-app[data-theme="ink"] .tv-bud-track i { filter: brightness(1.35) saturate(.92); }
+#view-travel .tv-app[data-theme="ink"] .tv-mood-dot { box-shadow: 0 0 0 2px rgba(247, 241, 227, .14); }
+#view-travel .tv-app[data-theme="ink"] .tv-mood-note {
+  border-color: color-mix(in srgb, var(--mood, #e5c481) 46%, var(--tv-line));
+  background: color-mix(in srgb, var(--mood, #e5c481) 14%, var(--tv-paper));
+}
+#view-travel .tv-app[data-theme="ink"] .tv-mood-stamp {
+  color: color-mix(in srgb, var(--mood, #e5c481) 52%, #f7f1e3);
+  border-color: color-mix(in srgb, var(--mood, #e5c481) 58%, transparent);
+  background: color-mix(in srgb, var(--mood, #e5c481) 16%, transparent);
+}
+#view-travel .tv-app[data-theme="ink"] .tv-mn-top em { color: color-mix(in srgb, var(--mood, #e5c481) 52%, #f7f1e3); }
 
 /* ---------------- 顶部品牌 ---------------- */
 #view-travel .tv-head { display: flex; flex-direction: column; gap: 18px; }
@@ -142,9 +162,9 @@
 #view-travel .tv-theme.on { border-color: var(--tv-accent); color: var(--tv-ink); background: var(--tv-surface); }
 #view-travel .tv-theme .sw { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
 #view-travel .sw-bloom { background: linear-gradient(135deg, #f8ece9 50%, #a34a5a 50%); }
-#view-travel .sw-paper { background: linear-gradient(135deg, #f2ebdd 50%, #bf4f2a 50%); }
+#view-travel .sw-paper { background: linear-gradient(135deg, #f3efe7 50%, #a5824c 50%); }
 #view-travel .sw-ocean { background: linear-gradient(135deg, #d7e9e8 50%, #2f6d78 50%); }
-#view-travel .sw-ink { background: linear-gradient(135deg, #15181a 50%, #d9b46a 50%); }
+#view-travel .sw-ink { background: linear-gradient(135deg, #1a1e20 50%, #e5c481 50%); }
 
 /* ---------------- 通用文字 / 按钮 ---------------- */
 #view-travel .tv-body { display: flex; flex-direction: column; gap: 26px; margin-top: 24px; }
