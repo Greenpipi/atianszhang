@@ -11,7 +11,7 @@ const HERO_DEFAULT_BG = 'assets/hero-default.jpg';
 /* 各页面路由：每页拥有各自独立的背景头图（图 + 位置分别独立保存）
    注意：新增页面时这里必须同步加上，否则该页取不到 heroes 槽位，
    「更换背景 / 恢复默认」会因 ph 为 undefined 而静默失败 */
-const HERO_PAGES = ['ledger', 'bills', 'wishlist', 'stats', 'rental', 'budget', 'settings'];
+const HERO_PAGES = ['ledger', 'travel', 'bills', 'wishlist', 'stats', 'rental', 'budget', 'settings'];
 
 const LEDGER_PERSONAL = '个人记账本';
 

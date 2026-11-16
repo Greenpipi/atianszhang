@@ -1,0 +1,1700 @@
+/* ============================================================
+   旅行账册 · 手帐风格样式
+   作用域：#view-travel / .travel-modal
+   主题：山茶（默认）/ 暖纸 / 海盐 / 墨夜
+   ============================================================ */
+
+#app-view[data-route="travel"] .ledger-switch { display: none; }
+
+#view-travel .tv-app {
+  --tv-bg: #f8ece9;
+  --tv-surface: #fff8f5;
+  --tv-surface2: #fdf1ed;
+  --tv-paper: #fffaf6;
+  --tv-ink: #3a2628;
+  --tv-soft: #7c5c5e;
+  --tv-faint: #a98a8c;
+  --tv-line: rgba(58, 38, 40, .14);
+  --tv-line-strong: rgba(58, 38, 40, .26);
+  --tv-accent: #a34a5a;
+  --tv-accent-soft: #f2d9d5;
+  --tv-accent2: #6d7f6a;
+  --tv-sun: #d9a05a;
+  --tv-tape: rgba(226, 199, 158, .62);
+  --tv-tape-edge: rgba(196, 164, 118, .35);
+  --tv-serif: "Fraunces", "Songti SC", "Noto Serif SC", "STSong", Georgia, serif;
+  --tv-sans: "Instrument Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --tv-shadow: 0 26px 60px -46px rgba(58, 38, 40, .6);
+  position: relative;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(58, 38, 40, .05) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(217, 160, 90, .20), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(109, 127, 106, .12), transparent 58%),
+    var(--tv-bg);
+  color: var(--tv-ink);
+  border: 1px solid var(--tv-line);
+  border-radius: 24px;
+  padding: clamp(16px, 2.4vw, 32px);
+  font-family: var(--tv-sans);
+  box-shadow: var(--tv-shadow);
+  overflow: hidden;
+  animation: tvFade .38s ease both;
+}
+#view-travel .tv-app *,
+#view-travel .tv-app *::before,
+#view-travel .tv-app *::after { box-sizing: border-box; }
+
+#view-travel .tv-app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+#view-travel .tv-app > * { position: relative; z-index: 1; }
+
+@keyframes tvFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------------- 主题 ---------------- */
+#view-travel .tv-app[data-theme="paper"] {
+  --tv-bg: #f3efe7; --tv-surface: #fbf8f2; --tv-surface2: #f6f1e7; --tv-paper: #fffcf5;
+  --tv-ink: #37342d; --tv-soft: #6f685c; --tv-faint: #9c9486;
+  --tv-line: rgba(55, 52, 45, .14); --tv-line-strong: rgba(55, 52, 45, .26);
+  --tv-accent: #a5824c; --tv-accent-soft: #ede3d2; --tv-accent2: #7c8c72; --tv-sun: #c09a5e;
+  --tv-tape: rgba(219, 203, 172, .62);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(55, 52, 45, .05) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(165, 130, 76, .20), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(124, 140, 114, .13), transparent 58%),
+    var(--tv-bg);
+}
+#view-travel .tv-app[data-theme="ocean"] {
+  --tv-bg: #eaf2f2; --tv-surface: #fbfefe; --tv-surface2: #f1f8f7; --tv-paper: #ffffff;
+  --tv-ink: #17323b; --tv-soft: #4e6b73; --tv-faint: #7d969d;
+  --tv-line: rgba(23, 50, 59, .14); --tv-line-strong: rgba(23, 50, 59, .27);
+  --tv-accent: #2f6d78; --tv-accent-soft: #d6e8e8; --tv-accent2: #c07a4a; --tv-sun: #7fa8a3;
+  --tv-tape: rgba(176, 205, 200, .55);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(23, 50, 59, .05) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(127, 168, 163, .30), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(192, 122, 74, .10), transparent 58%),
+    var(--tv-bg);
+}
+#view-travel .tv-app[data-theme="ink"] {
+  --tv-bg: #1a1e20; --tv-surface: #262b2e; --tv-surface2: #2c3235; --tv-paper: #2a3033;
+  --tv-ink: #f7f1e3; --tv-soft: #c6bfb0; --tv-faint: #a79f8f;
+  --tv-line: rgba(247, 241, 227, .20); --tv-line-strong: rgba(247, 241, 227, .38);
+  --tv-accent: #e5c481; --tv-accent-soft: rgba(229, 196, 129, .18); --tv-accent2: #9fbfaf; --tv-sun: #e5c481;
+  --tv-tape: rgba(229, 196, 129, .26);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(247, 241, 227, .055) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(90% 60% at 94% -8%, rgba(229, 196, 129, .20), transparent 62%),
+    radial-gradient(70% 50% at 0% 100%, rgba(159, 191, 175, .14), transparent 58%),
+    var(--tv-bg);
+  box-shadow: 0 30px 70px -44px rgba(0, 0, 0, .9);
+}
+#view-travel .tv-app[data-theme="ink"]::before { mix-blend-mode: screen; opacity: .06; }
+#view-travel .tv-app[data-theme="ink"] .tv-book-cover img,
+#view-travel .tv-app[data-theme="ink"] .tv-polaroid img { filter: saturate(.88) contrast(1.02) brightness(.96); }
+/* 墨夜下的小图标：提亮分类色，避免深色底上看不清 */
+#view-travel .tv-app[data-theme="ink"] .tv-catmark,
+#view-travel .tv-app[data-theme="ink"] .tv-bud-mark {
+  background: color-mix(in srgb, var(--c, #e5c481) 32%, transparent);
+  color: color-mix(in srgb, var(--c, #e5c481) 46%, #f7f1e3);
+  border-color: color-mix(in srgb, var(--c, #e5c481) 60%, transparent);
+}
+#view-travel .tv-app[data-theme="ink"] .tv-catbar-track i,
+#view-travel .tv-app[data-theme="ink"] .tv-bud-track i { filter: brightness(1.35) saturate(.92); }
+#view-travel .tv-app[data-theme="ink"] .tv-mood-dot { box-shadow: 0 0 0 2px rgba(247, 241, 227, .14); }
+#view-travel .tv-app[data-theme="ink"] .tv-mood-note {
+  border-color: color-mix(in srgb, var(--mood, #e5c481) 46%, var(--tv-line));
+  background: color-mix(in srgb, var(--mood, #e5c481) 14%, var(--tv-paper));
+}
+#view-travel .tv-app[data-theme="ink"] .tv-mood-stamp {
+  color: color-mix(in srgb, var(--mood, #e5c481) 52%, #f7f1e3);
+  border-color: color-mix(in srgb, var(--mood, #e5c481) 58%, transparent);
+  background: color-mix(in srgb, var(--mood, #e5c481) 16%, transparent);
+}
+#view-travel .tv-app[data-theme="ink"] .tv-mn-top em { color: color-mix(in srgb, var(--mood, #e5c481) 52%, #f7f1e3); }
+
+/* ---------------- 顶部品牌 ---------------- */
+#view-travel .tv-head { display: flex; flex-direction: column; gap: 18px; }
+#view-travel .tv-brandline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+#view-travel .tv-brand { display: flex; align-items: center; gap: 14px; }
+#view-travel .tv-stamp {
+  width: 50px; height: 50px; flex: none;
+  border: 1.6px solid var(--tv-accent);
+  color: var(--tv-accent);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--tv-serif); font-size: 22px; font-weight: 700;
+  position: relative;
+  transform: rotate(-6deg);
+}
+#view-travel .tv-stamp::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 50%;
+  border: 1px dashed var(--tv-accent); opacity: .55;
+}
+#view-travel .tv-brand h2 {
+  font-family: var(--tv-serif); font-size: clamp(24px, 2.5vw, 32px);
+  font-weight: 600; line-height: 1.12; letter-spacing: .01em; margin: 0;
+}
+#view-travel .tv-brand p { margin: 5px 0 0; font-size: 10.5px; letter-spacing: .2em; color: var(--tv-faint); }
+
+#view-travel .tv-theme-wrap { display: flex; align-items: center; gap: 10px; padding-top: 6px; }
+#view-travel .tv-theme-label { font-size: 10px; letter-spacing: .22em; color: var(--tv-faint); }
+#view-travel .tv-themes { display: flex; gap: 5px; flex-wrap: wrap; }
+#view-travel .tv-theme {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid var(--tv-line);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--tv-soft);
+  font-family: var(--tv-sans); font-size: 11px; letter-spacing: .05em;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s, transform .2s;
+}
+#view-travel .tv-theme:hover { background: var(--tv-surface); transform: translateY(-1px); }
+#view-travel .tv-theme.on { border-color: var(--tv-accent); color: var(--tv-ink); background: var(--tv-surface); }
+#view-travel .tv-theme .sw { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+#view-travel .sw-bloom { background: linear-gradient(135deg, #f8ece9 50%, #a34a5a 50%); }
+#view-travel .sw-paper { background: linear-gradient(135deg, #f3efe7 50%, #a5824c 50%); }
+#view-travel .sw-ocean { background: linear-gradient(135deg, #d7e9e8 50%, #2f6d78 50%); }
+#view-travel .sw-ink { background: linear-gradient(135deg, #1a1e20 50%, #e5c481 50%); }
+
+/* ---------------- 通用文字 / 按钮 ---------------- */
+#view-travel .tv-body { display: flex; flex-direction: column; gap: 26px; margin-top: 24px; }
+#view-travel .tv-eyebrow {
+  display: block; font-size: 10px; letter-spacing: .26em;
+  color: var(--tv-accent); text-transform: uppercase; margin-bottom: 6px;
+}
+#view-travel .tv-link {
+  border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--tv-accent); font-family: var(--tv-sans);
+  font-size: 12px; letter-spacing: .08em;
+  border-bottom: 1px solid transparent;
+}
+#view-travel .tv-link:hover { border-bottom-color: var(--tv-accent); }
+#view-travel .tv-btn {
+  appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid var(--tv-line-strong);
+  border-radius: 10px 12px 10px 13px;
+  background: var(--tv-surface);
+  color: var(--tv-ink);
+  font-family: var(--tv-sans); font-size: 12.5px; letter-spacing: .05em;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset, 0 10px 18px -16px rgba(0, 0, 0, .5);
+  transition: transform .18s, background .18s, color .18s, border-color .18s;
+}
+#view-travel .tv-btn:hover { transform: translateY(-1px); border-color: var(--tv-accent); }
+#view-travel .tv-btn.solid { background: var(--tv-accent); border-color: var(--tv-accent); color: #fff8f5; }
+#view-travel .tv-app[data-theme="ink"] .tv-btn.solid { color: #1b1e20; }
+#view-travel .tv-mini-btn {
+  width: 26px; height: 26px; flex: none;
+  display: inline-grid; place-items: center;
+  border: 1px solid var(--tv-line-strong);
+  border-radius: 50%;
+  background: var(--tv-surface);
+  color: var(--tv-soft);
+  font-size: 13px; cursor: pointer;
+  transition: background .18s, color .18s, border-color .18s;
+}
+#view-travel .tv-mini-btn:hover, #view-travel .tv-mini-btn.solid { background: var(--tv-accent); color: #fff8f5; border-color: var(--tv-accent); }
+#view-travel .tv-mini-btn.solid { width: auto; padding: 0 10px; border-radius: 99px; font-size: 11px; letter-spacing: .04em; }
+#view-travel .tv-hint { font-size: 11px; color: var(--tv-faint); letter-spacing: .04em; }
+#view-travel .tv-empty { margin: 12px 0; font-size: 12.5px; color: var(--tv-faint); line-height: 1.7; }
+#view-travel .tv-empty.big { grid-column: 1 / -1; padding: 38px 20px; text-align: center; border: 1px dashed var(--tv-line-strong); border-radius: 14px; }
+
+#view-travel .tv-section-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+}
+#view-travel .tv-section-head h3 {
+  margin: 0; font-family: var(--tv-serif); font-size: clamp(20px, 2.2vw, 26px); font-weight: 600;
+}
+#view-travel .tv-section-head p { margin: 6px 0 0; font-size: 12px; color: var(--tv-faint); line-height: 1.65; }
+
+/* ---------------- 头像 ---------------- */
+#view-travel .tv-avatar {
+  width: 27px; height: 27px; border-radius: 50%;
+  display: inline-grid; place-items: center; flex: none;
+  font-size: 10.5px; font-weight: 600; color: #fff;
+}
+#view-travel .tv-avatar.me { background: var(--tv-ink); color: var(--tv-bg); }
+#view-travel .tv-avatar.xiaoyu { background: var(--tv-accent); }
+#view-travel .tv-avatar.azhe { background: var(--tv-accent2); }
+#view-travel .tv-avatar.c1 { background: #8A5A6C; }
+#view-travel .tv-avatar.c2 { background: #5C7F8C; }
+#view-travel .tv-avatar.c3 { background: #7C7141; }
+#view-travel .tv-avatar.c4 { background: #4E8C82; }
+#view-travel .tv-avatar.c5 { background: #A66A45; }
+#view-travel .tv-avatar.lg { width: 36px; height: 36px; font-size: 13px; }
+#view-travel .tv-avatar.sm { width: 21px; height: 21px; font-size: 9px; }
+
+/* ---------------- 书架 ---------------- */
+#view-travel .tv-library { display: flex; flex-direction: column; gap: 30px; }
+#view-travel .tv-lib-intro {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+}
+#view-travel .tv-lib-intro h3 {
+  margin: 0; font-family: var(--tv-serif); font-size: clamp(24px, 3vw, 34px); font-weight: 600; letter-spacing: .01em;
+}
+#view-travel .tv-lib-intro p { margin: 8px 0 0; max-width: 520px; font-size: 12.5px; line-height: 1.75; color: var(--tv-soft); }
+
+#view-travel .tv-books {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 40px 30px;
+  padding: 10px 6px 24px;
+}
+#view-travel .tv-book {
+  position: relative;
+  cursor: pointer;
+  transform: rotate(var(--rot));
+  transition: transform .3s ease, filter .3s ease;
+}
+#view-travel .tv-book:hover { transform: rotate(0deg) translateY(-6px); }
+#view-travel .tv-book-stack {
+  position: absolute; inset: 0;
+  border-radius: 6px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  box-shadow: 0 16px 30px -24px rgba(0, 0, 0, .5);
+}
+#view-travel .tv-book-stack.s1 { transform: rotate(-2.6deg) translate(5px, 6px); background: var(--tv-surface2); }
+#view-travel .tv-book-stack.s2 { transform: rotate(2.2deg) translate(-4px, 3px); }
+#view-travel .tv-book-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--tv-surface2);
+  border: 1px solid var(--tv-line);
+  box-shadow: 0 26px 40px -30px rgba(20, 12, 12, .7);
+}
+#view-travel .tv-book-cover img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  filter: saturate(.95) contrast(1.02) sepia(.07);
+  transition: transform .6s ease;
+}
+#view-travel .tv-book-cover::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(155deg, rgba(163, 74, 90, .20), transparent 46%, rgba(109, 127, 106, .18));
+  mix-blend-mode: multiply;
+}
+#view-travel .tv-book:hover .tv-book-cover img { transform: scale(1.045); }
+#view-travel .tv-book-cover::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(20,12,12,.04) 35%, rgba(24,14,14,.62) 100%);
+  pointer-events: none;
+}
+#view-travel .tv-book-tape {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+  width: 68px; height: 20px;
+  background: var(--tv-tape);
+  border-left: 1px dashed var(--tv-tape-edge);
+  border-right: 1px dashed var(--tv-tape-edge);
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  z-index: 2;
+}
+#view-travel .tv-book-stamp {
+  position: absolute; top: 12px; right: 12px; z-index: 3;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 1.4px solid rgba(255, 246, 240, .78);
+  color: rgba(255, 246, 240, .94);
+  font-family: var(--tv-serif); font-size: 10.5px; letter-spacing: .02em;
+  transform: rotate(9deg);
+  background: rgba(30, 16, 16, .14);
+  backdrop-filter: blur(1px);
+}
+#view-travel .tv-book-stamp.st-going { border-color: rgba(255, 226, 184, .9); color: #fff3dd; }
+#view-travel .tv-book-stamp.st-plan { border-color: rgba(206, 236, 219, .9); color: #eaf7ee; }
+#view-travel .tv-book-moods { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+#view-travel .tv-book-mood {
+  position: absolute;
+  line-height: 1;
+  transform: rotate(var(--rot, 0deg));
+  filter: drop-shadow(0 1px 1px rgba(255, 255, 255, .55)) drop-shadow(0 3px 5px rgba(0, 0, 0, .35));
+}
+#view-travel .tv-book-mood.mm0 { top: 31%; left: 8%; }
+#view-travel .tv-book-mood.mm1 { top: 46%; right: 9%; }
+#view-travel .tv-book-mood.mm2 { top: 61%; left: 24%; }
+#view-travel .tv-book-tools {
+  position: absolute; top: 8px; left: 8px; z-index: 3;
+  display: flex; gap: 5px;
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity .2s, transform .2s;
+}
+#view-travel .tv-book:hover .tv-book-tools { opacity: 1; transform: none; }
+#view-travel .tv-book-tools button {
+  width: 24px; height: 24px; display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 248, 243, .9);
+  color: #51383a; font-size: 12px; cursor: pointer;
+}
+#view-travel .tv-book-tools button:hover { background: #fff; }
+#view-travel .tv-book-title {
+  position: absolute; left: 12px; right: 12px; bottom: 14px; z-index: 2;
+  padding: 10px 12px 9px;
+  background: rgba(255, 250, 246, .94);
+  border-radius: 2px;
+  transform: rotate(-1.2deg);
+  box-shadow: 0 8px 18px -14px rgba(0,0,0,.7);
+  color: #3a2628;
+}
+#view-travel .tv-app[data-theme="ink"] .tv-book-title { background: rgba(34, 40, 43, .94); color: var(--tv-ink); }
+#view-travel .tv-book-title span { display: block; font-size: 9px; letter-spacing: .2em; color: #a98a8c; text-transform: uppercase; }
+#view-travel .tv-book-title h3 { margin: 3px 0 2px; font-family: var(--tv-serif); font-size: 17px; font-weight: 600; line-height: 1.3; }
+#view-travel .tv-book-title p { margin: 0; font-size: 10.5px; letter-spacing: .08em; color: #8a6c6e; }
+#view-travel .tv-book-foot {
+  display: flex; align-items: baseline; gap: 6px; margin-top: 12px; padding: 0 2px;
+}
+#view-travel .tv-book-foot span { font-size: 10.5px; color: var(--tv-faint); }
+#view-travel .tv-book-foot em { margin-left: auto; font-style: normal; font-size: 9px; letter-spacing: .14em; color: var(--tv-faint); }
+#view-travel .tv-book-foot b { font-family: var(--tv-serif); font-size: 15px; font-weight: 600; color: var(--tv-accent); }
+
+#view-travel .tv-book-new {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 290px;
+  height: 100%;
+  align-self: stretch;
+  border: 1.6px dashed var(--tv-line-strong);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .16);
+  color: var(--tv-soft);
+  transform: rotate(1.2deg);
+  cursor: pointer;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+#view-travel .tv-book-new:hover { background: var(--tv-surface); border-color: var(--tv-accent); transform: rotate(0) translateY(-4px); }
+#view-travel .tv-book-plus {
+  width: 48px; height: 48px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px dashed var(--tv-line-strong);
+  font-size: 24px; font-weight: 300; color: var(--tv-accent);
+}
+#view-travel .tv-book-new b { font-family: var(--tv-serif); font-size: 16px; font-weight: 600; }
+#view-travel .tv-book-new em { font-style: normal; font-size: 11px; color: var(--tv-faint); }
+#view-travel .tv-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding-top: 16px; border-top: 1px dashed var(--tv-line);
+  font-size: 11px; color: var(--tv-faint);
+}
+
+/* ---------------- 旅行册内页头部 ---------------- */
+#view-travel .tv-tripbar {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 16px 20px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 14px;
+  box-shadow: 0 20px 34px -34px rgba(0, 0, 0, .55);
+}
+#view-travel .tv-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--tv-line);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--tv-soft);
+  font-family: var(--tv-sans); font-size: 11.5px; letter-spacing: .06em;
+  cursor: pointer; white-space: nowrap;
+  transition: background .2s, border-color .2s, color .2s;
+}
+#view-travel .tv-back:hover { background: var(--tv-surface2); border-color: var(--tv-accent); color: var(--tv-ink); }
+#view-travel .tv-tripinfo { flex: 1 1 260px; min-width: 0; }
+#view-travel .tv-tripinfo h3 {
+  margin: 0; font-family: var(--tv-serif); font-size: clamp(21px, 2.4vw, 29px);
+  font-weight: 600; line-height: 1.2;
+}
+#view-travel .tv-trip-title { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+#view-travel .tv-edit-icon {
+  appearance: none; flex: none;
+  width: 26px; height: 26px; padding: 0;
+  display: grid; place-items: center;
+  border: 1px solid var(--tv-line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tv-faint);
+  cursor: pointer;
+  transition: color .2s, border-color .2s, background .2s, transform .2s;
+}
+#view-travel .tv-edit-icon:hover { color: var(--tv-accent); border-color: var(--tv-accent); background: var(--tv-surface); transform: rotate(-8deg); }
+#view-travel .tv-member-count {
+  display: inline-flex; align-items: center;
+  font-family: var(--tv-sans); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--tv-faint);
+}
+#view-travel .tv-tripmeta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 7px; font-size: 11.5px; color: var(--tv-faint); }
+#view-travel .tv-tripmeta i { width: 3px; height: 3px; border-radius: 50%; background: var(--tv-faint); }
+#view-travel .tv-people { display: flex; align-items: center; margin-left: 3px; }
+#view-travel .tv-people .tv-avatar { margin-left: -6px; border: 2px solid var(--tv-surface); }
+#view-travel .tv-trip-acts { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+#view-travel .tv-chipbtn {
+  padding: 7px 13px;
+  border: 1px solid var(--tv-line-strong);
+  border-radius: 9px 11px 9px 12px;
+  background: transparent;
+  color: var(--tv-soft);
+  font-family: var(--tv-sans); font-size: 11.5px; letter-spacing: .06em;
+  cursor: pointer;
+}
+#view-travel .tv-chipbtn:hover { border-color: var(--tv-accent); color: var(--tv-ink); }
+#view-travel .tv-budget-chip {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  min-width: 176px; padding: 8px 13px;
+  border: 1px dashed var(--tv-line-strong);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--tv-ink);
+  text-align: right;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+#view-travel .tv-budget-chip:hover { border-color: var(--tv-accent); background: var(--tv-surface2); }
+#view-travel .tv-budget-chip > span { font-size: 9px; letter-spacing: .2em; color: var(--tv-faint); }
+#view-travel .tv-budget-chip b { font-family: var(--tv-serif); font-size: 19px; font-weight: 600; }
+#view-travel .tv-budget-chip em { font-style: normal; font-size: 10px; color: var(--tv-soft); }
+#view-travel .tv-budget-mini { display: block; width: 100%; height: 3px; margin-top: 5px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-budget-mini u { display: block; height: 100%; background: linear-gradient(90deg, var(--tv-accent2), var(--tv-sun)); }
+
+/* ---------------- 纸张标签页 ---------------- */
+#view-travel .tv-tabs {
+  display: flex; align-items: center; gap: 6px; overflow-x: auto;
+  padding: 0 4px;
+  scrollbar-width: none;
+}
+#view-travel .tv-tabs::-webkit-scrollbar { display: none; }
+#view-travel .tv-tab-group { display: flex; align-items: center; gap: 2px; flex: none; }
+#view-travel .tv-tab-group + .tv-tab-group {
+  margin-left: 8px; padding-left: 16px;
+  border-left: 1px solid var(--tv-line);
+}
+#view-travel .tv-tabgroup-label {
+  padding-right: 7px;
+  font-size: 9.5px; letter-spacing: .2em; color: var(--tv-faint);
+  white-space: nowrap;
+}
+#view-travel .tv-tab {
+  position: relative;
+  appearance: none; border: 1px solid transparent; border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  padding: 9px 16px 10px;
+  white-space: nowrap; cursor: pointer;
+  font-family: var(--tv-sans); font-size: 12.5px; letter-spacing: .12em;
+  color: var(--tv-faint);
+  transition: color .2s, background .2s;
+}
+#view-travel .tv-tab::after {
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: 0;
+  height: 2px; background: transparent; border-radius: 2px;
+}
+#view-travel .tv-tab em {
+  font-style: normal; margin-left: 5px; font-size: 9.5px; vertical-align: 2px;
+  color: var(--tv-faint); letter-spacing: 0;
+}
+#view-travel .tv-tab:hover { color: var(--tv-ink); background: rgba(255, 255, 255, .28); }
+#view-travel .tv-tab.on { color: var(--tv-ink); background: var(--tv-surface); border-color: var(--tv-line); }
+#view-travel .tv-tab.on::after { background: var(--tv-accent); }
+#view-travel .tv-tab.on em { color: var(--tv-accent); }
+
+/* ---------------- 总览拼贴 ---------------- */
+#view-travel .tv-scrap-cover {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr) minmax(210px, 262px);
+  align-items: center;
+  gap: clamp(18px, 3vw, 40px);
+  padding: clamp(18px, 3vw, 34px);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 31px, rgba(58, 38, 40, .055) 31px 32px),
+    var(--tv-paper);
+  border: 1px solid var(--tv-line);
+  border-radius: 16px;
+  box-shadow: 0 26px 44px -40px rgba(0, 0, 0, .6);
+}
+#view-travel .tv-side {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 16px;
+  min-width: 0;
+}
+#view-travel .tv-status-stamp {
+  appearance: none; flex: none;
+  width: 68px; height: 68px; padding: 0;
+  display: grid; place-items: center;
+  border: 1.6px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tv-accent);
+  font-family: var(--tv-serif); font-size: 13px; letter-spacing: .06em;
+  transform: rotate(9deg);
+  cursor: pointer;
+  position: relative;
+  transition: transform .2s, background .2s;
+}
+#view-travel .tv-status-stamp::after {
+  content: ""; position: absolute; inset: 4px; border-radius: 50%;
+  border: 1px dashed currentColor; opacity: .45;
+}
+#view-travel .tv-status-stamp:hover { transform: rotate(2deg) scale(1.04); background: var(--tv-surface); }
+#view-travel .tv-status-stamp.st-plan { color: var(--tv-accent2); }
+#view-travel .tv-status-stamp.st-going { color: var(--tv-sun); }
+#view-travel .tv-status-stamp.st-done { color: var(--tv-accent); }
+
+/* 心情贴 */
+#view-travel .tv-mood-notes {
+  display: flex; flex-direction: column;
+  width: 100%; min-width: 0;
+  padding-top: 2px;
+}
+#view-travel .tv-mn-head {
+  display: block; margin-bottom: 8px; text-align: right;
+  font-size: 8.5px; letter-spacing: .18em; color: var(--tv-faint);
+}
+#view-travel .tv-mood-note {
+  position: relative;
+  width: 100%;
+  display: block;
+  padding: 9px 11px 10px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--mood, var(--tv-accent)) 34%, var(--tv-line));
+  border-radius: 2px 9px 3px 8px;
+  background: color-mix(in srgb, var(--mood, var(--tv-accent)) 9%, var(--tv-paper));
+  color: var(--tv-ink);
+  font-family: var(--tv-sans);
+  box-shadow: 0 13px 20px -18px rgba(0, 0, 0, .6);
+  transform: rotate(var(--rot, 0deg));
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+#view-travel .tv-mood-note.mn1 { margin-top: -7px; margin-left: 11px; }
+#view-travel .tv-mood-note.mn2 { margin-top: -7px; margin-left: 2px; }
+#view-travel .tv-mood-note:hover { transform: rotate(0deg) translateY(-2px); z-index: 5; box-shadow: 0 18px 26px -18px rgba(0, 0, 0, .55); }
+#view-travel .tv-mn-top { display: flex; align-items: center; gap: 5px; }
+#view-travel .tv-mn-top i { font-style: normal; font-size: 15px; line-height: 1; }
+#view-travel .tv-mn-top em { font-style: normal; font-size: 9px; letter-spacing: .04em; color: var(--mood, var(--tv-accent)); }
+#view-travel .tv-mood-note p {
+  margin: 5px 0 0;
+  font-size: 11.5px; line-height: 1.6;
+  color: var(--tv-soft);
+  overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+#view-travel .tv-mood-note.empty { --mood: var(--tv-faint); border-style: dashed; }
+#view-travel .tv-mood-note.empty b { display: block; font-size: 12px; font-weight: 600; }
+#view-travel .tv-mood-note.empty p { color: var(--tv-faint); }
+#view-travel .tv-scrap-photos {
+  position: relative;
+  min-height: 250px;
+  padding: 6px 0 0 4px;
+}
+#view-travel .tv-washi {
+  position: absolute; left: 50%; top: 0;
+  width: 76px; height: 19px; transform: translateX(-52%) rotate(-5deg);
+  background: var(--tv-tape);
+  border-left: 1px dashed var(--tv-tape-edge);
+  border-right: 1px dashed var(--tv-tape-edge);
+  z-index: 4;
+}
+#view-travel .tv-polaroid {
+  position: relative;
+  background: #fffdf7;
+  padding: 8px 8px 26px;
+  border-radius: 3px;
+  box-shadow: 0 14px 26px -18px rgba(0, 0, 0, .65);
+  transform: rotate(var(--rot, -2deg));
+  margin: 0;
+}
+#view-travel .tv-polaroid img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; background: var(--tv-surface2); }
+#view-travel .tv-polaroid figcaption {
+  position: absolute; left: 0; right: 0; bottom: 7px;
+  text-align: center;
+  font-family: var(--tv-serif); font-size: 10.5px; letter-spacing: .06em; color: #7c6062;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;
+}
+#view-travel .tv-polaroid .tv-tape {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%) rotate(2deg);
+  width: 56px; height: 17px;
+  background: var(--tv-tape);
+  border-left: 1px dashed var(--tv-tape-edge);
+  border-right: 1px dashed var(--tv-tape-edge);
+}
+#view-travel .tv-polaroid-lg {
+  width: 68%; position: relative; z-index: 2;
+}
+#view-travel .tv-polaroid-sm {
+  position: absolute;
+  width: 54%;
+  z-index: 3;
+}
+#view-travel .tv-polaroid-sm:nth-of-type(2) { right: 0; top: 8%; }
+#view-travel .tv-polaroid-sm:nth-of-type(3) { right: 6%; bottom: -8%; }
+
+#view-travel .tv-scrap-copy h2 {
+  margin: 0; font-family: var(--tv-serif); font-size: clamp(26px, 3.1vw, 38px);
+  font-weight: 600; line-height: 1.2;
+}
+#view-travel .tv-scrap-copy > p {
+  margin: 12px 0 0; max-width: 440px; font-size: 12.5px; line-height: 1.85; color: var(--tv-soft);
+}
+#view-travel .tv-hero-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+#view-travel .tv-stamps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+#view-travel .tv-stamp-mark {
+  display: inline-grid; place-items: center;
+  min-width: 58px; height: 58px; padding: 0 9px;
+  border: 1.4px solid var(--tv-accent);
+  border-radius: 50%;
+  color: var(--tv-accent);
+  font-family: var(--tv-serif); font-size: 12px; letter-spacing: .04em;
+  opacity: .72;
+}
+#view-travel .stamp-date { transform: rotate(-9deg); }
+#view-travel .stamp-route { border-style: dashed; transform: rotate(5deg); border-radius: 10px; }
+#view-travel .stamp-year { transform: rotate(-3deg); border-color: var(--tv-accent2); color: var(--tv-accent2); }
+
+#view-travel .tv-ticket {
+  justify-self: end;
+  width: 100%;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 16px 15px;
+  background:
+    radial-gradient(circle at 0 50%, transparent 5px, var(--tv-surface) 5px) left / 100% 20px no-repeat,
+    var(--tv-surface);
+  border: 1px dashed var(--tv-line-strong);
+  border-radius: 4px;
+  transform: rotate(2deg);
+}
+#view-travel .tv-ticket-label { font-size: 8.5px; letter-spacing: .26em; color: var(--tv-faint); }
+#view-travel .tv-ticket b { font-family: var(--tv-serif); font-size: 23px; font-weight: 600; }
+#view-travel .tv-ticket em { font-style: normal; font-size: 10px; color: var(--tv-soft); }
+#view-travel .tv-ticket i { display: block; height: 4px; margin: 8px 0 5px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-ticket u { display: block; height: 100%; background: linear-gradient(90deg, var(--tv-accent2), var(--tv-sun)); }
+#view-travel .tv-ticket-edit { font-size: 10px; letter-spacing: .1em; color: var(--tv-accent); cursor: pointer; }
+
+/* ---------------- 统计小票 ---------------- */
+#view-travel .tv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+#view-travel .tv-stat {
+  position: relative;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 15px 16px 17px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 10px 12px 9px 13px;
+  box-shadow: 0 18px 30px -30px rgba(0, 0, 0, .55);
+}
+#view-travel .tv-stat:nth-child(odd) { transform: rotate(-.5deg); }
+#view-travel .tv-stat:nth-child(even) { transform: rotate(.45deg); }
+#view-travel .tv-stat::after {
+  content: ""; position: absolute; left: 12%; right: 12%; bottom: -4px; height: 5px;
+  background: radial-gradient(circle at 3px 0, var(--tv-surface) 3px, transparent 3.5px) 0 0 / 10px 6px repeat-x;
+}
+#view-travel .tv-stat > span { font-size: 10px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-stat b { font-family: var(--tv-serif); font-size: clamp(19px, 2.1vw, 24px); font-weight: 600; line-height: 1.2; }
+#view-travel .tv-stat em { font-style: normal; font-size: 10px; color: var(--tv-soft); }
+#view-travel .tv-stat.accent b { color: var(--tv-accent); }
+#view-travel .tv-stat.over b { color: #c0392b; }
+#view-travel .tv-stat[data-act] { cursor: pointer; }
+#view-travel .tv-stat[data-act]:hover { border-color: var(--tv-accent); }
+
+/* ---------------- 面板 ---------------- */
+#view-travel .tv-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+#view-travel .tv-panel {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 20px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 13px;
+  box-shadow: 0 22px 38px -36px rgba(0, 0, 0, .6);
+}
+#view-travel .tv-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#view-travel .tv-panel-head h4 { margin: 0; font-family: var(--tv-serif); font-size: 16px; font-weight: 600; }
+#view-travel .tv-budget-note { font-size: 10.5px; line-height: 1.65; color: var(--tv-faint); }
+#view-travel .tv-bigbar { display: flex; flex-direction: column; gap: 8px; }
+#view-travel .tv-bigbar-track { height: 9px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-bigbar-track i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--tv-accent2), var(--tv-sun)); transition: width .4s ease; }
+#view-travel .tv-bigbar-track i.over { background: linear-gradient(90deg, #c0392b, #e08a5a); }
+#view-travel .tv-bigbar-foot { display: flex; align-items: baseline; justify-content: space-between; }
+#view-travel .tv-bigbar-foot span { font-size: 11px; color: var(--tv-soft); }
+#view-travel .tv-bigbar-foot b { font-family: var(--tv-serif); font-size: 15px; }
+
+#view-travel .tv-members { display: flex; flex-direction: column; gap: 2px; }
+#view-travel .tv-member-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-member-row:last-child { border-bottom: 0; }
+#view-travel .tv-member-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#view-travel .tv-member-main b { font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-member-main span { font-size: 10.5px; color: var(--tv-faint); }
+#view-travel .tv-net { margin-left: auto; font-family: var(--tv-serif); font-size: 14px; }
+#view-travel .tv-net.pos { color: var(--tv-accent2); }
+#view-travel .tv-net.neg { color: var(--tv-accent); }
+
+#view-travel .tv-mini-day { display: flex; gap: 14px; align-items: stretch; }
+#view-travel .tv-mini-photo {
+  width: 42%; max-width: 190px; aspect-ratio: 4 / 3; object-fit: cover; display: block;
+  border: 5px solid #fffdf7; border-radius: 2px;
+  box-shadow: 0 12px 22px -16px rgba(0,0,0,.6);
+  transform: rotate(-1.6deg);
+}
+#view-travel .tv-mini-day-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#view-travel .tv-mini-day-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 3px; }
+#view-travel .tv-mini-day-head b { font-family: var(--tv-serif); font-size: 15px; font-weight: 600; }
+#view-travel .tv-mini-day-head span { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-mini-act {
+  display: flex; align-items: baseline; gap: 9px;
+  border: 0; background: transparent; padding: 3px 0; cursor: pointer;
+  text-align: left; color: var(--tv-ink); font-family: var(--tv-sans); font-size: 12px;
+  border-bottom: 1px dashed transparent;
+}
+#view-travel .tv-mini-act:hover { border-bottom-color: var(--tv-line-strong); }
+#view-travel .tv-mini-act em { font-style: normal; font-family: var(--tv-serif); font-size: 11px; color: var(--tv-accent); flex: none; }
+#view-travel .tv-mini-act span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view-travel .tv-mini-journal {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  border: 0; background: transparent; padding: 8px 0; cursor: pointer; text-align: left;
+  border-bottom: 1px dashed var(--tv-line);
+  color: var(--tv-ink); font-family: var(--tv-sans);
+}
+#view-travel .tv-mini-journal:last-child { border-bottom: 0; }
+#view-travel .tv-mood-dot {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; color: #fff;
+}
+#view-travel .tv-mini-journal-main { display: flex; flex-direction: column; gap: 2px; font-size: 11px; line-height: 1.55; color: var(--tv-soft); min-width: 0; }
+#view-travel .tv-mini-journal-main b { font-size: 11.5px; color: var(--tv-ink); font-weight: 600; }
+
+#view-travel .tv-catbars { display: flex; flex-direction: column; gap: 8px; }
+#view-travel .tv-catbar { display: flex; align-items: center; gap: 10px; }
+#view-travel .tv-catmark {
+  width: 24px; height: 24px; flex: none;
+  display: inline-grid; place-items: center;
+  border-radius: 7px 8px 6px 9px;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c);
+  font-family: var(--tv-serif); font-size: 11px; font-weight: 600;
+}
+#view-travel .tv-catmark.xs { width: 17px; height: 17px; font-size: 9px; border-radius: 5px; }
+#view-travel .tv-catbar-name { width: 46px; flex: none; font-size: 11.5px; color: var(--tv-soft); }
+#view-travel .tv-catbar-track { flex: 1; height: 6px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-catbar-track i { display: block; height: 100%; border-radius: 99px; }
+#view-travel .tv-catbar b { min-width: 64px; text-align: right; font-family: var(--tv-serif); font-size: 12.5px; font-weight: 600; }
+
+/* ---------------- 行程手帐页 ---------------- */
+#view-travel .tv-day-page {
+  position: relative;
+  padding: 20px 24px 24px 54px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 31px, rgba(58, 38, 40, .05) 31px 32px),
+    var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 14px;
+  box-shadow: 0 26px 44px -40px rgba(0, 0, 0, .6);
+  transform: rotate(var(--rot, 0deg));
+}
+#view-travel .tv-day-page + .tv-day-page { margin-top: 26px; }
+#view-travel .tv-page-holes {
+  position: absolute; left: 18px; top: 26px; bottom: 26px; width: 15px;
+  background: radial-gradient(circle at 7px 7px, var(--tv-bg) 5px, rgba(58, 38, 40, .18) 5.5px, transparent 6.5px) 0 0 / 15px 32px repeat-y;
+  opacity: .9;
+}
+#view-travel .tv-day-head {
+  display: flex; align-items: center; gap: 13px; flex-wrap: wrap;
+  padding-bottom: 13px; margin-bottom: 16px;
+  border-bottom: 1px dashed var(--tv-line-strong);
+}
+#view-travel .tv-day-num {
+  flex: none;
+  padding: 6px 9px;
+  border: 1.4px solid var(--tv-accent);
+  border-radius: 4px;
+  color: var(--tv-accent);
+  font-family: var(--tv-serif); font-size: 11px; letter-spacing: .08em;
+  transform: rotate(-3deg);
+}
+#view-travel .tv-day-title {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; background: transparent;
+  padding: 2px 4px; margin: -2px -4px;
+  border-radius: 8px;
+  text-align: left; cursor: pointer;
+  transition: background .18s;
+}
+#view-travel .tv-day-title:hover { background: var(--tv-surface2); }
+#view-travel .tv-day-title h4 { margin: 0; font-family: var(--tv-serif); font-size: 20px; font-weight: 600; }
+#view-travel .tv-day-edit { margin-left: 6px; font-family: var(--tv-sans); font-size: 11px; color: var(--tv-faint); opacity: .7; }
+#view-travel .tv-day-title:hover .tv-day-edit { color: var(--tv-accent); opacity: 1; }
+#view-travel .tv-day-title p { margin: 3px 0 0; font-size: 11px; color: var(--tv-faint); }
+#view-travel .tv-day-total { font-size: 10.5px; letter-spacing: .06em; color: var(--tv-soft); }
+#view-travel .tv-day-scrap { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 22px; align-items: start; }
+#view-travel .tv-day-photo { width: 100%; }
+#view-travel .tv-timeline { position: relative; display: flex; flex-direction: column; gap: 12px; padding-left: 4px; }
+#view-travel .tv-timeline::before {
+  content: ""; position: absolute; left: 56px; top: 6px; bottom: 6px;
+  border-left: 1px dashed var(--tv-line-strong);
+}
+#view-travel .tv-act { display: flex; align-items: flex-start; gap: 12px; }
+#view-travel .tv-act-time {
+  width: 56px; flex: none; padding-top: 8px; position: relative;
+  text-align: right; padding-right: 16px;
+  font-family: var(--tv-serif); font-size: 11px; color: var(--tv-accent);
+}
+#view-travel .tv-act-time i {
+  position: absolute; right: 3px; top: 12px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tv-surface); border: 1.4px solid var(--tv-accent);
+}
+#view-travel .tv-act-card {
+  flex: 1; min-width: 0;
+  padding: 11px 14px 12px;
+  background: var(--tv-paper);
+  border: 1px solid var(--tv-line);
+  border-left: 3px solid var(--tv-accent-soft);
+  border-radius: 3px 11px 9px 4px;
+  box-shadow: 0 12px 22px -20px rgba(0, 0, 0, .55);
+  transition: border-color .2s, transform .2s;
+}
+#view-travel .tv-act:hover .tv-act-card { border-left-color: var(--tv-accent); transform: translateX(2px); }
+#view-travel .tv-act-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#view-travel .tv-act-top h5 { margin: 0; font-family: var(--tv-serif); font-size: 15px; font-weight: 600; }
+#view-travel .tv-act-cost { flex: none; font-size: 10px; letter-spacing: .04em; color: var(--tv-accent); }
+#view-travel .tv-act-cost.muted { color: var(--tv-faint); }
+#view-travel .tv-act-place { margin: 4px 0 0; font-size: 11px; color: var(--tv-soft); }
+#view-travel .tv-act-note { margin: 6px 0 0; padding: 6px 9px; font-size: 10.5px; line-height: 1.6; color: var(--tv-soft); background: var(--tv-surface2); border-radius: 2px 7px 6px 3px; }
+#view-travel .tv-act-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--tv-line); }
+#view-travel .tv-link-tag { font-size: 9.5px; letter-spacing: .06em; color: var(--tv-accent2); }
+#view-travel .tv-link-empty { font-size: 9.5px; color: var(--tv-faint); letter-spacing: .04em; }
+#view-travel .tv-bill-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--tv-line);
+  border-radius: 99px;
+  background: var(--tv-surface);
+  padding: 2px 8px 2px 3px;
+  font-family: var(--tv-sans); font-size: 9.5px; color: var(--tv-soft);
+  cursor: pointer;
+}
+#view-travel .tv-bill-chip:hover { border-color: var(--tv-accent); color: var(--tv-ink); }
+
+/* ---------------- 日志明信片 ---------------- */
+#view-travel .tv-journal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+#view-travel .tv-postcard {
+  position: relative;
+  padding: 18px 20px 20px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 29px, rgba(58, 38, 40, .055) 29px 30px),
+    var(--tv-paper);
+  border: 1px solid var(--tv-line);
+  border-radius: 4px;
+  box-shadow: 0 24px 38px -34px rgba(0, 0, 0, .65);
+  transform: rotate(var(--rot, 0deg));
+  cursor: pointer;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+#view-travel .tv-postcard:hover { transform: rotate(0) translateY(-3px); box-shadow: 0 28px 44px -32px rgba(0, 0, 0, .6); }
+#view-travel .tv-tape-corner {
+  position: absolute; top: -9px; left: 26px;
+  width: 58px; height: 18px;
+  background: var(--tv-tape);
+  border-left: 1px dashed var(--tv-tape-edge);
+  border-right: 1px dashed var(--tv-tape-edge);
+  transform: rotate(-4deg);
+}
+#view-travel .tv-postcard-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+#view-travel .tv-mood-stamp {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border: 1.2px solid var(--mood);
+  border-radius: 99px;
+  color: var(--mood);
+  font-family: var(--tv-serif); font-size: 11px;
+  transform: rotate(-1.5deg);
+}
+#view-travel .tv-mood-stamp i { font-style: normal; font-size: 12px; }
+#view-travel .tv-postcard-date { font-size: 9.5px; letter-spacing: .1em; color: var(--tv-faint); }
+#view-travel .tv-postcard-weather { margin: 10px 0 0; font-size: 10.5px; color: var(--tv-faint); letter-spacing: .04em; }
+#view-travel .tv-postcard-body { margin-top: 8px; }
+#view-travel .tv-postcard-photo {
+  float: right; width: 40%; max-width: 150px; margin: 2px 0 8px 14px;
+  border: 5px solid #fffdf7; border-radius: 2px;
+  box-shadow: 0 12px 20px -16px rgba(0,0,0,.6);
+  transform: rotate(2deg);
+}
+#view-travel .tv-postcard-text {
+  margin: 0; font-family: var(--tv-serif); font-size: 13px; line-height: 2;
+  color: var(--tv-ink); white-space: pre-wrap; word-break: break-word;
+}
+#view-travel .tv-postcard-edit { display: block; margin-top: 12px; font-size: 9px; letter-spacing: .14em; color: var(--tv-faint); text-align: right; }
+
+/* ---------------- 账单小票 ---------------- */
+#view-travel .tv-exp-sum {
+  display: flex; align-items: center; gap: 26px; flex-wrap: wrap;
+  padding: 13px 18px;
+  border: 1px dashed var(--tv-line-strong);
+  border-radius: 10px;
+  background: var(--tv-surface);
+}
+#view-travel .tv-exp-sum > div { display: flex; flex-direction: column; gap: 2px; }
+#view-travel .tv-exp-sum span { font-size: 9.5px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-exp-sum b { font-family: var(--tv-serif); font-size: 19px; font-weight: 600; }
+#view-travel .tv-exp-sum b.accent { color: var(--tv-accent); }
+#view-travel .tv-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+#view-travel .tv-filter {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 11px 5px 6px;
+  border: 1px solid var(--tv-line);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--tv-soft);
+  font-family: var(--tv-sans); font-size: 11px;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s;
+}
+#view-travel .tv-filter:hover { background: var(--tv-surface); }
+#view-travel .tv-filter.on { border-color: var(--tv-accent); color: var(--tv-ink); background: var(--tv-surface); }
+#view-travel .tv-exp-list { display: flex; flex-direction: column; gap: 10px; }
+#view-travel .tv-exp {
+  position: relative;
+  display: flex; align-items: center; gap: 13px;
+  padding: 13px 18px;
+  background: var(--tv-paper);
+  border: 1px solid var(--tv-line);
+  border-radius: 4px 10px 3px 9px;
+  box-shadow: 0 14px 24px -24px rgba(0, 0, 0, .6);
+  transform: rotate(var(--rot, 0deg));
+  cursor: pointer;
+  transition: transform .2s, border-color .2s;
+}
+#view-travel .tv-exp:hover { transform: rotate(0) translateX(3px); border-color: var(--tv-line-strong); }
+#view-travel .tv-exp::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 6px;
+  background: radial-gradient(circle at 4px 6px, transparent 4px, var(--tv-paper) 4.5px) 0 0 / 12px 6px repeat-x;
+  pointer-events: none;
+}
+#view-travel .tv-exp-main { flex: 1; min-width: 0; }
+#view-travel .tv-exp-title { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+#view-travel .tv-exp-title b { font-size: 13px; font-weight: 600; }
+#view-travel .tv-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--tv-surface2);
+  border: 1px solid var(--tv-line);
+  font-size: 8.5px; letter-spacing: .06em; color: var(--tv-faint);
+  white-space: nowrap;
+}
+#view-travel .tv-tag.aa { color: var(--tv-accent); border-color: color-mix(in srgb, var(--tv-accent) 35%, transparent); }
+#view-travel .tv-tag.solo { color: var(--tv-faint); }
+#view-travel .tv-tag.synced { color: var(--tv-accent2); border-color: color-mix(in srgb, var(--tv-accent2) 35%, transparent); }
+#view-travel .tv-exp-meta { margin: 4px 0 0; font-size: 10px; line-height: 1.6; color: var(--tv-faint); overflow: hidden; text-overflow: ellipsis; }
+#view-travel .tv-exp-money { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#view-travel .tv-exp-money b { font-family: var(--tv-serif); font-size: 17px; font-weight: 600; }
+#view-travel .tv-exp-money span { font-size: 9.5px; color: var(--tv-accent); letter-spacing: .02em; }
+#view-travel .tv-exp-money span.muted { color: var(--tv-faint); }
+
+/* ---------------- 住宿 ---------------- */
+#view-travel .tv-hotel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+#view-travel .tv-hotel {
+  display: flex; flex-direction: column;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 4px 13px 4px 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 38px -38px rgba(0, 0, 0, .6);
+  cursor: pointer;
+  transition: transform .22s, box-shadow .22s;
+}
+#view-travel .tv-hotel:hover { transform: translateY(-3px); box-shadow: 0 28px 44px -34px rgba(0, 0, 0, .55); }
+#view-travel .tv-hotel-photo { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--tv-surface2); }
+#view-travel .tv-hotel-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s ease; }
+#view-travel .tv-hotel:hover .tv-hotel-photo img { transform: scale(1.04); }
+#view-travel .tv-hotel-photo .tv-tape {
+  position: absolute; top: 8px; left: 22px; width: 64px; height: 18px;
+  background: var(--tv-tape); transform: rotate(-4deg);
+  border-left: 1px dashed var(--tv-tape-edge);
+  border-right: 1px dashed var(--tv-tape-edge);
+}
+#view-travel .tv-hotel-photo-none { display: grid; place-items: center; background: repeating-linear-gradient(135deg, var(--tv-surface2) 0 12px, var(--tv-surface) 12px 24px); }
+#view-travel .tv-hotel-key {
+  font-family: var(--tv-serif); font-size: 20px; letter-spacing: .3em; color: var(--tv-faint);
+  border: 1.4px dashed var(--tv-faint); border-radius: 8px; padding: 6px 14px; transform: rotate(-4deg);
+}
+#view-travel .tv-hotel-body { display: flex; flex-direction: column; gap: 10px; padding: 15px 17px 16px; }
+#view-travel .tv-hotel-top { position: relative; }
+#view-travel .tv-hotel-night {
+  position: absolute; right: 0; top: 0;
+  padding: 2px 7px; border-radius: 99px;
+  background: var(--tv-accent-soft); color: var(--tv-accent);
+  font-size: 9px; letter-spacing: .06em;
+}
+#view-travel .tv-hotel-top h4 { margin: 0; padding-right: 46px; font-family: var(--tv-serif); font-size: 17px; font-weight: 600; }
+#view-travel .tv-hotel-top p { margin: 4px 0 0; font-size: 10.5px; color: var(--tv-faint); }
+#view-travel .tv-hotel-mid { display: flex; align-items: center; gap: 13px; padding: 10px 0; border-top: 1px dashed var(--tv-line); border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-hotel-mid > div { display: flex; flex-direction: column; gap: 1px; }
+#view-travel .tv-hotel-mid span { font-size: 9px; letter-spacing: .12em; color: var(--tv-faint); }
+#view-travel .tv-hotel-mid b { font-family: var(--tv-serif); font-size: 13px; font-weight: 600; }
+#view-travel .tv-hotel-mid i { font-style: normal; color: var(--tv-faint); font-size: 11px; }
+#view-travel .tv-hotel-amt { margin-left: auto; align-items: flex-end; }
+#view-travel .tv-hotel-amt b { color: var(--tv-accent); font-size: 16px; }
+#view-travel .tv-hotel-foot { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-hotel-foot .tv-tag { margin-left: auto; }
+#view-travel .tv-hotel-note { margin: 0; padding: 7px 10px; font-size: 10.5px; line-height: 1.6; color: var(--tv-soft); background: var(--tv-surface2); border-radius: 3px 8px 7px 4px; }
+
+/* ---------------- 对账 ---------------- */
+#view-travel .tv-settle-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+#view-travel .tv-settle-hero {
+  display: flex; align-items: center; gap: clamp(18px, 3vw, 34px); flex-wrap: wrap;
+  padding: clamp(18px, 3vw, 30px);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 31px, rgba(58, 38, 40, .05) 31px 32px),
+    var(--tv-paper);
+  border: 1px solid var(--tv-line);
+  border-radius: 14px;
+  box-shadow: 0 26px 44px -40px rgba(0, 0, 0, .6);
+}
+#view-travel .tv-settle-stamp {
+  flex: none; width: 68px; height: 68px;
+  display: grid; place-items: center;
+  border: 1.6px solid var(--tv-accent); border-radius: 50%;
+  color: var(--tv-accent);
+  font-family: var(--tv-serif); font-size: 11px; line-height: 1.35; letter-spacing: .1em;
+  transform: rotate(-8deg);
+  opacity: .8;
+}
+#view-travel .tv-settle-title { flex: 1; min-width: 220px; }
+#view-travel .tv-settle-title span { font-size: 10px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-settle-title h3 { margin: 5px 0 4px; font-family: var(--tv-serif); font-size: clamp(26px, 3vw, 36px); font-weight: 600; }
+#view-travel .tv-settle-title p { margin: 0; font-size: 11px; color: var(--tv-faint); }
+#view-travel .tv-settle-mine { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#view-travel .tv-settle-mine span { font-size: 9.5px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-settle-mine b { font-family: var(--tv-serif); font-size: 23px; font-weight: 600; color: var(--tv-accent); }
+#view-travel .tv-settle-mine em { font-style: normal; font-size: 9.5px; color: var(--tv-soft); }
+#view-travel .tv-settle-rows { display: flex; flex-direction: column; gap: 2px; }
+#view-travel .tv-settle-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-settle-row:last-child { border-bottom: 0; }
+#view-travel .tv-settle-row > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+#view-travel .tv-settle-row b { font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-settle-row span { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-settle-row strong { margin-left: auto; font-family: var(--tv-serif); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-settle-row strong.pos { color: var(--tv-accent2); }
+#view-travel .tv-settle-row strong.neg { color: var(--tv-accent); }
+#view-travel .tv-transfer-list { display: flex; flex-direction: column; gap: 6px; }
+#view-travel .tv-transfer {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--tv-surface2);
+  border: 1px dashed var(--tv-line-strong);
+  border-radius: 3px 9px 7px 4px;
+}
+#view-travel .tv-transfer b { font-size: 11.5px; font-weight: 600; }
+#view-travel .tv-transfer i { font-style: normal; color: var(--tv-faint); font-size: 11px; }
+#view-travel .tv-transfer strong { margin-left: auto; font-family: var(--tv-serif); font-size: 14px; color: var(--tv-accent); }
+#view-travel .tv-settle-note { margin: 4px 0 0; font-size: 10px; line-height: 1.65; color: var(--tv-faint); }
+
+/* ---------------- 分类预算 ---------------- */
+#view-travel .tv-bud-list { display: flex; flex-direction: column; gap: 7px; }
+#view-travel .tv-bud-row {
+  display: grid;
+  grid-template-columns: 22px minmax(48px, auto) 1fr;
+  grid-template-areas: "mark label num" "track track track";
+  align-items: center; gap: 3px 7px;
+}
+#view-travel .tv-bud-mark {
+  grid-area: mark;
+  width: 20px; height: 20px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(58, 38, 40, .14);
+  background: color-mix(in srgb, var(--c, #a34a5a) 10%, #fff);
+  color: var(--c, #a34a5a);
+  font-size: 10px; font-weight: 600;
+}
+#view-travel .tv-bud-label { grid-area: label; font-size: 11.5px; color: var(--tv-soft); }
+#view-travel .tv-bud-num { grid-area: num; justify-self: end; font-family: var(--tv-serif); font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-bud-num em { font-style: normal; font-weight: 400; font-size: 10.5px; color: var(--tv-faint); }
+#view-travel .tv-bud-num.over { color: #b23a3a; }
+#view-travel .tv-bud-track { grid-area: track; height: 4px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-bud-track i { display: block; height: 100%; border-radius: 99px; }
+#view-travel .tv-bud-track i.over { background: #b23a3a !important; }
+#view-travel .tv-bud-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 11px; padding-top: 9px;
+  border-top: 1px solid var(--tv-line);
+  font-size: 11.5px; color: var(--tv-faint); letter-spacing: .06em;
+}
+#view-travel .tv-bud-total b { font-family: var(--tv-serif); font-size: 16px; color: var(--tv-ink); }
+
+/* ---------------- 分类折叠（对账页） ---------------- */
+#view-travel .tv-cat-folds { display: flex; flex-direction: column; gap: 5px; }
+#view-travel .tv-cat-fold { border-bottom: 1px solid var(--tv-line); }
+#view-travel .tv-cat-fold:last-child { border-bottom: 0; }
+#view-travel .tv-cat-fold > summary {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 2px; cursor: pointer; list-style: none;
+}
+#view-travel .tv-cat-fold > summary::-webkit-details-marker { display: none; }
+#view-travel .tv-cat-fold-name { font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-cat-fold-count { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-cat-fold-amt { margin-left: auto; font-family: var(--tv-serif); font-size: 13.5px; font-weight: 600; }
+#view-travel .tv-cat-fold-amt em { font-style: normal; font-size: 10px; font-weight: 400; color: var(--tv-faint); }
+#view-travel .tv-cat-fold-amt.over { color: #b23a3a; }
+#view-travel .tv-cat-fold-caret { flex: none; color: var(--tv-faint); font-size: 13px; transition: transform .2s; }
+#view-travel .tv-cat-fold[open] .tv-cat-fold-caret { transform: rotate(90deg); }
+#view-travel .tv-cat-fold-body { padding: 2px 0 10px 30px; }
+#view-travel .tv-cat-item { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-cat-item:last-child { border-bottom: 0; }
+#view-travel .tv-cat-item-date { flex: none; width: 34px; font-size: 10px; color: var(--tv-faint); padding-top: 2px; }
+#view-travel .tv-cat-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-cat-item-main b { font-size: 12px; font-weight: 600; }
+#view-travel .tv-cat-item-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-cat-item-share { margin-left: auto; text-align: right; font-family: var(--tv-serif); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-cat-item-share em { display: block; font-style: normal; font-family: var(--tv-sans); font-size: 9.5px; font-weight: 400; color: var(--tv-faint); }
+
+/* ---------------- 每个人的对账单 ---------------- */
+#view-travel .tv-pairs { display: flex; flex-direction: column; gap: 12px; }
+#view-travel .tv-pair {
+  padding: 13px 15px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 4px 14px 12px 5px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset;
+}
+#view-travel .tv-pair-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#view-travel .tv-pair-who { display: flex; flex-direction: column; gap: 1px; }
+#view-travel .tv-pair-who b { font-size: 13px; font-weight: 600; }
+#view-travel .tv-pair-who span { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-pair-sum { margin-left: auto; font-size: 12px; color: var(--tv-soft); }
+#view-travel .tv-pair-sum b { font-family: var(--tv-serif); font-size: 16px; }
+#view-travel .tv-pair-sum.pos b { color: var(--tv-accent2); }
+#view-travel .tv-pair-sum.neg b { color: var(--tv-accent); }
+#view-travel .tv-pair-detail { margin-top: 8px; }
+#view-travel .tv-pair-detail > summary {
+  cursor: pointer; list-style: none;
+  font-size: 10.5px; letter-spacing: .06em; color: var(--tv-accent);
+  padding: 5px 0;
+}
+#view-travel .tv-pair-detail > summary::-webkit-details-marker { display: none; }
+#view-travel .tv-pair-detail > summary::before { content: "▸ "; }
+#view-travel .tv-pair-detail[open] > summary::before { content: "▾ "; }
+#view-travel .tv-pair-items { border-top: 1px dashed var(--tv-line); margin-top: 4px; }
+#view-travel .tv-pair-item { display: flex; align-items: flex-start; gap: 9px; padding: 7px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-pair-item:last-child { border-bottom: 0; }
+#view-travel .tv-pair-date { flex: none; width: 32px; font-size: 10px; color: var(--tv-faint); padding-top: 2px; }
+#view-travel .tv-pair-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-pair-main b { font-size: 12px; font-weight: 600; }
+#view-travel .tv-pair-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-pair-amt { margin-left: auto; font-family: var(--tv-serif); font-size: 13px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-pair-amt.pos { color: var(--tv-accent2); }
+#view-travel .tv-pair-amt.neg { color: var(--tv-accent); }
+#view-travel .tv-pair-foot {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  margin-top: 7px; font-size: 10.5px; color: var(--tv-faint);
+}
+#view-travel .tv-pair-foot b { color: var(--tv-ink); font-family: var(--tv-serif); font-size: 12.5px; }
+#view-travel .tv-pair-acts {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 9px;
+  border-top: 1px solid var(--tv-line);
+}
+#view-travel .tv-pair-acts span { font-size: 10px; color: var(--tv-faint); line-height: 1.5; }
+
+/* ---------------- 分类预算弹窗 ---------------- */
+.travel-modal .tv-bud-edit { display: flex; flex-direction: column; gap: 7px; }
+.travel-modal .tv-bud-edit-row { display: flex; align-items: center; gap: 9px; }
+.travel-modal .tv-bud-mark {
+  width: 22px; height: 22px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(58, 38, 40, .14);
+  background: color-mix(in srgb, var(--c, #a34a5a) 10%, #fff);
+  color: var(--c, #a34a5a);
+  font-size: 10px; font-weight: 600;
+}
+.travel-modal .tv-bud-edit-name { flex: none; width: 56px; font-size: 12px; color: #5c4a4b; }
+.travel-modal .tv-bud-input {
+  flex: 1; min-width: 0; height: 34px;
+  padding: 0 10px;
+  background: #fffdf8;
+  border: 1px solid rgba(58, 38, 40, .17);
+  border-radius: 8px 10px 8px 11px;
+  font-family: inherit; font-size: 13px; color: #3a2628;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.travel-modal .tv-bud-input:focus { border-color: #a34a5a; box-shadow: 0 0 0 3px rgba(163, 74, 90, .12); }
+.travel-modal .tv-bud-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid rgba(58, 38, 40, .16);
+  font-size: 12px; color: #a98a8c;
+}
+.travel-modal .tv-bud-total b { font-family: "Fraunces", "Songti SC", Georgia, serif; font-size: 18px; color: #3a2628; }
+
+/* ---------------- 弹窗：沿用记账本控件，山茶配色 ---------------- */
+.travel-modal {
+  --tm-ink: #3a2628;
+  --tm-soft: #7c5c5e;
+  --tm-faint: #a98a8c;
+  --tm-line: rgba(58, 38, 40, .16);
+  --tm-accent: #a34a5a;
+  background: #fffaf6;
+  border-radius: 18px;
+  color: var(--tm-ink);
+  box-shadow: 0 34px 80px -44px rgba(58, 38, 40, .55);
+}
+.travel-modal .modal-title {
+  font-family: "Fraunces", "Songti SC", "Noto Serif SC", Georgia, serif;
+  font-size: 20px; font-weight: 600; letter-spacing: .01em;
+  color: var(--tm-ink);
+}
+.travel-modal .modal-title .icon-btn { color: var(--tm-faint); }
+.travel-modal .tv-modal-sub {
+  margin: -10px 0 16px;
+  font-size: 10.5px; letter-spacing: .04em; line-height: 1.6;
+  color: var(--tm-faint);
+}
+.travel-modal .field label {
+  font-size: 10px; font-weight: 600; letter-spacing: .12em;
+  color: var(--tm-faint);
+}
+.travel-modal .field input,
+.travel-modal .field select,
+.travel-modal .field textarea {
+  background: #fffdf8;
+  border-color: rgba(58, 38, 40, .17);
+  border-radius: 9px 11px 9px 12px;
+  color: var(--tm-ink);
+  font-family: "Instrument Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+}
+.travel-modal .field input:focus,
+.travel-modal .field select:focus,
+.travel-modal .field textarea:focus {
+  border-color: var(--tm-accent);
+  box-shadow: 0 0 0 3px rgba(163, 74, 90, .12);
+  background: #fff;
+}
+.travel-modal .field textarea { line-height: 1.8; min-height: 116px; }
+.travel-modal .field input::placeholder,
+.travel-modal .field textarea::placeholder { color: #c6adad; }
+.travel-modal .cal-input { cursor: pointer; caret-color: transparent; }
+.travel-modal .csel-btn {
+  background: #fffdf8;
+  border-color: rgba(58, 38, 40, .17);
+  border-radius: 9px 11px 9px 12px;
+  color: var(--tm-ink);
+  font-size: 13px;
+}
+.travel-modal .csel-btn:hover { border-color: #d3b1b1; }
+.travel-modal .csel.open .csel-btn { border-color: var(--tm-accent); box-shadow: 0 0 0 3px rgba(163, 74, 90, .12); background: #fff; }
+.travel-modal .csel-arrow { color: var(--tm-accent); }
+.travel-modal .csel-pop {
+  background: #fffdf8;
+  border-color: rgba(58, 38, 40, .16);
+  box-shadow: 0 22px 48px -28px rgba(58, 38, 40, .42);
+  border-radius: 12px;
+}
+.travel-modal .csel-opt { color: var(--tm-ink); border-radius: 8px; }
+.travel-modal .csel-opt:not(.sel):hover { background: #fbeeea; color: var(--tm-accent); }
+.travel-modal .csel-opt.sel { background: var(--tm-accent); color: #fff8f5; }
+.travel-modal .btn { border-radius: 9px 11px 9px 12px; }
+.travel-modal .btn-primary {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  color: #fff8f5;
+  box-shadow: 0 8px 16px -12px rgba(163, 74, 90, .8);
+}
+.travel-modal .btn-primary:hover { background: #8f3d4c; border-color: #8f3d4c; }
+.travel-modal .btn-ghost { background: transparent; color: var(--tm-soft); border-color: rgba(58, 38, 40, .18); }
+.travel-modal .btn-ghost:hover { background: #fbeeea; color: var(--tm-ink); }
+.travel-modal .btn-danger { background: #f9ecea; color: #a33b33; border-color: #eccfc8; }
+.travel-modal .btn-danger:hover { background: #f3dad4; }
+.travel-modal .modal-acts { margin-top: 22px; }
+
+/* 手绘勾选 */
+.travel-modal .tv-checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.travel-modal .tv-check {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px 6px 7px;
+  border: 1px solid rgba(58, 38, 40, .15);
+  border-radius: 11px 13px 11px 14px;
+  background: #fffdf8;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, transform .18s;
+  user-select: none;
+}
+.travel-modal .tv-check:hover { border-color: #d3b1b1; transform: translateY(-1px); }
+.travel-modal .tv-check:has(input:checked) { border-color: rgba(163, 74, 90, .55); background: #fdf1ed; }
+.travel-modal .tv-check input {
+  position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+.travel-modal .tv-check-box {
+  width: 20px; height: 20px; flex: none;
+  display: grid; place-items: center;
+  border: 1.6px solid #cbb4b0;
+  border-radius: 6px 8px 5px 7px;
+  background: #fffaf6;
+  color: #fff8f5;
+  transform: rotate(-1.5deg);
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.travel-modal .tv-check-box svg {
+  width: 15px; height: 15px;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  transition: stroke-dashoffset .26s cubic-bezier(.4, .1, .2, 1);
+}
+.travel-modal .tv-check input:checked + .tv-check-box {
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
+  transform: rotate(0deg);
+}
+.travel-modal .tv-check input:checked + .tv-check-box svg { stroke-dashoffset: 0; }
+.travel-modal .tv-check:focus-within .tv-check-box { box-shadow: 0 0 0 3px rgba(163, 74, 90, .14); }
+.travel-modal .tv-check-text { font-size: 12px; color: var(--tm-ink); letter-spacing: .02em; }
+.travel-modal .tv-check-line { width: 100%; padding: 9px 12px; }
+.travel-modal .tv-sync-box {
+  margin: 4px 0 0;
+  padding: 10px 12px 6px;
+  border: 1px dashed rgba(58, 38, 40, .2);
+  border-radius: 11px;
+  background: #fdf6f1;
+}
+.travel-modal .tv-form-tip {
+  margin: 7px 0 0;
+  font-size: 10.5px; line-height: 1.65; color: var(--tm-faint);
+}
+.travel-modal .tv-form-tip b { color: var(--tm-accent); font-weight: 600; }
+.travel-modal .tv-quick-amounts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.travel-modal .tv-quick-amounts button {
+  padding: 4px 12px;
+  border: 1px solid rgba(58, 38, 40, .16);
+  border-radius: 99px;
+  background: #fffdf8;
+  color: var(--tm-soft);
+  font-family: inherit; font-size: 11px; cursor: pointer;
+}
+.travel-modal .tv-quick-amounts button:hover { border-color: var(--tm-accent); color: var(--tm-accent); }
+
+/* 情绪选择 */
+.travel-modal .tv-mood-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.travel-modal .tv-mood-opt {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px 5px 7px;
+  border: 1px solid rgba(58, 38, 40, .14);
+  border-radius: 99px;
+  background: #fffdf8;
+  color: var(--tm-soft);
+  font-family: inherit; font-size: 11px;
+  cursor: pointer;
+  transition: background .16s, border-color .16s, color .16s, transform .16s;
+}
+.travel-modal .tv-mood-opt i { font-style: normal; font-size: 13px; }
+.travel-modal .tv-mood-opt:hover { border-color: var(--mood); transform: translateY(-1px); }
+.travel-modal .tv-mood-opt.on { border-color: var(--mood); background: color-mix(in srgb, var(--mood) 10%, #fffdf8); color: var(--mood); font-weight: 600; }
+
+/* 同行成员编辑：一行两列，小标题 本人 / 朋友 */
+.travel-modal .tv-memlist { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.travel-modal .tv-memrow { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.travel-modal .tv-mem-tag { font-size: 10px; letter-spacing: .1em; color: #A99E8E; padding-left: 2px; }
+.travel-modal .tv-memrow.is-me .tv-mem-tag { color: #A34A5A; }
+.travel-modal .tv-mem-line { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.travel-modal .tv-mem-name {
+  flex: 1; min-width: 0; height: 38px;
+  padding: 0 11px;
+  background: #FFFDF8;
+  border: 1px solid rgba(58, 38, 40, .17);
+  border-radius: 9px 11px 9px 12px;
+  font-family: inherit; font-size: 13px; color: #3A2628;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.travel-modal .tv-mem-name:focus { border-color: #A34A5A; box-shadow: 0 0 0 3px rgba(163, 74, 90, .12); background: #fff; }
+.travel-modal .tv-mem-name::placeholder { color: #C6ADAD; }
+.travel-modal .tv-mem-del {
+  flex: none; width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%;
+  background: transparent; color: #B5A695;
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.travel-modal .tv-mem-del:hover { background: #F6EAEA; color: #A34A5A; }
+.travel-modal .tv-addmem {
+  width: 100%; margin-top: 10px; padding: 9px;
+  border: 1px dashed #D9CFC0; border-radius: 10px;
+  background: transparent; color: #8A7E70;
+  font-family: inherit; font-size: 12.5px; letter-spacing: .04em;
+  cursor: pointer; transition: border-color .2s, color .2s, background .2s;
+}
+.travel-modal .tv-addmem:hover { border-color: #A34A5A; color: #A34A5A; background: #FFF8F5; }
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 1080px) {
+  #view-travel .tv-scrap-cover { grid-template-columns: minmax(0, 280px) minmax(0, 1fr); }
+  #view-travel .tv-side {
+    grid-column: 1 / -1;
+    flex-direction: row; align-items: flex-start;
+    gap: 20px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--tv-line);
+  }
+  #view-travel .tv-mood-notes { flex: 1; flex-direction: row; gap: 10px; padding: 0; }
+  #view-travel .tv-mn-head { display: none; }
+  #view-travel .tv-mood-note { margin: 0 !important; }
+  #view-travel .tv-mood-note p { -webkit-line-clamp: 2; }
+  #view-travel .tv-status-stamp { width: 58px; height: 58px; font-size: 11.5px; }
+  #view-travel .tv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  #view-travel .tv-day-scrap { grid-template-columns: 1fr; }
+  #view-travel .tv-day-photo { max-width: 340px; }
+  #view-travel .tv-grid2 { grid-template-columns: 1fr; }
+  #view-travel .tv-journal-grid { grid-template-columns: 1fr; }
+  #view-travel .tv-hotel-grid { grid-template-columns: 1fr; }
+  #view-travel .tv-scrap-cover { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); }
+  #view-travel .tv-tripbar { gap: 12px; }
+  #view-travel .tv-trip-acts { width: 100%; justify-content: space-between; }
+  #view-travel .tv-budget-chip { flex: 1; }
+}
+@media (max-width: 620px) {
+  #view-travel .tv-app { border-radius: 18px; padding: 14px; }
+  #view-travel .tv-brandline { align-items: flex-start; }
+  #view-travel .tv-brand h2 { font-size: 23px; }
+  #view-travel .tv-stamp { width: 42px; height: 42px; font-size: 19px; }
+  #view-travel .tv-theme-wrap { width: 100%; justify-content: space-between; }
+  #view-travel .tv-theme { padding: 4px 8px 4px 5px; font-size: 10px; }
+  #view-travel .tv-theme .sw { width: 12px; height: 12px; }
+  #view-travel .tv-body { gap: 20px; margin-top: 18px; }
+  #view-travel .tv-lib-intro { align-items: flex-start; }
+  #view-travel .tv-lib-intro h3 { font-size: 24px; }
+  #view-travel .tv-books { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 14px; padding: 8px 2px 18px; }
+  #view-travel .tv-book-title { left: 8px; right: 8px; bottom: 9px; padding: 7px 9px 6px; }
+  #view-travel .tv-book-title h3 { font-size: 13.5px; }
+  #view-travel .tv-book-title span { font-size: 8px; letter-spacing: .12em; }
+  #view-travel .tv-book-title p { font-size: 9px; }
+  #view-travel .tv-book-foot { flex-wrap: wrap; gap: 3px 6px; margin-top: 8px; }
+  #view-travel .tv-book-foot em { margin-left: 0; }
+  #view-travel .tv-book-foot b { margin-left: auto; font-size: 13px; }
+  #view-travel .tv-book-new { min-height: 200px; }
+  #view-travel .tv-book-new b { font-size: 13px; }
+  #view-travel .tv-book-new em { font-size: 10px; }
+  #view-travel .tv-book-plus { width: 38px; height: 38px; font-size: 19px; }
+  #view-travel .tv-tripbar { padding: 12px 14px; }
+  #view-travel .tv-back { order: -1; }
+  #view-travel .tv-tripinfo { flex: 1 1 100%; }
+  #view-travel .tv-tripinfo h3 { font-size: 21px; }
+  #view-travel .tv-tabs { gap: 2px; }
+  #view-travel .tv-tab-group + .tv-tab-group { margin-left: 4px; padding-left: 10px; }
+  #view-travel .tv-tabgroup-label { font-size: 9px; letter-spacing: .12em; padding-right: 4px; }
+  #view-travel .tv-tab { padding: 8px 11px 9px; font-size: 11.5px; letter-spacing: .06em; }
+  #view-travel .tv-scrap-cover { grid-template-columns: 1fr; padding: 16px; gap: 20px; }
+  #view-travel .tv-side { flex-direction: column; align-items: stretch; gap: 0; padding-top: 0; border-top: 0; }
+  #view-travel .tv-status-stamp {
+    position: absolute; top: 22px; right: 22px; z-index: 6;
+    width: 58px; height: 58px; font-size: 11px;
+    background: color-mix(in srgb, var(--tv-paper) 74%, transparent);
+    backdrop-filter: blur(2px);
+  }
+  #view-travel .tv-mood-notes { flex-direction: column; }
+  #view-travel .tv-mood-note.mn1 { margin-top: -6px !important; margin-left: 10px !important; }
+  #view-travel .tv-mood-note.mn2 { margin-top: -6px !important; margin-left: 2px !important; }
+  #view-travel .tv-book-stamp { width: 36px; height: 36px; font-size: 9px; top: 8px; right: 8px; }
+  #view-travel .tv-scrap-photos { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  #view-travel .tv-polaroid-lg { width: 100%; grid-column: 1 / -1; }
+  #view-travel .tv-polaroid-sm { position: relative; width: 100%; right: auto; top: auto; bottom: auto; }
+  #view-travel .tv-washi { top: -8px; }
+  #view-travel .tv-scrap-copy h2 { font-size: 25px; }
+  #view-travel .tv-stamps { gap: 7px; }
+  #view-travel .tv-stamp-mark { min-width: 46px; height: 46px; font-size: 10px; }
+  #view-travel .tv-stats { gap: 10px; }
+  #view-travel .tv-stat { padding: 12px 13px 14px; }
+  #view-travel .tv-stat b { font-size: 18px; }
+  #view-travel .tv-panel { padding: 14px 15px; }
+  #view-travel .tv-mini-day { gap: 10px; }
+  #view-travel .tv-mini-photo { width: 38%; }
+  #view-travel .tv-section-head { align-items: flex-start; }
+  #view-travel .tv-day-page { padding: 16px 15px 18px 38px; }
+  #view-travel .tv-page-holes { left: 10px; top: 20px; bottom: 20px; }
+  #view-travel .tv-day-head { gap: 9px; }
+  #view-travel .tv-day-title h4 { font-size: 17px; }
+  #view-travel .tv-day-total { display: none; }
+  #view-travel .tv-day-photo { max-width: 100%; }
+  #view-travel .tv-timeline::before { left: 45px; }
+  #view-travel .tv-act-time { width: 45px; padding-right: 13px; font-size: 10px; }
+  #view-travel .tv-act-card { padding: 10px 12px 11px; }
+  #view-travel .tv-act-top h5 { font-size: 13.5px; }
+  #view-travel .tv-postcard { padding: 15px 16px 16px; }
+  #view-travel .tv-postcard-photo { width: 36%; max-width: 110px; margin-left: 10px; }
+  #view-travel .tv-postcard-text { font-size: 12px; line-height: 1.9; }
+  #view-travel .tv-exp { padding: 11px 13px; gap: 10px; flex-wrap: wrap; }
+  #view-travel .tv-exp-money { width: 100%; flex-direction: row; align-items: baseline; justify-content: flex-end; gap: 8px; }
+  #view-travel .tv-exp-sum { gap: 18px; padding: 11px 14px; }
+  #view-travel .tv-exp-sum b { font-size: 16px; }
+  #view-travel .tv-hotel-body { padding: 13px 14px 14px; }
+  #view-travel .tv-settle-hero { gap: 16px; padding: 18px; }
+  #view-travel .tv-settle-mine { align-items: flex-start; width: 100%; }
+  #view-travel .tv-settle-acts { width: 100%; }
+  #view-travel .tv-settle-acts .tv-btn { flex: 1; }
+  #view-travel .tv-trip-acts { flex-wrap: wrap; }
+  #view-travel .tv-chipbtn { flex: 1; }
+  #view-travel .tv-foot { align-items: flex-start; }
+  .travel-modal { padding: 18px 16px 16px; border-radius: 16px; }
+  .travel-modal .modal-title { font-size: 18px; margin-bottom: 14px; }
+  .travel-modal .field-row { flex-direction: column; gap: 0; }
+  .travel-modal .modal-acts { gap: 8px; flex-wrap: wrap; }
+  .travel-modal .modal-acts .btn { flex: 1; }
+  .travel-modal .modal-acts .btn-danger { flex: 1 0 100%; margin-right: 0 !important; }
+}
+@media (max-width: 380px) {
+  #view-travel .tv-books { gap: 20px 10px; }
+  #view-travel .tv-book-title h3 { font-size: 12.5px; }
+  #view-travel .tv-tab { padding: 8px 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view-travel .tv-app, #view-travel .tv-book, #view-travel .tv-postcard, #view-travel .tv-exp, #view-travel .tv-act-card {
+    animation: none !important; transition: none !important;
+  }
+}
+
+/* ---------------- 点击照片换图 ---------------- */
+#view-travel .tv-polaroid > img,
+#view-travel .tv-hotel-photo,
+#view-travel .tv-postcard-photo { cursor: pointer; }
+#view-travel .tv-polaroid > img:hover,
+#view-travel .tv-postcard-photo:hover { filter: brightness(1.03) saturate(1.04); }
+#view-travel .tv-hotel-photo:hover img { transform: scale(1.03); }
+
+.travel-modal .tv-imgpick { display: flex; flex-direction: column; gap: 14px; }
+.travel-modal .tv-imgpick-prev {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: grid; place-items: center;
+  overflow: hidden;
+  border: 1px solid #E4DDD1;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(135deg, #FBF8F2 0 12px, #F6F1E8 12px 24px);
+}
+.travel-modal .tv-imgpick-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.travel-modal .tv-imgpick-prev.empty span { font-size: 12px; letter-spacing: .06em; color: #A99E8E; }
+.travel-modal .tv-imgpick-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.travel-modal .tv-imgpick-row .btn { flex: 1 1 0; min-width: 120px; }
+.travel-modal .tv-imgpick-link { display: flex; gap: 8px; align-items: center; }
+.travel-modal .tv-imgpick-link input { flex: 1; min-width: 0; }
+.travel-modal .tv-imgpick-link .btn { flex: none; }
+
+/* 封面心情 emoji 选择 */
+.travel-modal .tv-emoji-pick {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px;
+  border: 1px solid #E4DDD1;
+  border-radius: 12px;
+  background: #FBF8F2;
+}
+.travel-modal .tv-emoji-opt {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 18px; line-height: 1;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.travel-modal .tv-emoji-opt:hover { transform: translateY(-1px); border-color: #D9CFC0; }
+.travel-modal .tv-emoji-opt.on { border-color: #A34A5A; background: #F8EAE7; box-shadow: 0 0 0 2px rgba(163, 74, 90, .12); }
+@media (max-width: 520px) {
+  .travel-modal .tv-imgpick-row .btn { flex: 1 0 100%; }
+}
+
+/* ---------------- 总览 · 三列模块 ---------------- */
+#view-travel .tv-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+#view-travel .tv-grid3 .tv-panel,
+#view-travel .tv-grid-even .tv-panel { display: flex; flex-direction: column; }
+#view-travel .tv-grid3 .tv-bud-total,
+#view-travel .tv-grid3 .tv-budget-note { margin-top: auto; }
+#view-travel .tv-catbar-name em { display: block; margin-left: 0; font-style: normal; font-size: 9.5px; line-height: 1.2; color: var(--tv-faint); }
+#view-travel .tv-mini-journals { display: flex; flex-direction: column; overflow: hidden; }
+
+/* 住宿缩略 */
+#view-travel .tv-hotel-mini-list { display: flex; flex-direction: column; gap: 8px; }
+#view-travel .tv-hotel-mini {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 9px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 9px;
+  text-align: left; cursor: pointer;
+  transition: border-color .18s, transform .18s;
+}
+#view-travel .tv-hotel-mini:hover { border-color: var(--tv-accent); transform: translateY(-1px); }
+#view-travel .tv-hotel-mini img,
+#view-travel .tv-hotel-mini-none {
+  width: 50px; height: 40px; flex: none;
+  border-radius: 6px; object-fit: cover;
+  display: grid; place-items: center;
+}
+#view-travel .tv-hotel-mini-none { background: var(--tv-surface2); font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-hotel-mini-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-hotel-mini-main b { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-travel .tv-hotel-mini-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-hotel-mini-amt { margin-left: auto; flex: none; font-family: var(--tv-serif); font-size: 13px; font-weight: 600; color: var(--tv-accent); }
+
+/* ---------------- 昨日 / 今日 / 明日 ---------------- */
+#view-travel .tv-daylane { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+#view-travel .tv-daylane-card.is-today { background: var(--tv-paper); border-color: color-mix(in srgb, var(--tv-accent) 40%, var(--tv-line)); }
+#view-travel .tv-lane-meta { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 7px; }
+#view-travel .tv-lane-meta b { font-family: var(--tv-serif); font-size: 15px; font-weight: 600; }
+#view-travel .tv-lane-meta span { font-size: 10px; color: var(--tv-faint); line-height: 1.55; }
+#view-travel .tv-lane-list { display: flex; flex-direction: column; }
+#view-travel .tv-lane-act {
+  display: flex; align-items: flex-start; gap: 9px;
+  width: 100%; padding: 7px 0;
+  border-bottom: 1px dashed var(--tv-line);
+  background: transparent; color: inherit; text-align: left;
+  font-family: var(--tv-sans); cursor: pointer;
+}
+#view-travel .tv-lane-act:last-child { border-bottom: 0; }
+#view-travel .tv-lane-act:hover .tv-lane-act-body b { color: var(--tv-accent); }
+#view-travel .tv-lane-act em { flex: none; width: 34px; padding-top: 1px; font-style: normal; font-size: 10px; color: var(--tv-accent); }
+#view-travel .tv-lane-act-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+#view-travel .tv-lane-act-body b { font-size: 12px; font-weight: 600; line-height: 1.5; transition: color .18s; }
+#view-travel .tv-lane-act-body i { font-style: normal; font-size: 10px; color: var(--tv-faint); line-height: 1.5; }
+#view-travel .tv-lane-act-cost { flex: none; font-size: 10.5px; color: var(--tv-soft); white-space: nowrap; padding-top: 1px; }
+
+/* ---------------- 内页头部 · 今日概览 ---------------- */
+#view-travel .tv-trip-sum {
+  margin-left: auto; flex: none;
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: right;
+  padding-left: 18px;
+  border-left: 1px dashed var(--tv-line);
+}
+#view-travel .tv-ts-line { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; }
+#view-travel .tv-ts-line em { font-style: normal; font-size: 9.5px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-ts-line b { font-family: var(--tv-serif); font-size: 14px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-ts-line b.c-day { color: var(--tv-accent2); }
+#view-travel .tv-ts-line b.c-spent { color: var(--tv-accent); }
+#view-travel .tv-ts-line b.c-budget { color: var(--tv-sun); }
+
+@media (max-width: 1080px) {
+  #view-travel .tv-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-travel .tv-daylane { grid-template-columns: 1fr 1fr; }
+  #view-travel .tv-daylane-card:nth-child(1) { grid-column: 1 / -1; }
+}
+@media (max-width: 860px) {
+  #view-travel .tv-grid3 { grid-template-columns: 1fr; }
+  #view-travel .tv-daylane { grid-template-columns: 1fr; }
+  #view-travel .tv-trip-sum {
+    width: 100%; flex-direction: row; justify-content: space-between; align-items: center;
+    margin-left: 0; padding: 9px 0 0;
+    border-left: 0; border-top: 1px dashed var(--tv-line);
+    text-align: left;
+  }
+  #view-travel .tv-ts-line { gap: 5px; }
+}
+
+
+
+
