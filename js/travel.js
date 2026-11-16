@@ -1,5 +1,7 @@
 /* ============================================================
-   旅行账本 · 集成在财务管家内的旅行账单 / 行程 / 日志模块
+   旅行账册 · 集成在财务管家内的旅行账单 / 行程 / 日志模块
+   - 多本旅行册（library）+ 每本翻开是手帐风格的内页
+   - 控件沿用记账本的自定义下拉 / 日历
    - 旅行明细保存在本机（按账号隔离），不新增云端表
    - 产生的旅行账单会按「我的 AA 份额」同步到记账本 records
    ============================================================ */
@@ -10,17 +12,17 @@
   const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
   const THEMES = [
+    { id: 'bloom', name: '山茶', desc: '山茶粉调 · 苔绿点缀' },
     { id: 'paper', name: '暖纸', desc: '奶油纸感 · 陶土红' },
     { id: 'ocean', name: '海盐', desc: '海雾青蓝 · 珊瑚橙' },
-    { id: 'ink', name: '墨夜', desc: '夜墨底色 · 鎏金线条' },
-    { id: 'bloom', name: '山茶', desc: '山茶粉调 · 苔绿点缀' }
+    { id: 'ink', name: '墨夜', desc: '夜墨底色 · 鎏金线条' }
   ];
 
   const THEME_COLORS = {
+    bloom: { bg: '#f8ece9', surface: '#fff8f5', ink: '#3a2628', soft: '#7c5c5e', faint: '#a98a8c', line: 'rgba(58,38,40,.16)', accent: '#a34a5a', accent2: '#6d7f6a', sun: '#d9a05a' },
     paper: { bg: '#f2ebdd', surface: '#fbf6e9', ink: '#23251c', soft: '#5c5b4b', faint: '#8d8876', line: 'rgba(35,37,28,.16)', accent: '#bf4f2a', accent2: '#2e5c4e', sun: '#d9a02a' },
     ocean: { bg: '#eaf2f2', surface: '#fbfefe', ink: '#17323b', soft: '#4e6b73', faint: '#7d969d', line: 'rgba(23,50,59,.16)', accent: '#2f6d78', accent2: '#c07a4a', sun: '#7fa8a3' },
-    ink: { bg: '#15181a', surface: '#1f2427', ink: '#f0e9da', soft: '#b8b2a4', faint: '#8b867b', line: 'rgba(240,233,218,.18)', accent: '#d9b46a', accent2: '#8fa89b', sun: '#d9b46a' },
-    bloom: { bg: '#f8ece9', surface: '#fff8f5', ink: '#3a2628', soft: '#7c5c5e', faint: '#a98a8c', line: 'rgba(58,38,40,.16)', accent: '#a34a5a', accent2: '#6d7f6a', sun: '#d9a05a' }
+    ink: { bg: '#15181a', surface: '#1f2427', ink: '#f0e9da', soft: '#b8b2a4', faint: '#8b867b', line: 'rgba(240,233,218,.18)', accent: '#d9b46a', accent2: '#8fa89b', sun: '#d9b46a' }
   };
 
   const MOODS = [
@@ -63,6 +65,12 @@
   const MOOD = Object.fromEntries(MOODS.map(m => [m.id, m]));
   const CAT = Object.fromEntries(CATS.map(c => [c.id, c]));
 
+  /* 照片：统一走文生图接口，px 尺寸选接口支持的值 */
+  const IMG_API = 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=';
+  function photo(prompt, size) {
+    return IMG_API + encodeURIComponent(prompt) + '&image_size=' + (size || 'landscape_4_3');
+  }
+
   /* ---------------- 工具 ---------------- */
   function esc(s) {
     return String(s == null ? '' : s)
@@ -75,6 +83,7 @@
     const d = new Date();
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
+  function fmtDate(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function parseDate(s) {
     const a = String(s || '').split('-').map(Number);
     return new Date(a[0] || 1970, (a[1] || 1) - 1, a[2] || 1);
@@ -89,8 +98,7 @@
   }
   function money(n) {
     const v = Math.round((Number(n) || 0) * 100) / 100;
-    const s = v.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    return '¥' + s;
+    return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   }
   function money2(n) {
     const v = Math.round((Number(n) || 0) * 100) / 100;
@@ -104,22 +112,41 @@
     let rest = totalCents - base * n;
     return Array.from({ length: n }, (_, i) => base + (i < rest ? 1 : 0));
   }
+  function nights(inD, outD) {
+    const v = Math.round((parseDate(outD) - parseDate(inD)) / 86400000);
+    return Math.max(1, v);
+  }
+  function dateRange(start, end) {
+    const out = [];
+    const s = parseDate(start), e = parseDate(end || start);
+    const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+    const stop = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    while (cur <= stop && out.length < 90) {
+      out.push(fmtDate(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  }
+
+  function defaultMembers() {
+    return [
+      { id: 'me', name: '我', initial: '我', cls: 'me' },
+      { id: 'xiaoyu', name: '小雨', initial: '小', cls: 'xiaoyu' },
+      { id: 'azhe', name: '阿哲', initial: '哲', cls: 'azhe' }
+    ];
+  }
 
   /* ---------------- 示例数据 ---------------- */
   function seedState() {
-    return {
-      version: 1,
-      theme: 'paper',
-      tab: 'overview',
-      filterCat: 'all',
-      trip: {
-        id: 'trip-1',
-        title: '大理，四天三夜',
-        destination: '大理',
-        startDate: '2026-11-15',
-        endDate: '2026-11-18',
-        budget: 6000
-      },
+    const dali = {
+      id: 'trip-dali',
+      title: '大理，四天三夜',
+      destination: '大理',
+      startDate: '2026-11-15',
+      endDate: '2026-11-18',
+      budget: 6000,
+      createdAt: 1,
+      cover: photo('dali ancient town travel photography, cangshan mountain and erhai lake in distance, warm autumn afternoon, film grain, dreamy travel journal cover', 'portrait_4_3'),
       members: [
         { id: 'me', name: '我', initial: '我', cls: 'me' },
         { id: 'xiaoyu', name: '小雨', initial: '小', cls: 'xiaoyu' },
@@ -128,6 +155,7 @@
       days: [
         {
           day: 1, date: '2026-11-15', city: '大理古城', theme: '抵达 · 古城慢逛', weather: '晴 19°',
+          photo: photo('dali ancient town stone street with wooden houses and red lanterns, warm sunlight, travel snapshot', 'landscape_4_3'),
           activities: [
             { id: 'a1', time: '09:10', title: '昆明南 → 大理', place: '动车 D8656 · 2 小时 10 分', note: '', cost: 435 },
             { id: 'a2', time: '13:40', title: '入住古城民宿', place: '人民路下段 · 15:00 后可入住', note: '', cost: 0 },
@@ -137,6 +165,7 @@
         },
         {
           day: 2, date: '2026-11-16', city: '洱海西岸', theme: '环海 · 稻田与咖啡', weather: '晴 21°',
+          photo: photo('erhai lake west shore golden rice fields, bicycle road, yunnan countryside, warm afternoon light, travel photo', 'landscape_4_3'),
           activities: [
             { id: 'a5', time: '08:00', title: '洱海门早点', place: '才村码头 · 稀豆粉配饵块', note: '', cost: 42 },
             { id: 'a6', time: '09:30', title: '环洱海包车', place: '才村 → 喜洲 → 双廊', note: '', cost: 480 },
@@ -147,6 +176,7 @@
         },
         {
           day: 3, date: '2026-11-17', city: '双廊 · 洱海东岸', theme: '坐船 · 等一场日落', weather: '多云 18°',
+          photo: photo('shuanglang lakeside sunset over erhai lake, orange sky, silhouettes of boats, travel journal', 'landscape_4_3'),
           activities: [
             { id: 'a10', time: '09:00', title: '南诏风情岛', place: '双廊码头 · 船票 + 门票', note: '', cost: 150 },
             { id: 'a11', time: '13:00', title: '海地生活 · 玻璃球拍照', place: '双廊环海路', note: '', cost: 0 },
@@ -156,6 +186,7 @@
         },
         {
           day: 4, date: '2026-11-18', city: '大理 → 昆明', theme: '返程 · 下次再见', weather: '晴 20°',
+          photo: photo('yunnan rice noodle breakfast on rustic wooden table, steam, morning light, travel memory', 'landscape_4_3'),
           activities: [
             { id: 'a14', time: '09:30', title: '最后一碗饵丝', place: '古城北门', note: '', cost: 54 },
             { id: 'a15', time: '11:00', title: '大理 → 昆明', place: '动车 D8672', note: '', cost: 0 },
@@ -167,12 +198,14 @@
         {
           id: 'h1', name: '既下山 · 大理古城', address: '大理市古城区人民路下段 108 号',
           checkIn: '2026-11-15', checkOut: '2026-11-17', amount: 1160,
-          payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '两层小院，天台能看见苍山', expenseId: 'e1'
+          payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '两层小院，天台能看见苍山', expenseId: 'e1',
+          photo: photo('boutique guesthouse courtyard in dali with wooden beams, plants and warm lantern light', 'landscape_4_3')
         },
         {
           id: 'h2', name: '云七 · 双廊海景民宿', address: '大理市双廊镇环海东路',
           checkIn: '2026-11-17', checkOut: '2026-11-18', amount: 780,
-          payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '阳台正对洱海，早上有海鸥', expenseId: 'e9'
+          payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '阳台正对洱海，早上有海鸥', expenseId: 'e9',
+          photo: photo('seaside guesthouse balcony facing erhai lake, white curtains, morning light', 'landscape_4_3')
         }
       ],
       expenses: [
@@ -209,6 +242,154 @@
         }
       ]
     };
+
+    const kyoto = {
+      id: 'trip-kyoto',
+      title: '京都，追一场红叶',
+      destination: '京都',
+      startDate: '2026-11-05',
+      endDate: '2026-11-08',
+      budget: 12000,
+      createdAt: 2,
+      cover: photo('kyoto autumn temple with red maple leaves, traditional wooden street, soft film photography, travel journal cover', 'portrait_4_3'),
+      members: defaultMembers(),
+      days: [
+        {
+          day: 1, date: '2026-11-05', city: '清水寺 · 二年坂', theme: '初见 · 红叶与石阶', weather: '晴 17°',
+          photo: photo('kiyomizu dera temple wooden stage above red and orange autumn leaves, kyoto, clear day', 'landscape_4_3'),
+          activities: [
+            { id: 'k1', time: '10:20', title: '关西机场 → 京都', place: 'HARUKA 特急', note: '', cost: 0 },
+            { id: 'k2', time: '14:00', title: '清水寺参拜', place: '音羽山 · 清水舞台', note: '', cost: 400 },
+            { id: 'k3', time: '17:00', title: '二年坂散步', place: '石塀小路 · 八坂塔', note: '', cost: 0 }
+          ]
+        },
+        {
+          day: 2, date: '2026-11-06', city: '伏见稻荷 · 宇治', theme: '千本鸟居 · 抹茶', weather: '多云 16°',
+          photo: photo('fushimi inari shrine thousands of red torii gates path, kyoto, soft morning light', 'landscape_4_3'),
+          activities: [
+            { id: 'k4', time: '08:30', title: '伏见稻荷大社', place: '千本鸟居 · 稻荷山', note: '', cost: 0 },
+            { id: 'k5', time: '13:00', title: '宇治平等院', place: '宇治川 · 抹茶一条街', note: '', cost: 700 }
+          ]
+        },
+        {
+          day: 3, date: '2026-11-07', city: '岚山 · 竹林', theme: '竹林 · 小火车', weather: '晴 18°',
+          photo: photo('arashiyama bamboo grove path with sunlight rays, kyoto, green and gold tones', 'landscape_4_3'),
+          activities: [
+            { id: 'k6', time: '09:00', title: '岚山竹林', place: '嵯峨野', note: '', cost: 0 },
+            { id: 'k7', time: '11:00', title: '嵯峨野小火车', place: 'トロッコ嵯峨站', note: '', cost: 880 }
+          ]
+        },
+        {
+          day: 4, date: '2026-11-08', city: '京都 → 上海', theme: '返程 · 带回一片红叶', weather: '阴 15°',
+          photo: photo('kyoto station modern architecture at dusk, travelers with luggage, autumn evening', 'landscape_4_3'),
+          activities: [
+            { id: 'k8', time: '10:00', title: '锦市场买手信', place: '锦小路通', note: '', cost: 0 },
+            { id: 'k9', time: '15:30', title: '京都 → 关西机场', place: 'HARUKA 特急', note: '', cost: 0 }
+          ]
+        }
+      ],
+      hotels: [
+        {
+          id: 'kh1', name: '町家旅馆 · 五条', address: '京都市下京区五条通',
+          checkIn: '2026-11-05', checkOut: '2026-11-08', amount: 3600,
+          payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '木造町家，晚上能听见风铃', expenseId: 'ke1',
+          photo: photo('traditional kyoto machiya wooden townhouse interior, tatami and small garden', 'landscape_4_3')
+        }
+      ],
+      expenses: [
+        { id: 'ke1', hotelId: 'kh1', day: 1, date: '2026-11-05', category: 'stay', title: '町家旅馆 · 五条（3 晚）', amount: 3600, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'ke2', day: 1, date: '2026-11-05', category: 'transport', title: '关西机场 → 京都 HARUKA ×3', amount: 480, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'ke3', activityId: 'k2', day: 1, date: '2026-11-05', category: 'ticket', title: '清水寺门票 ×3', amount: 60, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'ke4', day: 2, date: '2026-11-06', category: 'food', title: '宇治抹茶甜品', amount: 168, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'ke5', activityId: 'k7', day: 3, date: '2026-11-07', category: 'fun', title: '嵯峨野小火车 ×3', amount: 132, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true }
+      ],
+      journals: [
+        { id: 'kj1', day: 1, date: '2026-11-05', mood: 'look', weather: '晴 · 清水寺', created: 1, text: '第一次看到这么红的枫叶，像有人把整座山点燃了。站在清水舞台往下看，人群像缓慢流动的河。' },
+        { id: 'kj2', day: 3, date: '2026-11-07', mood: 'free', weather: '晴 · 岚山', created: 2, text: '竹林里风一吹，沙沙声从头顶盖下来。什么都没做，只是慢慢走，也觉得这一天很完整。' }
+      ]
+    };
+
+    const quanzhou = {
+      id: 'trip-quanzhou',
+      title: '泉州，刺桐旧巷',
+      destination: '泉州',
+      startDate: '2026-06-13',
+      endDate: '2026-06-15',
+      budget: 3000,
+      createdAt: 3,
+      cover: photo('quanzhou old town red brick lanes, kaiyuan temple twin pagodas, southern fujian architecture, warm evening light, travel journal cover', 'portrait_4_3'),
+      members: defaultMembers(),
+      days: [
+        {
+          day: 1, date: '2026-06-13', city: '西街 · 开元寺', theme: '红砖厝 · 半城烟火', weather: '晴 30°',
+          photo: photo('quanzhou west street old town with red brick buildings and kaiyuan temple pagodas, evening lights', 'landscape_4_3'),
+          activities: [
+            { id: 'q1', time: '11:00', title: '西街闲逛', place: '钟楼 · 开元寺', note: '', cost: 0 },
+            { id: 'q2', time: '15:00', title: '开元寺', place: '东西塔 · 古桑树', note: '', cost: 0 },
+            { id: 'q3', time: '19:00', title: '面线糊 + 土笋冻', place: '水门巷', note: '', cost: 58 }
+          ]
+        },
+        {
+          day: 2, date: '2026-06-14', city: '蟳埔村 · 海边', theme: '簪花围 · 海风', weather: '多云 29°',
+          photo: photo('xunpu village women with flower hair ornaments, oyster shell houses, quanzhou coast', 'landscape_4_3'),
+          activities: [
+            { id: 'q4', time: '09:30', title: '蟳埔村簪花', place: '蟳埔妈祖庙附近', note: '', cost: 120 },
+            { id: 'q5', time: '15:00', title: '洛阳桥', place: '洛阳江入海口', note: '', cost: 0 }
+          ]
+        },
+        {
+          day: 3, date: '2026-06-15', city: '泉州 → 回家', theme: '最后一碗四果汤', weather: '晴 31°',
+          photo: photo('quanzhou street food four fruits soup dessert on table, summer afternoon', 'landscape_4_3'),
+          activities: [
+            { id: 'q6', time: '10:00', title: '承天寺', place: '南俊路', note: '', cost: 0 },
+            { id: 'q7', time: '14:00', title: '返程', place: '泉州站', note: '', cost: 0 }
+          ]
+        }
+      ],
+      hotels: [
+        {
+          id: 'qh1', name: '西街民宿 · 红砖小院', address: '泉州市鲤城区西街',
+          checkIn: '2026-06-13', checkOut: '2026-06-15', amount: 640,
+          payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '天井里有棵石榴树', expenseId: 'qe1',
+          photo: photo('traditional southern fujian red brick courtyard guesthouse with pomegranate tree', 'landscape_4_3')
+        }
+      ],
+      expenses: [
+        { id: 'qe1', hotelId: 'qh1', day: 1, date: '2026-06-13', category: 'stay', title: '西街民宿（2 晚）', amount: 640, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'qe2', activityId: 'q3', day: 1, date: '2026-06-13', category: 'food', title: '面线糊 + 土笋冻', amount: 58, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
+        { id: 'qe3', activityId: 'q4', day: 2, date: '2026-06-14', category: 'fun', title: '蟳埔簪花 + 拍照', amount: 120, payerId: 'me', participants: ['xiaoyu'], note: '只有小雨拍了', sync: true }
+      ],
+      journals: [
+        { id: 'qj1', day: 1, date: '2026-06-13', mood: 'happy', weather: '晴 · 西街', created: 1, text: '红砖厝在夕阳里像刚出炉的面包。西街的钟楼下人来人往，面线糊热得刚好。' }
+      ]
+    };
+
+    return {
+      version: 2,
+      theme: 'bloom',
+      view: 'library',
+      activeTripId: 'trip-dali',
+      tab: 'overview',
+      filterCat: 'all',
+      trips: [dali, kyoto, quanzhou]
+    };
+  }
+
+  function buildDays(start, end, destination, prevDays) {
+    return dateRange(start, end).map((date, i) => {
+      const old = (prevDays || []).find(d => d.date === date);
+      if (old) {
+        return Object.assign({}, old, {
+          day: i + 1,
+          city: old.city || destination,
+          photo: old.photo || photo(destination + ' day ' + (i + 1) + ' travel scenery, warm film photography', 'landscape_4_3')
+        });
+      }
+      return {
+        day: i + 1, date: date, city: destination, theme: '', weather: '', activities: [],
+        photo: photo(destination + ' day ' + (i + 1) + ' travel scenery, local street and landscape, warm film photography', 'landscape_4_3')
+      };
+    });
   }
 
   /* ---------------- 状态读写 ---------------- */
@@ -218,53 +399,127 @@
   function userKey() {
     try { return (typeof Store !== 'undefined' && Store.user && Store.user.email) || 'guest'; } catch (e) { return 'guest'; }
   }
+
+  function normalizeState(s) {
+    if (!s || !Array.isArray(s.trips)) return seedState();
+    if (!s.theme || !THEMES.some(t => t.id === s.theme)) s.theme = 'bloom';
+    if (s.view !== 'trip') s.view = 'library';
+    if (!s.trips.length) s.view = 'library';
+    if (s.view === 'trip' && !s.trips.some(t => t.id === s.activeTripId)) s.view = 'library';
+    if (!s.activeTripId && s.trips[0]) s.activeTripId = s.trips[0].id;
+    if (s.tab == null) s.tab = 'overview';
+    if (s.filterCat == null) s.filterCat = 'all';
+    s.trips.forEach(t => {
+      if (!Array.isArray(t.members) || !t.members.length) t.members = defaultMembers();
+      if (!Array.isArray(t.days)) t.days = [];
+      if (!Array.isArray(t.hotels)) t.hotels = [];
+      if (!Array.isArray(t.expenses)) t.expenses = [];
+      if (!Array.isArray(t.journals)) t.journals = [];
+      if (!t.cover) t.cover = photo(t.destination + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
+      if (t.budget == null) t.budget = 0;
+    });
+    return s;
+  }
+
+  function migrateV1(s) {
+    const trip = {
+      id: 'trip-1',
+      title: (s.trip && s.trip.title) || '我的旅行',
+      destination: (s.trip && s.trip.destination) || '旅行',
+      startDate: (s.trip && s.trip.startDate) || todayStr(),
+      endDate: (s.trip && s.trip.endDate) || todayStr(),
+      budget: (s.trip && s.trip.budget) || 0,
+      createdAt: Date.now(),
+      members: s.members && s.members.length ? s.members : defaultMembers(),
+      days: Array.isArray(s.days) ? s.days : [],
+      hotels: Array.isArray(s.hotels) ? s.hotels : [],
+      expenses: Array.isArray(s.expenses) ? s.expenses : [],
+      journals: Array.isArray(s.journals) ? s.journals : []
+    };
+    trip.days.forEach((d, i) => {
+      d.day = i + 1;
+      if (!d.photo) d.photo = photo((d.city || trip.destination) + ' travel scenery, warm film photography', 'landscape_4_3');
+    });
+    trip.cover = photo(trip.destination + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
+    return normalizeState({
+      version: 2,
+      theme: s.theme || 'bloom',
+      view: 'library',
+      activeTripId: trip.id,
+      tab: 'overview',
+      filterCat: 'all',
+      trips: [trip]
+    });
+  }
+
   function loadFor(key) {
     try {
       const raw = localStorage.getItem(STORAGE_PREFIX + key);
       if (raw) {
         const s = JSON.parse(raw);
-        if (s && s.version === 1) return s;
+        if (s && s.version === 2) return normalizeState(s);
+        if (s && s.version === 1) return migrateV1(s);
       }
     } catch (e) { console.warn('读取旅行数据失败', e); }
     return seedState();
   }
+
   function ensureState() {
     const k = userKey();
     if (!state || stateKey !== k) {
       stateKey = k;
       state = loadFor(k);
-      if (!state.trip) state = seedState();
     }
     return state;
   }
+
   function persist() {
     try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); } catch (e) { console.warn('保存旅行数据失败', e); }
   }
 
-  /* ---------------- 查询 ---------------- */
-  function member(id) { return state.members.find(m => m.id === id) || { id: id, name: '成员', initial: '?', cls: '' }; }
+  /* 当前翻开的旅行册 */
+  function T() {
+    if (!state) return null;
+    return state.trips.find(t => t.id === state.activeTripId) || null;
+  }
+
+  /* ---------------- 查询（均基于当前旅行册） ---------------- */
+  function member(id) {
+    const t = T();
+    const m = t && t.members.find(x => x.id === id);
+    return m || { id: id, name: '成员', initial: '?', cls: '' };
+  }
   function allActivities() {
+    const t = T();
     const out = [];
-    state.days.forEach(d => (d.activities || []).forEach(a => out.push({ ...a, day: d.day, date: d.date, city: d.city })));
+    if (!t) return out;
+    t.days.forEach(d => (d.activities || []).forEach(a => out.push(Object.assign({}, a, { day: d.day, date: d.date, city: d.city }))));
     return out.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   }
   function activityById(id) {
     const loc = locateActivity(id);
     if (!loc) return null;
-    return { ...loc.act, day: loc.day.day, date: loc.day.date, city: loc.day.city };
+    return Object.assign({}, loc.act, { day: loc.day.day, date: loc.day.date, city: loc.day.city });
   }
   function locateActivity(id) {
-    for (const d of state.days) {
+    const t = T();
+    if (!t) return null;
+    for (const d of t.days) {
       const a = (d.activities || []).find(x => x.id === id);
       if (a) return { act: a, day: d };
     }
     return null;
   }
-  function expensesOfActivity(id) { return state.expenses.filter(e => e.activityId === id); }
+  function expensesOfActivity(id) {
+    const t = T();
+    return t ? t.expenses.filter(e => e.activityId === id) : [];
+  }
   function dayOfDate(date) {
-    const exact = state.days.find(d => d.date === date);
+    const t = T();
+    if (!t) return 1;
+    const exact = t.days.find(d => d.date === date);
     if (exact) return exact.day;
-    return state.days[0] ? state.days[0].day : 1;
+    return t.days[0] ? t.days[0].day : 1;
   }
   function shareCents(exp, mid) {
     const ps = exp.participants || [];
@@ -274,14 +529,25 @@
     return arr[i] || 0;
   }
   function myShare(exp) { return yuan(shareCents(exp, 'me')); }
-  function totalMyCents() { return state.expenses.reduce((s, e) => s + shareCents(e, 'me'), 0); }
-  function totalAllCents() { return state.expenses.reduce((s, e) => s + cents(e.amount), 0); }
-  function budgetCents() { return cents(state.trip.budget || 0); }
+  function totalMyCents(t) {
+    t = t || T();
+    return t ? t.expenses.reduce((s, e) => s + shareCents(e, 'me'), 0) : 0;
+  }
+  function totalAllCents(t) {
+    t = t || T();
+    return t ? t.expenses.reduce((s, e) => s + cents(e.amount), 0) : 0;
+  }
+  function budgetCents(t) {
+    t = t || T();
+    return t ? cents(t.budget || 0) : 0;
+  }
 
   function settlement() {
-    const rows = state.members.map(m => ({ ...m, paid: 0, share: 0, net: 0 }));
+    const t = T();
+    if (!t) return { rows: [], transfers: [], totalCents: 0 };
+    const rows = t.members.map(m => Object.assign({}, m, { paid: 0, share: 0, net: 0 }));
     const byId = Object.fromEntries(rows.map(r => [r.id, r]));
-    state.expenses.forEach(e => {
+    t.expenses.forEach(e => {
       const amt = cents(e.amount);
       if (byId[e.payerId]) byId[e.payerId].paid += amt;
       const ps = e.participants || [];
@@ -292,8 +558,7 @@
     const debtors = rows.filter(r => r.net < -0.5).map(r => ({ id: r.id, name: r.name, cents: -r.net })).sort((a, b) => b.cents - a.cents);
     const creditors = rows.filter(r => r.net > 0.5).map(r => ({ id: r.id, name: r.name, cents: r.net })).sort((a, b) => b.cents - a.cents);
     const transfers = [];
-    let i = 0, j = 0;
-    let guard = 0;
+    let i = 0, j = 0, guard = 0;
     while (i < debtors.length && j < creditors.length && guard++ < 200) {
       const pay = Math.min(debtors[i].cents, creditors[j].cents);
       if (pay > 0) transfers.push({ from: debtors[i].name, fromId: debtors[i].id, to: creditors[j].name, toId: creditors[j].id, cents: pay });
@@ -301,7 +566,7 @@
       if (debtors[i].cents <= 0.5) i++;
       if (creditors[j].cents <= 0.5) j++;
     }
-    return { rows, transfers, totalCents: totalAllCents() };
+    return { rows, transfers, totalCents: totalAllCents(t) };
   }
 
   /* ---------------- 与记账本同步 ---------------- */
@@ -321,6 +586,7 @@
   }
 
   function recordPayload(exp) {
+    const t = T();
     const target = resolveTarget(exp.category);
     const mine = myShare(exp);
     if (!target || mine <= 0) return null;
@@ -329,7 +595,7 @@
     return {
       ledger_id: target.ledger_id, category: target.category, sub: target.sub, kind: 'expense',
       amount: mine, date: exp.date,
-      note: '旅行 · ' + state.trip.title + '｜' + exp.title + aa,
+      note: '旅行 · ' + (t ? t.title : '') + '｜' + exp.title + aa,
       favorite: false, tags: [], rating: 0, image: null
     };
   }
@@ -393,7 +659,7 @@
 
   /* ---------------- 主题 ---------------- */
   function applyTheme(next) {
-    if (!THEMES.some(t => t.id === next)) next = 'paper';
+    if (!THEMES.some(t => t.id === next)) next = 'bloom';
     state.theme = next;
     persist();
     const root = document.querySelector('#view-travel .tv-app');
@@ -408,115 +674,216 @@
     ensureState();
     const root = document.getElementById('view-travel');
     if (!root) return;
-    root.innerHTML =
-      '<div class="tv-app" data-theme="' + esc(state.theme || 'paper') + '">' +
-        renderHead() +
-        '<main class="tv-body">' + renderTab() + '</main>' +
+    const t = T();
+    root.innerHTML = '<div class="tv-app" data-theme="' + esc(state.theme || 'bloom') + '">' +
+      (state.view === 'trip' && t ? renderTripShell(t) : renderLibraryShell()) +
       '</div>';
     bind(root);
   }
 
-  function renderHead() {
-    const used = totalMyCents();
-    const budget = budgetCents();
-    const pct = budget > 0 ? Math.min(100, Math.round(used / budget * 100)) : 0;
-    const remain = budget - used;
-    return '' +
-      '<header class="tv-head">' +
-        '<div class="tv-brandline">' +
-          '<div class="tv-brand">' +
-            '<span class="tv-stamp">旅</span>' +
-            '<div><h2>旅行账本</h2><p>' + esc(state.trip.title) + '</p></div>' +
-          '</div>' +
-          '<div class="tv-theme-wrap">' +
-            '<span class="tv-theme-label">风格</span>' +
-            '<div class="tv-themes">' +
-              THEMES.map(t => '<button type="button" class="tv-theme' + (state.theme === t.id ? ' on' : '') + '" data-theme-set="' + t.id + '" title="' + esc(t.name + ' · ' + t.desc) + '"><i class="sw sw-' + t.id + '"></i><span>' + esc(t.name) + '</span></button>').join('') +
-            '</div>' +
-          '</div>' +
+  function renderBrandline() {
+    return '<div class="tv-brandline">' +
+      '<div class="tv-brand">' +
+        '<span class="tv-stamp">旅</span>' +
+        '<div><h2>旅行账册</h2><p>' + (state.view === 'trip'
+          ? 'TRAVEL JOURNAL · ' + dateRange(T().startDate, T().endDate).length + ' DAYS'
+          : 'TRAVEL BOOKS · ' + state.trips.length + ' 本') + '</p></div>' +
+      '</div>' +
+      '<div class="tv-theme-wrap">' +
+        '<span class="tv-theme-label">风格</span>' +
+        '<div class="tv-themes">' +
+          THEMES.map(t => '<button type="button" class="tv-theme' + (state.theme === t.id ? ' on' : '') + '" data-theme-set="' + t.id + '" title="' + esc(t.name + ' · ' + t.desc) + '"><i class="sw sw-' + t.id + '"></i><span>' + esc(t.name) + '</span></button>').join('') +
         '</div>' +
-        '<div class="tv-tripbar">' +
-          '<div class="tv-tripmeta">' +
-            '<div class="tv-dates"><span>' + esc(state.trip.startDate) + '</span><i>→</i><span>' + esc(state.trip.endDate) + '</span></div>' +
-            '<div class="tv-people">' +
-              state.members.map(m => '<span class="tv-avatar ' + esc(m.cls) + '" title="' + esc(m.name) + '">' + esc(m.initial) + '</span>').join('') +
-              '<span class="tv-people-note">' + state.members.length + ' 人同行</span>' +
-            '</div>' +
-          '</div>' +
-          '<button type="button" class="tv-budget" data-act="edit-budget" title="点击修改预算">' +
-            '<span class="tv-budget-label">我的预算</span>' +
-            '<b>' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b>' +
-            '<span class="tv-budget-sub">' + (budget > 0
-              ? '已花 ' + money(yuan(used)) + ' · ' + (remain >= 0 ? '还剩 ' + money(yuan(remain)) : '超支 ' + money(yuan(-remain)))
-              : '已经花了 ' + money(yuan(used)) + '，点这里设个预算') + '</span>' +
-            '<span class="tv-budget-bar"><i style="width:' + pct + '%"></i></span>' +
-            '<span class="tv-budget-edit">' + (budget > 0 ? '修改' : '设置') + '</span>' +
-          '</button>' +
-        '</div>' +
-        '<nav class="tv-tabs">' +
-          [
-            ['overview', '总览', ''],
-            ['plan', '行程', allActivities().length],
-            ['journal', '日志', state.journals.length],
-            ['expenses', '账本', state.expenses.length],
-            ['hotels', '住宿', state.hotels.length],
-            ['settle', '对账', '']
-          ].map(t => '<button type="button" class="tv-tab' + (state.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + (t[2] !== '' ? '<em>' + t[2] + '</em>' : '') + '</button>').join('') +
-        '</nav>' +
-      '</header>';
+      '</div>' +
+    '</div>';
   }
 
-  function renderTab() {
-    if (state.tab === 'plan') return renderPlan();
-    if (state.tab === 'journal') return renderJournal();
-    if (state.tab === 'expenses') return renderExpenses();
-    if (state.tab === 'hotels') return renderHotels();
-    if (state.tab === 'settle') return renderSettle();
-    return renderOverview();
+  /* ---------- 旅行册书架 ---------- */
+  function renderLibraryShell() {
+    return '<header class="tv-head">' + renderBrandline() + '</header>' +
+      '<main class="tv-body">' + renderLibrary() + '</main>';
+  }
+
+  function renderLibrary() {
+    const trips = state.trips.slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+    const rots = [-2.4, 1.7, -1.3, 2.2, -1.8, 1.4];
+    return '<section class="tv-library">' +
+        '<div class="tv-lib-intro">' +
+          '<div>' +
+            '<span class="tv-eyebrow">My travel books</span>' +
+            '<h3>我的旅行册</h3>' +
+            '<p>每出发一次，就多一本贴满照片、票根和心情的手帐。点开一本翻看。</p>' +
+          '</div>' +
+          '<button type="button" class="tv-btn solid" data-act="new-trip">＋ 新建旅行册</button>' +
+        '</div>' +
+        '<div class="tv-books">' +
+          trips.map((t, i) => {
+            const days = t.days.length || dateRange(t.startDate, t.endDate).length;
+            const my = yuan(totalMyCents(t));
+            return '<article class="tv-book" data-act="open-trip" data-id="' + esc(t.id) + '" style="--rot:' + rots[i % rots.length] + 'deg">' +
+              '<div class="tv-book-stack s1"></div><div class="tv-book-stack s2"></div>' +
+              '<div class="tv-book-cover">' +
+                '<img src="' + esc(t.cover) + '" alt="' + esc(t.destination) + '" loading="lazy">' +
+                '<span class="tv-book-tape"></span>' +
+                '<span class="tv-book-stamp">' + esc(String(t.destination || '旅').slice(0, 2)) + '</span>' +
+                '<div class="tv-book-tools">' +
+                  '<button type="button" data-act="edit-trip" data-id="' + esc(t.id) + '" title="编辑这本">✎</button>' +
+                  '<button type="button" data-act="delete-trip" data-id="' + esc(t.id) + '" title="删除这本">×</button>' +
+                '</div>' +
+                '<div class="tv-book-title">' +
+                  '<span>' + esc(String(t.startDate || '').slice(0, 4)) + ' · ' + esc(t.destination) + '</span>' +
+                  '<h3>' + esc(t.title) + '</h3>' +
+                  '<p>' + esc(shortDate(t.startDate)) + ' — ' + esc(shortDate(t.endDate)) + '</p>' +
+                '</div>' +
+              '</div>' +
+              '<div class="tv-book-foot">' +
+                '<span>' + days + ' 天 · ' + t.members.length + ' 人</span>' +
+                '<em>我的花费</em><b>' + money(my) + '</b>' +
+              '</div>' +
+            '</article>';
+          }).join('') +
+          '<button type="button" class="tv-book tv-book-new" data-act="new-trip">' +
+            '<span class="tv-book-plus">＋</span>' +
+            '<b>新建旅行册</b>' +
+            '<em>把下一段旅程贴进来</em>' +
+          '</button>' +
+        '</div>' +
+        '<div class="tv-foot">' +
+          '<span>旅行明细保存在本机 · 账单按我的 AA 份额同步到记账本</span>' +
+          '<button type="button" class="tv-link" data-act="reset-demo">恢复示例数据</button>' +
+        '</div>' +
+      '</section>';
+  }
+
+  /* ---------- 翻开一本 ---------- */
+  function renderTripShell(t) {
+    return '<header class="tv-head">' +
+        renderBrandline() +
+        renderTripBar(t) +
+        renderTabs(t) +
+      '</header>' +
+      '<main class="tv-body">' + renderTab(t) + '</main>';
+  }
+
+  function renderTripBar(t) {
+    const used = totalMyCents(t);
+    const budget = budgetCents(t);
+    const remain = budget - used;
+    const pct = budget > 0 ? Math.min(100, Math.round(used / budget * 100)) : 0;
+    const days = dateRange(t.startDate, t.endDate).length;
+    return '<div class="tv-tripbar">' +
+        '<button type="button" class="tv-back" data-act="back-library"><span>←</span> 全部旅行册</button>' +
+        '<div class="tv-tripinfo">' +
+          '<span class="tv-eyebrow">' + esc(t.destination) + ' · ' + days + ' 天</span>' +
+          '<h3>' + esc(t.title) + '</h3>' +
+          '<div class="tv-tripmeta">' +
+            '<span>' + esc(shortDate(t.startDate)) + ' — ' + esc(shortDate(t.endDate)) + '</span>' +
+            '<i></i>' +
+            '<span>' + t.members.length + ' 人同行</span>' +
+            '<div class="tv-people">' + t.members.map(m => '<span class="tv-avatar sm ' + esc(m.cls) + '" title="' + esc(m.name) + '">' + esc(m.initial) + '</span>').join('') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tv-trip-acts">' +
+          '<button type="button" class="tv-chipbtn" data-act="edit-trip">编辑册子</button>' +
+          '<button type="button" class="tv-budget-chip" data-act="edit-budget" title="修改预算">' +
+            '<span>我的预算</span>' +
+            '<b>' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b>' +
+            '<em>' + (budget > 0 ? (remain >= 0 ? '剩 ' + money(yuan(remain)) : '超支 ' + money(yuan(-remain))) : '点这里设置') + '</em>' +
+            '<i class="tv-budget-mini"><u style="width:' + pct + '%"></u></i>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderTabs(t) {
+    const items = [
+      ['overview', '总览', ''],
+      ['plan', '行程', allActivities().length],
+      ['journal', '日志', t.journals.length],
+      ['expenses', '账本', t.expenses.length],
+      ['hotels', '住宿', t.hotels.length],
+      ['settle', '对账', '']
+    ];
+    return '<nav class="tv-tabs">' + items.map(it =>
+      '<button type="button" class="tv-tab' + (state.tab === it[0] ? ' on' : '') + '" data-tab="' + it[0] + '">' +
+        it[1] + (it[2] !== '' ? '<em>' + it[2] + '</em>' : '') +
+      '</button>').join('') + '</nav>';
+  }
+
+  function renderTab(t) {
+    if (state.tab === 'plan') return renderPlan(t);
+    if (state.tab === 'journal') return renderJournal(t);
+    if (state.tab === 'expenses') return renderExpenses(t);
+    if (state.tab === 'hotels') return renderHotels(t);
+    if (state.tab === 'settle') return renderSettle(t);
+    return renderOverview(t);
+  }
+
+  function polaroid(src, caption, cls, rot) {
+    return '<figure class="tv-polaroid ' + (cls || '') + '" style="--rot:' + (rot || -2) + 'deg">' +
+      '<img src="' + esc(src) + '" alt="' + esc(caption) + '" loading="lazy">' +
+      '<figcaption>' + esc(caption) + '</figcaption>' +
+      '<span class="tv-tape"></span>' +
+    '</figure>';
   }
 
   /* ---------- 总览 ---------- */
-  function renderOverview() {
+  function renderOverview(t) {
     const s = settlement();
-    const total = totalAllCents();
-    const mine = totalMyCents();
-    const budget = budgetCents();
+    const total = totalAllCents(t);
+    const mine = totalMyCents(t);
+    const budget = budgetCents(t);
     const remain = budget - mine;
-    const per = state.members.length ? Math.round(total / state.members.length) : 0;
+    const per = t.members.length ? Math.round(total / t.members.length) : 0;
     const today = todayStr();
-    const day = state.days.find(d => d.date === today) || state.days[0];
-    const cats = CATS.map(c => ({
-      ...c,
-      amount: state.expenses.filter(e => e.category === c.id).reduce((a, e) => a + cents(e.amount), 0)
+    const day = t.days.find(d => d.date === today) || t.days[0];
+    const cats = CATS.map(c => Object.assign({}, c, {
+      amount: t.expenses.filter(e => e.category === c.id).reduce((a, e) => a + cents(e.amount), 0)
     })).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
     const catMax = Math.max.apply(null, cats.map(c => c.amount).concat([1]));
-    const recent = state.journals.slice().sort((a, b) => (b.date + (b.created || 0)).localeCompare(a.date + (a.created || 0))).slice(0, 2);
+    const recent = t.journals.slice().sort((a, b) => (b.date + (b.created || 0)).localeCompare(a.date + (a.created || 0))).slice(0, 2);
+    const dayPhotos = t.days.filter(d => d.photo).slice(0, 2);
 
-    return '' +
-      '<div class="tv-hero">' +
-        '<div class="tv-hero-copy">' +
-          '<span class="tv-eyebrow">' + esc(state.trip.destination) + ' · ' + (state.days.length) + ' 天</span>' +
-          '<h3>' + esc(state.trip.title) + '</h3>' +
-          '<p>把每天的行程、心情和共同账单放在一起。需要 AA 的消费，记账本只记我分摊后的金额。</p>' +
+    return '<div class="tv-scrap-cover">' +
+        '<div class="tv-scrap-photos">' +
+          polaroid(t.cover, t.destination + ' · ' + String(t.startDate).slice(0, 4), 'tv-polaroid-lg', -3) +
+          dayPhotos.map((d, i) => polaroid(d.photo, d.city, 'tv-polaroid-sm', i === 0 ? 4 : -6)).join('') +
+          '<span class="tv-washi"></span>' +
+        '</div>' +
+        '<div class="tv-scrap-copy">' +
+          '<span class="tv-eyebrow">Travel scrapbook</span>' +
+          '<h2>' + esc(t.title) + '</h2>' +
+          '<p>把每天的行程、照片、心情和共同账单贴在一起。需要 AA 的消费，记账本只记我分摊后的金额。</p>' +
           '<div class="tv-hero-acts">' +
             '<button type="button" class="tv-btn solid" data-act="new-expense">＋ 记一笔</button>' +
             '<button type="button" class="tv-btn" data-act="new-journal">写日志</button>' +
             '<button type="button" class="tv-btn" data-act="new-activity">加行程</button>' +
           '</div>' +
+          '<div class="tv-stamps">' +
+            '<span class="tv-stamp-mark stamp-date">' + esc(shortDate(t.startDate)) + '</span>' +
+            '<span class="tv-stamp-mark stamp-route">' + esc(t.destination) + '</span>' +
+            '<span class="tv-stamp-mark stamp-year">' + esc(String(t.startDate).slice(0, 4)) + '</span>' +
+          '</div>' +
         '</div>' +
-        '<div class="tv-hero-stamp">' + esc(state.trip.destination.slice(0, 2)) + '<span>' + esc(state.trip.startDate.slice(0, 4)) + '</span></div>' +
+        '<div class="tv-ticket">' +
+          '<span class="tv-ticket-label">MY BUDGET</span>' +
+          '<b>' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b>' +
+          '<em>' + (budget > 0 ? (remain >= 0 ? '还剩 ' + money(yuan(remain)) : '超支 ' + money(yuan(-remain))) : '点这里设预算') + '</em>' +
+          '<i><u style="width:' + (budget > 0 ? Math.min(100, Math.round(mine / budget * 100)) : 0) + '%"></u></i>' +
+          '<span class="tv-ticket-edit" data-act="edit-budget">修改预算</span>' +
+        '</div>' +
       '</div>' +
       '<div class="tv-stats">' +
-        statCard('总花费', money(yuan(total)), state.expenses.length + ' 笔共同账单') +
+        statCard('总花费', money(yuan(total)), t.expenses.length + ' 笔共同账单') +
         statCard('我的花费', money(yuan(mine)), '已按 AA 份额计算', 'accent') +
-        statCard('人均', money(yuan(per)), state.members.length + ' 人均摊') +
+        statCard('人均', money(yuan(per)), t.members.length + ' 人均摊') +
         statCard(budget ? (remain >= 0 ? '预算剩余' : '预算超支') : '旅行预算', budget ? money(yuan(Math.abs(remain))) : '未设置', budget ? '预算 ' + money(yuan(budget)) : '点这里输入旅行预算', remain >= 0 ? '' : 'over', 'edit-budget') +
       '</div>' +
       '<div class="tv-grid2">' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>预算进度</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
           budgetBar(budget, mine) +
-          '<div class="tv-budget-note">预算按「我的花费」计算，不含朋友那份。' + (budget ? '' : ' 还没填预算，点右上角设一个吧。') + '</div>' +
+          '<div class="tv-budget-note">预算按「我的花费」计算，不含朋友那份。' + (budget ? '' : ' 还没填预算，点上面的小票设置一个吧。') + '</div>' +
         '</section>' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>成员分摊</h4><button type="button" class="tv-link" data-act="go-settle">查看对账</button></div>' +
@@ -530,18 +897,25 @@
         '</section>' +
       '</div>' +
       '<div class="tv-grid2">' +
-        '<section class="tv-panel">' +
+        '<section class="tv-panel tv-panel-day">' +
           '<div class="tv-panel-head"><h4>' + (day && day.date === today ? '今天 · DAY ' + day.day : '行程速览 · DAY ' + (day ? day.day : 1)) + '</h4><button type="button" class="tv-link" data-act="go-plan">全部行程</button></div>' +
-          (day ? '<div class="tv-mini-day"><div class="tv-mini-day-head"><b>' + esc(day.city) + '</b><span>' + esc(cnDate(day.date)) + ' · ' + esc(day.weather || '') + '</span></div>' +
-            day.activities.slice(0, 4).map(a => '<button type="button" class="tv-mini-act" data-act="edit-activity" data-id="' + a.id + '"><em>' + esc(a.time) + '</em><span>' + esc(a.title) + '</span></button>').join('') +
+          (day ? '<div class="tv-mini-day">' +
+            (day.photo ? '<img class="tv-mini-photo" src="' + esc(day.photo) + '" alt="" loading="lazy">' : '') +
+            '<div class="tv-mini-day-body">' +
+              '<div class="tv-mini-day-head"><b>' + esc(day.city) + '</b><span>' + esc(cnDate(day.date)) + ' · ' + esc(day.weather || '') + '</span></div>' +
+              day.activities.slice(0, 3).map(a => '<button type="button" class="tv-mini-act" data-act="edit-activity" data-id="' + a.id + '"><em>' + esc(a.time) + '</em><span>' + esc(a.title) + '</span></button>').join('') +
+            '</div>' +
           '</div>' : '<p class="tv-empty">还没有行程，点上面「加行程」安排第一天。</p>') +
         '</section>' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>最近日志</h4><button type="button" class="tv-link" data-act="go-journal">全部日志</button></div>' +
-          (recent.length ? recent.map(j => '<button type="button" class="tv-mini-journal" data-act="edit-journal" data-id="' + j.id + '">' +
-            '<span class="tv-mood-dot" style="background:' + MOOD[j.mood].color + '">' + MOOD[j.mood].emoji + '</span>' +
-            '<span class="tv-mini-journal-main"><b>' + esc(MOOD[j.mood].label) + ' · ' + esc(shortDate(j.date)) + '</b>' + esc(j.text.slice(0, 36)) + (j.text.length > 36 ? '…' : '') + '</span>' +
-          '</button>').join('') : '<p class="tv-empty">还没有日志，记录一下今天的心情。</p>') +
+          (recent.length ? recent.map(j => {
+            const mood = MOOD[j.mood] || MOOD.calm;
+            return '<button type="button" class="tv-mini-journal" data-act="edit-journal" data-id="' + j.id + '">' +
+              '<span class="tv-mood-dot" style="background:' + mood.color + '">' + mood.emoji + '</span>' +
+              '<span class="tv-mini-journal-main"><b>' + esc(mood.label) + ' · ' + esc(shortDate(j.date)) + '</b>' + esc(j.text.slice(0, 36)) + (j.text.length > 36 ? '…' : '') + '</span>' +
+            '</button>';
+          }).join('') : '<p class="tv-empty">还没有日志，记录一下今天的心情。</p>') +
         '</section>' +
       '</div>' +
       '<section class="tv-panel">' +
@@ -552,11 +926,7 @@
           '<span class="tv-catbar-track"><i style="width:' + Math.max(3, Math.round(c.amount / catMax * 100)) + '%;background:' + c.color + '"></i></span>' +
           '<b>' + money(yuan(c.amount)) + '</b>' +
         '</div>').join('') + '</div>' : '<p class="tv-empty">还没有账单，先记第一笔吧。</p>') +
-      '</section>' +
-      '<div class="tv-foot">' +
-        '<span>旅行明细保存在本机 · 账单按我的 AA 份额同步到记账本</span>' +
-        '<button type="button" class="tv-link" data-act="reset-demo">恢复示例数据</button>' +
-      '</div>';
+      '</section>';
   }
 
   function statCard(label, value, foot, cls, act) {
@@ -570,70 +940,79 @@
   }
 
   /* ---------- 行程 ---------- */
-  function renderPlan() {
+  function renderPlan(t) {
     return '<div class="tv-section-head">' +
         '<div><span class="tv-eyebrow">Itinerary</span><h3>每天要去哪</h3><p>点任意行程可编辑；也可以直接从行程记一笔，自动建立关联。</p></div>' +
         '<button type="button" class="tv-btn solid" data-act="new-activity">＋ 加行程</button>' +
       '</div>' +
-      state.days.map(day => {
-        const planned = day.activities.reduce((s, a) => s + cents(a.cost), 0);
-        return '<section class="tv-day">' +
-          '<div class="tv-day-head">' +
+      t.days.map((day, idx) => {
+        const planned = (day.activities || []).reduce((s, a) => s + cents(a.cost), 0);
+        return '<section class="tv-day-page" style="--rot:' + (idx % 2 ? -0.5 : 0.45) + 'deg">' +
+          '<span class="tv-page-holes"></span>' +
+          '<header class="tv-day-head">' +
             '<span class="tv-day-num">DAY ' + day.day + '</span>' +
             '<div class="tv-day-title"><h4>' + esc(day.city) + '</h4><p>' + esc(cnDate(day.date)) + ' · ' + esc(day.theme || '') + (day.weather ? ' · ' + esc(day.weather) : '') + '</p></div>' +
             '<span class="tv-day-total">计划 ' + money(yuan(planned)) + '</span>' +
-            '<button type="button" class="tv-mini-btn" data-act="new-activity" data-day="' + day.day + '">＋</button>' +
-          '</div>' +
-          '<div class="tv-timeline">' +
-            (day.activities.length ? day.activities.map(a => {
-              const linked = expensesOfActivity(a.id);
-              const linkedTotal = linked.reduce((s, e) => s + cents(e.amount), 0);
-              return '<article class="tv-act" data-act="edit-activity" data-id="' + a.id + '">' +
-                '<div class="tv-act-time">' + esc(a.time || '--:--') + '<i></i></div>' +
-                '<div class="tv-act-card">' +
-                  '<div class="tv-act-top"><h5>' + esc(a.title) + '</h5>' +
-                    (a.cost ? '<span class="tv-act-cost">预算 ' + money(a.cost) + '</span>' : '<span class="tv-act-cost muted">未设花费</span>') +
+            '<button type="button" class="tv-mini-btn" data-act="new-activity" data-day="' + day.day + '" title="给这一天加行程">＋</button>' +
+          '</header>' +
+          '<div class="tv-day-scrap">' +
+            (day.photo ? polaroid(day.photo, day.city, 'tv-day-photo', idx % 2 ? 2.2 : -2.2) : '') +
+            '<div class="tv-timeline">' +
+              ((day.activities || []).length ? day.activities.map(a => {
+                const linked = expensesOfActivity(a.id);
+                const linkedTotal = linked.reduce((s, e) => s + cents(e.amount), 0);
+                return '<article class="tv-act" data-act="edit-activity" data-id="' + a.id + '">' +
+                  '<div class="tv-act-time">' + esc(a.time || '--:--') + '<i></i></div>' +
+                  '<div class="tv-act-card">' +
+                    '<div class="tv-act-top"><h5>' + esc(a.title) + '</h5>' +
+                      (a.cost ? '<span class="tv-act-cost">预算 ' + money(a.cost) + '</span>' : '<span class="tv-act-cost muted">未设花费</span>') +
+                    '</div>' +
+                    (a.place ? '<p class="tv-act-place">' + esc(a.place) + '</p>' : '') +
+                    (a.note ? '<p class="tv-act-note">' + esc(a.note) + '</p>' : '') +
+                    '<div class="tv-act-links">' +
+                      (linked.length ? '<span class="tv-link-tag">已关联 ' + linked.length + ' 笔 · ' + money(yuan(linkedTotal)) + '</span>' +
+                        linked.map(e => '<button type="button" class="tv-bill-chip" data-act="edit-expense" data-id="' + e.id + '" title="编辑这笔账单"><span class="tv-catmark xs" style="--c:' + (CAT[e.category] || CAT.other).color + '">' + (CAT[e.category] || CAT.other).mark + '</span>' + esc(e.title) + ' · ' + money(e.amount) + '</button>').join('')
+                        : '<span class="tv-link-empty">还没有关联账单</span>') +
+                      '<button type="button" class="tv-mini-btn solid" data-act="new-expense" data-activity="' + a.id + '">＋ 记一笔</button>' +
+                    '</div>' +
                   '</div>' +
-                  (a.place ? '<p class="tv-act-place">' + esc(a.place) + '</p>' : '') +
-                  (a.note ? '<p class="tv-act-note">' + esc(a.note) + '</p>' : '') +
-                  '<div class="tv-act-links">' +
-                    (linked.length ? '<span class="tv-link-tag">已关联 ' + linked.length + ' 笔 · ' + money(yuan(linkedTotal)) + '</span>' +
-                      linked.map(e => '<button type="button" class="tv-bill-chip" data-act="edit-expense" data-id="' + e.id + '" title="编辑这笔账单"><span class="tv-catmark xs" style="--c:' + CAT[e.category].color + '">' + CAT[e.category].mark + '</span>' + esc(e.title) + ' · ' + money(e.amount) + '</button>').join('')
-                      : '<span class="tv-link-empty">还没有关联账单</span>') +
-                    '<button type="button" class="tv-mini-btn solid" data-act="new-expense" data-activity="' + a.id + '">＋ 记一笔</button>' +
-                  '</div>' +
-                '</div>' +
-              '</article>';
-            }).join('') : '<p class="tv-empty">这一天还没有安排。</p>') +
+                '</article>';
+              }).join('') : '<p class="tv-empty">这一天还没有安排。</p>') +
+            '</div>' +
           '</div>' +
         '</section>';
       }).join('');
   }
 
   /* ---------- 日志 ---------- */
-  function renderJournal() {
-    const list = state.journals.slice().sort((a, b) => (b.date + String(b.created || 0).padStart(6, '0')).localeCompare(a.date + String(a.created || 0).padStart(6, '0')));
+  function renderJournal(t) {
+    const list = t.journals.slice().sort((a, b) => (b.date + String(b.created || 0).padStart(6, '0')).localeCompare(a.date + String(a.created || 0).padStart(6, '0')));
     return '<div class="tv-section-head">' +
         '<div><span class="tv-eyebrow">Journal</span><h3>旅行日志</h3><p>' + MOODS.length + ' 种情绪可选。点卡片可以继续编辑，也可以补上当时的天气。</p></div>' +
         '<button type="button" class="tv-btn solid" data-act="new-journal">＋ 写日志</button>' +
       '</div>' +
-      (list.length ? '<div class="tv-journal-grid">' + list.map(j => {
+      (list.length ? '<div class="tv-journal-grid">' + list.map((j, i) => {
         const mood = MOOD[j.mood] || MOOD.calm;
-        return '<article class="tv-journal" data-act="edit-journal" data-id="' + j.id + '" style="--mood:' + mood.color + '">' +
-          '<div class="tv-journal-top">' +
+        const d = t.days.find(x => x.day === j.day);
+        return '<article class="tv-postcard" data-act="edit-journal" data-id="' + j.id + '" style="--mood:' + mood.color + ';--rot:' + (i % 2 ? 0.6 : -0.5) + 'deg">' +
+          '<span class="tv-tape tv-tape-corner"></span>' +
+          '<div class="tv-postcard-top">' +
             '<span class="tv-mood-stamp" style="--mood:' + mood.color + '"><i>' + mood.emoji + '</i>' + esc(mood.label) + '</span>' +
-            '<span class="tv-journal-date">DAY ' + j.day + ' · ' + esc(cnDate(j.date)) + '</span>' +
+            '<span class="tv-postcard-date">DAY ' + j.day + ' · ' + esc(cnDate(j.date)) + '</span>' +
           '</div>' +
-          '<p class="tv-journal-weather">' + esc(j.weather || '') + '</p>' +
-          '<p class="tv-journal-text">' + esc(j.text) + '</p>' +
-          '<span class="tv-journal-edit">点击编辑</span>' +
+          '<p class="tv-postcard-weather">' + esc(j.weather || '') + '</p>' +
+          '<div class="tv-postcard-body">' +
+            (d && d.photo ? '<img class="tv-postcard-photo" src="' + esc(d.photo) + '" alt="" loading="lazy">' : '') +
+            '<p class="tv-postcard-text">' + esc(j.text) + '</p>' +
+          '</div>' +
+          '<span class="tv-postcard-edit">点击编辑</span>' +
         '</article>';
       }).join('') + '</div>' : '<p class="tv-empty big">还没有日志。旅行里那些说不清的小情绪，值得写下来。</p>');
   }
 
   /* ---------- 账本 ---------- */
-  function renderExpenses() {
-    const list = state.expenses.slice()
+  function renderExpenses(t) {
+    const list = t.expenses.slice()
       .filter(e => state.filterCat === 'all' || e.category === state.filterCat)
       .sort((a, b) => (b.date + b.id).localeCompare(a.date + a.id));
     const total = list.reduce((s, e) => s + cents(e.amount), 0);
@@ -652,13 +1031,13 @@
         CATS.map(c => '<button type="button" class="tv-filter' + (state.filterCat === c.id ? ' on' : '') + '" data-filter="' + c.id + '"><span class="tv-catmark xs" style="--c:' + c.color + '">' + c.mark + '</span>' + c.label + '</button>').join('') +
       '</div>' +
       '<div class="tv-exp-list">' +
-        (list.length ? list.map(e => {
+        (list.length ? list.map((e, i) => {
           const c = CAT[e.category] || CAT.other;
           const payer = member(e.payerId);
           const act = e.activityId ? activityById(e.activityId) : null;
           const n = (e.participants || []).length;
           const mineY = myShare(e);
-          return '<article class="tv-exp" data-act="edit-expense" data-id="' + e.id + '">' +
+          return '<article class="tv-exp" data-act="edit-expense" data-id="' + e.id + '" style="--rot:' + (i % 2 ? 0.35 : -0.3) + 'deg">' +
             '<span class="tv-catmark" style="--c:' + c.color + '">' + c.mark + '</span>' +
             '<div class="tv-exp-main">' +
               '<div class="tv-exp-title"><b>' + esc(e.title) + '</b>' +
@@ -677,34 +1056,39 @@
   }
 
   /* ---------- 住宿 ---------- */
-  function renderHotels() {
+  function renderHotels(t) {
     return '<div class="tv-section-head">' +
         '<div><span class="tv-eyebrow">Stays</span><h3>住宿酒店</h3><p>民宿 / 酒店可以有很多个。新增时会自动生成一笔住宿账单。</p></div>' +
         '<button type="button" class="tv-btn solid" data-act="new-hotel">＋ 加住宿</button>' +
       '</div>' +
-      (state.hotels.length ? '<div class="tv-hotel-grid">' + state.hotels.map(h => {
-        const nights = Math.max(1, Math.round((parseDate(h.checkOut) - parseDate(h.checkIn)) / 86400000));
+      (t.hotels.length ? '<div class="tv-hotel-grid">' + t.hotels.map(h => {
+        const nt = nights(h.checkIn, h.checkOut);
         const payer = member(h.payerId);
         return '<article class="tv-hotel" data-act="edit-hotel" data-id="' + h.id + '">' +
-          '<div class="tv-hotel-top"><span class="tv-hotel-night">' + nights + ' 晚</span><h4>' + esc(h.name) + '</h4><p>' + esc(h.address || '') + '</p></div>' +
-          '<div class="tv-hotel-mid">' +
-            '<div><span>入住</span><b>' + esc(shortDate(h.checkIn)) + '</b></div>' +
-            '<i>→</i>' +
-            '<div><span>退房</span><b>' + esc(shortDate(h.checkOut)) + '</b></div>' +
-            '<div class="tv-hotel-amt"><span>房费</span><b>' + money(h.amount) + '</b></div>' +
+          (h.photo
+            ? '<div class="tv-hotel-photo"><img src="' + esc(h.photo) + '" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
+            : '<div class="tv-hotel-photo tv-hotel-photo-none"><span class="tv-hotel-key">KEY</span></div>') +
+          '<div class="tv-hotel-body">' +
+            '<div class="tv-hotel-top"><span class="tv-hotel-night">' + nt + ' 晚</span><h4>' + esc(h.name) + '</h4><p>' + esc(h.address || '') + '</p></div>' +
+            '<div class="tv-hotel-mid">' +
+              '<div><span>入住</span><b>' + esc(shortDate(h.checkIn)) + '</b></div>' +
+              '<i>→</i>' +
+              '<div><span>退房</span><b>' + esc(shortDate(h.checkOut)) + '</b></div>' +
+              '<div class="tv-hotel-amt"><span>房费</span><b>' + money(h.amount) + '</b></div>' +
+            '</div>' +
+            '<div class="tv-hotel-foot">' +
+              '<span class="tv-avatar sm ' + esc(payer.cls) + '">' + esc(payer.initial) + '</span>' +
+              '<span>' + esc(payer.name) + '付 · ' + (h.participants || []).length + ' 人分</span>' +
+              (h.expenseId ? '<span class="tv-tag synced">已生成账单</span>' : '<span class="tv-tag">未生成账单</span>') +
+            '</div>' +
+            (h.note ? '<p class="tv-hotel-note">' + esc(h.note) + '</p>' : '') +
           '</div>' +
-          '<div class="tv-hotel-foot">' +
-            '<span class="tv-avatar sm ' + esc(payer.cls) + '">' + esc(payer.initial) + '</span>' +
-            '<span>' + esc(payer.name) + '付 · ' + (h.participants || []).length + ' 人分</span>' +
-            (h.expenseId ? '<span class="tv-tag synced">已生成账单</span>' : '<span class="tv-tag">未生成账单</span>') +
-          '</div>' +
-          (h.note ? '<p class="tv-hotel-note">' + esc(h.note) + '</p>' : '') +
         '</article>';
       }).join('') + '</div>' : '<p class="tv-empty big">还没有住宿记录。</p>');
   }
 
   /* ---------- 对账 ---------- */
-  function renderSettle() {
+  function renderSettle(t) {
     const s = settlement();
     return '<div class="tv-section-head">' +
         '<div><span class="tv-eyebrow">Settlement</span><h3>分摊对账</h3><p>整趟旅行结束后，按最少转账次数结清。复制出来是一张图片，直接发群里就行。</p></div>' +
@@ -715,8 +1099,8 @@
       '</div>' +
       '<div class="tv-settle-hero">' +
         '<div class="tv-settle-stamp">对<br>账<br>单</div>' +
-        '<div class="tv-settle-title"><span>' + esc(state.trip.title) + '</span><h3>' + money(yuan(s.totalCents)) + '</h3><p>' + esc(state.trip.startDate) + ' — ' + esc(state.trip.endDate) + ' · ' + state.members.length + ' 人</p></div>' +
-        '<div class="tv-settle-mine"><span>我的花费</span><b>' + money2(yuan(totalMyCents())) + '</b><em>已按 AA 份额入账</em></div>' +
+        '<div class="tv-settle-title"><span>' + esc(t.title) + '</span><h3>' + money(yuan(s.totalCents)) + '</h3><p>' + esc(t.startDate) + ' — ' + esc(t.endDate) + ' · ' + t.members.length + ' 人</p></div>' +
+        '<div class="tv-settle-mine"><span>我的花费</span><b>' + money2(yuan(totalMyCents(t))) + '</b><em>已按 AA 份额入账</em></div>' +
       '</div>' +
       '<div class="tv-grid2">' +
         '<section class="tv-panel">' +
@@ -729,10 +1113,10 @@
         '</section>' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>转账方案</h4><span class="tv-hint">' + (s.transfers.length || '无需') + ' 笔结清</span></div>' +
-          (s.transfers.length ? '<div class="tv-transfer-list">' + s.transfers.map(t => '<div class="tv-transfer">' +
-            '<span class="tv-avatar sm ' + esc(member(t.fromId).cls) + '">' + esc(member(t.fromId).initial) + '</span>' +
-            '<b>' + esc(t.from) + '</b><i>→</i><span class="tv-avatar sm ' + esc(member(t.toId).cls) + '">' + esc(member(t.toId).initial) + '</span><b>' + esc(t.to) + '</b>' +
-            '<strong>' + money(yuan(t.cents)) + '</strong>' +
+          (s.transfers.length ? '<div class="tv-transfer-list">' + s.transfers.map(tr => '<div class="tv-transfer">' +
+            '<span class="tv-avatar sm ' + esc(member(tr.fromId).cls) + '">' + esc(member(tr.fromId).initial) + '</span>' +
+            '<b>' + esc(tr.from) + '</b><i>→</i><span class="tv-avatar sm ' + esc(member(tr.toId).cls) + '">' + esc(member(tr.toId).initial) + '</span><b>' + esc(tr.to) + '</b>' +
+            '<strong>' + money(yuan(tr.cents)) + '</strong>' +
           '</div>').join('') + '</div>' : '<p class="tv-empty">刚好平账，不用转钱。</p>') +
           '<p class="tv-settle-note">对账单只统计本旅行账本。记账本里的金额是我的分摊份额，不是账单总额。</p>' +
         '</section>' +
@@ -760,7 +1144,12 @@
   }
 
   function handleAction(act, ds) {
-    if (act === 'edit-budget') openBudgetModal();
+    if (act === 'open-trip') openTrip(ds.id);
+    else if (act === 'back-library') { state.view = 'library'; persist(); render(); }
+    else if (act === 'new-trip') openTripModal(null);
+    else if (act === 'edit-trip') openTripModal(ds.id || (T() && T().id));
+    else if (act === 'delete-trip') deleteTrip(ds.id);
+    else if (act === 'edit-budget') openBudgetModal();
     else if (act === 'new-expense') openExpenseModal(null, { activityId: ds.activity || '' });
     else if (act === 'edit-expense') openExpenseModal(ds.id);
     else if (act === 'new-activity') openActivityModal(null, Number(ds.day) || 1);
@@ -777,543 +1166,735 @@
     else if (act === 'reset-demo') resetDemo();
   }
 
-  /* ---------------- 弹窗通用 ---------------- */
-  function modalShell(title, sub, body, acts) {
-    return '<div class="tv-modal-head"><div><h3>' + esc(title) + '</h3>' + (sub ? '<p>' + esc(sub) + '</p>' : '') + '</div><button type="button" class="tv-modal-x" data-close>✕</button></div>' +
-      '<div class="tv-modal-body">' + body + '</div>' +
-      '<div class="tv-modal-acts">' + acts + '</div>';
+  function openTrip(id) {
+    if (!state.trips.some(t => t.id === id)) return;
+    state.activeTripId = id;
+    state.view = 'trip';
+    state.tab = 'overview';
+    state.filterCat = 'all';
+    persist();
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  function deleteTrip(id) {
+    const t = state.trips.find(x => x.id === id);
+    if (!t) return;
+    App.confirmDialog('删除旅行册', '「' + t.title + '」里的行程、日志和账单都会从本机删除（记账本里已生成的记录不会自动删除）。确定吗？').then(ok => {
+      if (!ok) return;
+      state.trips = state.trips.filter(x => x.id !== id);
+      if (state.activeTripId === id) {
+        state.activeTripId = state.trips[0] ? state.trips[0].id : null;
+        state.view = 'library';
+      }
+      persist(); render();
+      toast('旅行册已删除', 'ok');
+    });
+  }
+
+  /* ---------------- 弹窗通用（沿用记账本控件） ---------------- */
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 12.9c2.2 1.7 3.8 3.3 4.9 5.1 2.6-5.1 5.5-8.9 9.1-12.2"/></svg>';
+
   function openModal(html) {
     if (typeof App === 'undefined' || !App.openModal) return null;
-    return App.openModal(html, true, 'tv-modal', 'tv-modal-mask');
+    return App.openModal(html, true, 'travel-modal');
   }
-  function field(label, control, cls) {
-    return '<label class="tv-field ' + (cls || '') + '"><span>' + esc(label) + '</span>' + control + '</label>';
+  function modalTitle(title, sub) {
+    return '<div class="modal-title">' + esc(title) + '<button class="icon-btn" style="display:flex" data-close>✕</button></div>' +
+      (sub ? '<p class="tv-modal-sub">' + esc(sub) + '</p>' : '');
+  }
+  function field(label, control) {
+    return '<div class="field"><label>' + esc(label) + '</label>' + control + '</div>';
+  }
+  function dateInput(id, val) {
+    const v = val || todayStr();
+    return '<input id="' + id + '" class="cal-input" type="text" readonly value="' + esc(v) + '" data-date="' + esc(v) + '">';
+  }
+  function bindControls(m) {
+    m.querySelectorAll('.cal-input').forEach(inp => {
+      inp.onclick = () => App.openCalendar(inp, 'day');
+    });
+    try { App.enhanceSelects(m); } catch (e) { console.warn(e); }
   }
   function memberOptions(selected) {
-    return state.members.map(m => '<option value="' + m.id + '"' + (m.id === selected ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('');
+    const t = T();
+    return (t ? t.members : []).map(m => '<option value="' + m.id + '"' + (m.id === selected ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('');
   }
   function memberChecks(selected) {
-    return '<div class="tv-checks">' + state.members.map(m =>
-      '<label class="tv-check" data-mid="' + m.id + '"><input type="checkbox" value="' + m.id + '"' + ((selected || []).indexOf(m.id) >= 0 ? ' checked' : '') + '><span class="tv-avatar sm ' + m.cls + '">' + esc(m.initial) + '</span>' + esc(m.name) + '</label>'
+    const t = T();
+    const list = t ? t.members : [];
+    return '<div class="tv-checks">' + list.map(m =>
+      '<label class="tv-check"><input type="checkbox" value="' + m.id + '"' + ((selected || []).indexOf(m.id) >= 0 ? ' checked' : '') + '>' +
+        '<span class="tv-check-box">' + CHECK_SVG + '</span>' +
+        '<span class="tv-avatar sm ' + m.cls + '">' + esc(m.initial) + '</span>' +
+        '<span class="tv-check-text">' + esc(m.name) + '</span>' +
+      '</label>'
     ).join('') + '</div>';
+  }
+  function checkLine(id, label, checked) {
+    return '<label class="tv-check tv-check-line"><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '>' +
+      '<span class="tv-check-box">' + CHECK_SVG + '</span>' +
+      '<span class="tv-check-text">' + esc(label) + '</span>' +
+    '</label>';
+  }
+  function checkedIds(m) {
+    const out = [];
+    m.querySelectorAll('.tv-checks input:checked').forEach(x => out.push(x.value));
+    return out;
+  }
+
+  /* ---------- 新建 / 编辑旅行册 ---------- */
+  function openTripModal(id) {
+    if (!App.openModal) return;
+    const editing = !!id;
+    const trip = editing ? state.trips.find(x => x.id === id) : null;
+    const defaultDest = editing ? trip.destination : '';
+    const data = trip || {
+      title: '', destination: '', startDate: todayStr(), endDate: todayStr(),
+      budget: '', cover: ''
+    };
+    const m = openModal(
+      modalTitle(editing ? '编辑旅行册' : '新建旅行册', '每次旅行都是一本新的手帐，日期会自动拆成 DAY 页') +
+      '<div class="field-row">' +
+        field('旅行册标题', '<input id="tv-t-title" type="text" value="' + esc(data.title) + '" placeholder="例如 大理，四天三夜">') +
+        field('目的地', '<input id="tv-t-dest" type="text" value="' + esc(data.destination) + '" placeholder="例如 大理">') +
+      '</div>' +
+      '<div class="field-row">' +
+        field('出发日期', dateInput('tv-t-start', data.startDate)) +
+        field('结束日期', dateInput('tv-t-end', data.endDate)) +
+      '</div>' +
+      '<div class="field-row">' +
+        field('我的预算（元）', '<input id="tv-t-budget" type="number" min="0" step="100" value="' + (data.budget || '') + '" placeholder="例如 6000">') +
+        field('封面图片链接（可选）', '<input id="tv-t-cover" type="text" value="' + esc(data.cover || '') + '" placeholder="留空按目的地自动生成">') +
+      '</div>' +
+      '<p class="tv-form-tip">同行成员默认「我 / 小雨 / 阿哲」，可在账单里调整分摊。</p>' +
+      '<div class="modal-acts">' +
+        (editing ? '<button type="button" class="btn btn-danger" id="tv-t-del" style="margin-right:auto">删除这本</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-t-save">' + (editing ? '保存修改' : '创建旅行册') + '</button>' +
+      '</div>'
+    );
+    if (!m) return;
+    bindControls(m);
+    const del = m.querySelector('#tv-t-del');
+    if (del) del.onclick = () => { App.closeModal(); deleteTrip(trip.id); };
+    m.querySelector('#tv-t-save').onclick = () => {
+      const title = m.querySelector('#tv-t-title').value.trim();
+      const dest = m.querySelector('#tv-t-dest').value.trim() || defaultDest;
+      const start = m.querySelector('#tv-t-start').dataset.date || todayStr();
+      const end = m.querySelector('#tv-t-end').dataset.date || start;
+      const budget = Number(m.querySelector('#tv-t-budget').value) || 0;
+      const coverIn = m.querySelector('#tv-t-cover').value.trim();
+      if (!title) return toast('请填写旅行册标题', 'err');
+      if (!dest) return toast('请填写目的地', 'err');
+      if (parseDate(end) < parseDate(start)) return toast('结束日期不能早于出发日期', 'err');
+      const cover = coverIn || (trip && trip.cover) || photo(dest + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
+      if (editing) {
+        Object.assign(trip, { title: title, destination: dest, budget: budget, cover: cover });
+        if (trip.startDate !== start || trip.endDate !== end) {
+          trip.startDate = start; trip.endDate = end;
+          trip.days = buildDays(start, end, dest, trip.days);
+          trip.expenses.forEach(e => {
+            const d = trip.days.find(x => x.date === e.date);
+            e.day = d ? d.day : (trip.days[0] ? trip.days[0].day : 1);
+          });
+        } else {
+          trip.startDate = start; trip.endDate = end;
+          trip.days.forEach(d => { if (!d.city || d.city === trip.destination) d.city = dest; });
+        }
+      } else {
+        const nt = {
+          id: uid('trip'),
+          title: title,
+          destination: dest,
+          startDate: start,
+          endDate: end,
+          budget: budget,
+          cover: cover,
+          createdAt: Date.now(),
+          members: defaultMembers(),
+          days: buildDays(start, end, dest, []),
+          hotels: [],
+          expenses: [],
+          journals: []
+        };
+        state.trips.unshift(nt);
+        state.activeTripId = nt.id;
+        state.view = 'trip';
+        state.tab = 'overview';
+      }
+      persist(); App.closeModal(); render();
+      toast(editing ? '旅行册已更新' : '旅行册已创建，开始贴照片吧', 'ok');
+    };
   }
 
   /* ---------- 预算 ---------- */
   function openBudgetModal() {
-    const m = openModal(modalShell('设置旅行预算', '预算按我的花费计算，不含朋友那份', 
-      '<div class="tv-budget-form">' +
-        field('预算金额（元）', '<input id="tv-budget-input" type="number" min="0" step="100" value="' + (state.trip.budget || '') + '" placeholder="例如 6000">') +
-        '<div class="tv-quick-amounts">' + [3000, 5000, 8000, 12000].map(v => '<button type="button" data-amount="' + v + '">' + v + '</button>').join('') + '</div>' +
-        '<p class="tv-form-tip">当前示例：我的花费已累计 <b>' + money2(yuan(totalMyCents())) + '</b></p>' +
-      '</div>',
-      '<button type="button" class="tv-btn" data-close>取消</button><button type="button" class="tv-btn solid" id="tv-budget-save">保存预算</button>'
-    ));
+    const t = T();
+    if (!t) return;
+    const m = openModal(
+      modalTitle('设置旅行预算', '预算按我的花费计算，不含朋友那份') +
+      field('预算金额（元）', '<input id="tv-budget-input" type="number" min="0" step="100" value="' + (t.budget || '') + '" placeholder="例如 6000">') +
+      '<div class="tv-quick-amounts">' + [3000, 5000, 8000, 12000].map(v => '<button type="button" data-amount="' + v + '">' + v + '</button>').join('') + '</div>' +
+      '<p class="tv-form-tip">当前我的花费已累计 <b>' + money2(yuan(totalMyCents())) + '</b></p>' +
+      '<div class="modal-acts">' +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-budget-save">保存预算</button>' +
+      '</div>'
+    );
     if (!m) return;
     const input = m.querySelector('#tv-budget-input');
     m.querySelectorAll('[data-amount]').forEach(b => { b.onclick = () => { input.value = b.dataset.amount; input.focus(); }; });
-    m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => App.closeModal(); });
     m.querySelector('#tv-budget-save').onclick = () => {
       const v = Number(input.value);
       if (!isFinite(v) || v < 0) return toast('请输入正确的预算金额', 'err');
-      state.trip.budget = Math.round(v);
+      t.budget = Math.round(v);
       persist(); App.closeModal(); render();
-      toast('预算已更新为 ' + money(state.trip.budget), 'ok');
+      toast('预算已更新为 ' + money(t.budget), 'ok');
     };
     setTimeout(() => input.focus(), 80);
   }
 
   /* ---------- 行程 ---------- */
+  function dayOptions(selected) {
+    const t = T();
+    if (!t) return '';
+    return t.days.map(d => '<option value="' + d.day + '"' + (d.day === selected ? ' selected' : '') + '>DAY ' + d.day + ' · ' + shortDate(d.date) + ' ' + esc(d.city) + '</option>').join('');
+  }
+  function timeOptions(selected) {
+    const list = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) list.push(pad2(h) + ':' + pad2(m));
+    }
+    if (selected && list.indexOf(selected) < 0) list.push(selected);
+    list.sort();
+    return list.map(v => '<option value="' + v + '"' + (v === selected ? ' selected' : '') + '>' + v + '</option>').join('');
+  }
   function openActivityModal(id, presetDay) {
-    const editing = !!id;
-    const loc = editing ? locateActivity(id) : null;
-    const act = loc ? loc.act : null;
-    const dayNum = act ? loc.day.day : (presetDay || 1);
-    const data = act || { time: '09:00', title: '', place: '', note: '', cost: 0 };
-    const dayOpts = state.days.map(d => '<option value="' + d.day + '"' + (d.day === dayNum ? ' selected' : '') + '>DAY ' + d.day + ' · ' + esc(shortDate(d.date)) + ' ' + esc(d.city) + '</option>').join('');
-    const m = openModal(modalShell(editing ? '编辑行程' : '新增行程', '行程和账单可以互相关联', 
-      '<div class="tv-form-grid">' +
-        field('所属日期', '<select id="tv-act-day">' + dayOpts + '</select>') +
-        field('时间', '<input id="tv-act-time" type="time" value="' + esc(data.time || '09:00') + '">') +
-        field('行程标题', '<input id="tv-act-title" type="text" value="' + esc(data.title) + '" placeholder="例如 环洱海包车">', 'span2') +
-        field('地点 / 备注', '<input id="tv-act-place" type="text" value="' + esc(data.place) + '" placeholder="例如 才村 → 喜洲 → 双廊">', 'span2') +
-        field('计划花费（元）', '<input id="tv-act-cost" type="number" min="0" step="0.01" value="' + (data.cost || '') + '" placeholder="0">') +
-        field('补充说明', '<input id="tv-act-note" type="text" value="' + esc(data.note) + '" placeholder="可选">') +
+    const t = T();
+    if (!t) return;
+    const loc = id ? locateActivity(id) : null;
+    const editing = !!loc;
+    const a = loc ? loc.act : { time: '09:00', title: '', place: '', note: '', cost: '' };
+    const day = loc ? loc.day.day : (presetDay || (t.days[0] ? t.days[0].day : 1));
+    const m = openModal(
+      modalTitle(editing ? '编辑行程' : '加一段行程', '选好第几天，费用可以稍后在账本里记') +
+      '<div class="field-row">' +
+        field('第几天', '<select id="tv-a-day">' + dayOptions(day) + '</select>') +
+        field('时间', '<select id="tv-a-time">' + timeOptions(a.time) + '</select>') +
       '</div>' +
-      (editing && expensesOfActivity(id).length ? '<p class="tv-form-tip">已关联 ' + expensesOfActivity(id).length + ' 笔账单，编辑行程不会影响账单金额。</p>' : ''),
-      (editing ? '<button type="button" class="tv-btn danger" id="tv-act-del">删除行程</button>' : '<button type="button" class="tv-btn" data-close>取消</button>') +
-      '<button type="button" class="tv-btn solid" id="tv-act-save">保存行程</button>'
-    ));
+      field('行程标题', '<input id="tv-a-title" type="text" value="' + esc(a.title) + '" placeholder="例如 环洱海包车">') +
+      field('地点 / 说明', '<input id="tv-a-place" type="text" value="' + esc(a.place) + '" placeholder="才村 → 喜洲 → 双廊">') +
+      '<div class="field-row">' +
+        field('预计花费（元）', '<input id="tv-a-cost" type="number" min="0" step="1" value="' + (a.cost || '') + '" placeholder="0">') +
+        field('备注', '<input id="tv-a-note" type="text" value="' + esc(a.note) + '" placeholder="可选">') +
+      '</div>' +
+      '<div class="modal-acts">' +
+        (editing ? '<button type="button" class="btn btn-danger" id="tv-a-del" style="margin-right:auto">删除行程</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-a-save">' + (editing ? '保存' : '添加') + '</button>' +
+      '</div>'
+    );
     if (!m) return;
-    m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => App.closeModal(); });
-    m.querySelector('#tv-act-save').onclick = () => {
-      const title = m.querySelector('#tv-act-title').value.trim();
-      if (!title) return toast('请填写行程标题', 'err');
-      const payload = {
-        time: m.querySelector('#tv-act-time').value || '09:00',
-        title: title,
-        place: m.querySelector('#tv-act-place').value.trim(),
-        note: m.querySelector('#tv-act-note').value.trim(),
-        cost: Number(m.querySelector('#tv-act-cost').value) || 0
-      };
-      const targetDay = Number(m.querySelector('#tv-act-day').value);
-      if (editing) {
-        Object.assign(act, payload);
-        if (targetDay !== loc.day.day) {
-          const to = state.days.find(d => d.day === targetDay);
-          if (to) {
-            loc.day.activities = loc.day.activities.filter(a => a.id !== act.id);
-            to.activities.push(act);
-          }
-        }
-      } else {
-        const to = state.days.find(d => d.day === targetDay);
-        if (!to) return;
-        to.activities.push(Object.assign({ id: uid('a') }, payload));
-      }
-      state.days.forEach(d => d.activities.sort((a, b) => (a.time || '').localeCompare(b.time || '')));
-      persist(); App.closeModal(); render();
-      toast(editing ? '行程已更新' : '已添加行程', 'ok');
-    };
-    const del = m.querySelector('#tv-act-del');
+    bindControls(m);
+    const del = m.querySelector('#tv-a-del');
     if (del) del.onclick = () => {
-      App.confirmDialog('删除行程', '删除后，已关联的账单会保留，但会取消关联。确定删除吗？').then(ok => {
+      App.confirmDialog('删除行程', '「' + a.title + '」将从行程里移除，关联的账单会保留但解除关联。').then(ok => {
         if (!ok) return;
-        const found = locateActivity(act.id);
-        if (found) found.day.activities = found.day.activities.filter(a => a.id !== act.id);
-        state.expenses.forEach(e => { if (e.activityId === act.id) e.activityId = null; });
+        t.days.forEach(d => { d.activities = (d.activities || []).filter(x => x.id !== a.id); });
+        t.expenses.forEach(e => { if (e.activityId === a.id) e.activityId = ''; });
         persist(); App.closeModal(); render();
         toast('行程已删除', 'ok');
       });
+    };
+    m.querySelector('#tv-a-save').onclick = () => {
+      const title = m.querySelector('#tv-a-title').value.trim();
+      if (!title) return toast('请填写行程标题', 'err');
+      const targetDay = Number(m.querySelector('#tv-a-day').value) || 1;
+      const dayObj = t.days.find(d => d.day === targetDay) || t.days[0];
+      const next = {
+        id: loc ? a.id : uid('a'),
+        time: m.querySelector('#tv-a-time').value || '09:00',
+        title: title,
+        place: m.querySelector('#tv-a-place').value.trim(),
+        note: m.querySelector('#tv-a-note').value.trim(),
+        cost: Number(m.querySelector('#tv-a-cost').value) || 0
+      };
+      if (loc) {
+        if (loc.day.day !== targetDay) {
+          loc.day.activities = (loc.day.activities || []).filter(x => x.id !== a.id);
+          (dayObj.activities = dayObj.activities || []).push(next);
+        } else {
+          Object.assign(loc.act, next);
+        }
+      } else {
+        (dayObj.activities = dayObj.activities || []).push(next);
+      }
+      t.days.forEach(d => { if (d.activities) d.activities.sort((x, y) => (x.time || '').localeCompare(y.time || '')); });
+      t.expenses.forEach(e => { if (e.activityId === next.id) e.day = targetDay; });
+      persist(); App.closeModal(); render();
+      toast(editing ? '行程已更新' : '行程已添加', 'ok');
     };
   }
 
   /* ---------- 日志 ---------- */
   function openJournalModal(id) {
-    const editing = !!id;
-    const j = editing ? state.journals.find(x => x.id === id) : null;
-    const data = j || { day: state.days[0] ? state.days[0].day : 1, mood: 'happy', weather: '', text: '' };
-    const day = state.days.find(d => d.day === data.day) || state.days[0];
-    const dayOpts = state.days.map(d => '<option value="' + d.day + '"' + (d.day === data.day ? ' selected' : '') + '>DAY ' + d.day + ' · ' + esc(shortDate(d.date)) + ' ' + esc(d.city) + '</option>').join('');
-    const m = openModal(modalShell(editing ? '编辑日志' : '写一篇旅行日志', '选一个当下的情绪，之后再回来看会很有意思', 
-      '<div class="tv-form-grid">' +
-        field('所属日期', '<select id="tv-j-day">' + dayOpts + '</select>') +
-        field('天气 / 场景', '<input id="tv-j-weather" type="text" value="' + esc(data.weather) + '" placeholder="晴 · 洱海边">') +
+    const t = T();
+    if (!t) return;
+    const j = id ? t.journals.find(x => x.id === id) : null;
+    const editing = !!j;
+    const data = j || { day: t.days[0] ? t.days[0].day : 1, mood: 'happy', weather: '', text: '' };
+    const day = t.days.find(d => d.day === data.day) || t.days[0];
+    const m = openModal(
+      modalTitle(editing ? '编辑日志' : '写一篇旅行日志', day ? cnDate(day.date) + ' · ' + day.city : '') +
+      '<div class="field-row">' +
+        field('第几天', '<select id="tv-j-day">' + dayOptions(data.day) + '</select>') +
+        field('天气 / 一句话', '<input id="tv-j-weather" type="text" value="' + esc(data.weather) + '" placeholder="晴 · 风里有洱海味">') +
       '</div>' +
-      '<div class="tv-mood-picker" id="tv-mood-picker">' + MOODS.map(md => '<button type="button" class="tv-mood-opt' + (md.id === data.mood ? ' on' : '') + '" data-mood="' + md.id + '" style="--mood:' + md.color + '"><i>' + md.emoji + '</i><span>' + md.label + '</span></button>').join('') + '</div>' +
-      '<label class="tv-field"><span>日志正文</span><textarea id="tv-j-text" rows="6" placeholder="今天发生了什么？">' + esc(data.text) + '</textarea></label>',
-      (editing ? '<button type="button" class="tv-btn danger" id="tv-j-del">删除日志</button>' : '<button type="button" class="tv-btn" data-close>取消</button>') +
-      '<button type="button" class="tv-btn solid" id="tv-j-save">保存日志</button>'
-    ));
+      '<div class="field"><label>此刻的心情</label><div class="tv-mood-picker">' +
+        MOODS.map(md => '<button type="button" class="tv-mood-opt' + (md.id === data.mood ? ' on' : '') + '" data-mood="' + md.id + '" style="--mood:' + md.color + '"><i>' + md.emoji + '</i>' + esc(md.label) + '</button>').join('') +
+      '</div></div>' +
+      '<div class="field"><label>日志 / 心情</label><textarea id="tv-j-text" rows="6" placeholder="今天发生了什么？有什么想记住的？">' + esc(data.text) + '</textarea></div>' +
+      '<div class="modal-acts">' +
+        (editing ? '<button type="button" class="btn btn-danger" id="tv-j-del" style="margin-right:auto">删除日志</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-j-save">' + (editing ? '保存' : '写下') + '</button>' +
+      '</div>'
+    );
     if (!m) return;
+    bindControls(m);
     let mood = data.mood;
     m.querySelectorAll('[data-mood]').forEach(b => {
       b.onclick = () => {
         mood = b.dataset.mood;
-        m.querySelectorAll('[data-mood]').forEach(x => x.classList.toggle('on', x.dataset.mood === mood));
+        m.querySelectorAll('[data-mood]').forEach(x => x.classList.toggle('on', x === b));
       };
     });
-    m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => App.closeModal(); });
-    m.querySelector('#tv-j-save').onclick = () => {
-      const text = m.querySelector('#tv-j-text').value.trim();
-      if (!text) return toast('写点什么再保存吧', 'err');
-      const dayNum = Number(m.querySelector('#tv-j-day').value);
-      const d = state.days.find(x => x.day === dayNum) || day;
-      const payload = { day: dayNum, date: d ? d.date : (day ? day.date : todayStr()), mood: mood, weather: m.querySelector('#tv-j-weather').value.trim(), text: text };
-      if (editing) Object.assign(j, payload);
-      else state.journals.push(Object.assign({ id: uid('j'), created: Date.now() }, payload));
-      persist(); App.closeModal(); render();
-      toast(editing ? '日志已更新' : '日志已保存', 'ok');
-    };
     const del = m.querySelector('#tv-j-del');
     if (del) del.onclick = () => {
-      App.confirmDialog('删除日志', '确定要删除这篇日志吗？').then(ok => {
+      App.confirmDialog('删除日志', '确定删除这篇日志吗？').then(ok => {
         if (!ok) return;
-        state.journals = state.journals.filter(x => x.id !== id);
+        t.journals = t.journals.filter(x => x.id !== j.id);
         persist(); App.closeModal(); render();
         toast('日志已删除', 'ok');
       });
     };
+    m.querySelector('#tv-j-save').onclick = () => {
+      const text = m.querySelector('#tv-j-text').value.trim();
+      if (!text) return toast('写点什么再保存吧', 'err');
+      const targetDay = Number(m.querySelector('#tv-j-day').value) || 1;
+      const dayObj = t.days.find(d => d.day === targetDay) || t.days[0];
+      const patch = {
+        day: targetDay,
+        date: dayObj ? dayObj.date : todayStr(),
+        mood: mood,
+        weather: m.querySelector('#tv-j-weather').value.trim(),
+        text: text
+      };
+      if (j) Object.assign(j, patch);
+      else t.journals.push(Object.assign({ id: uid('j'), created: Date.now() }, patch));
+      persist(); App.closeModal(); render();
+      toast(editing ? '日志已更新' : '日志已保存', 'ok');
+    };
   }
 
   /* ---------- 账单 ---------- */
+  function activityOptions(selected) {
+    const acts = allActivities();
+    return '<option value="">不关联行程</option>' + acts.map(a =>
+      '<option value="' + a.id + '"' + (a.id === selected ? ' selected' : '') + '>D' + a.day + ' ' + esc(a.time || '') + ' ' + esc(a.title) + '</option>'
+    ).join('');
+  }
   function openExpenseModal(id, preset) {
-    const editing = !!id;
-    const exp = editing ? state.expenses.find(x => x.id === id) : null;
-    const p = preset || {};
-    const presetAct = p.activityId ? activityById(p.activityId) : null;
-    const data = exp || {
-      title: presetAct ? presetAct.title : '', amount: presetAct && presetAct.cost ? presetAct.cost : '',
-      category: 'food', date: presetAct ? presetAct.date : todayStr(), payerId: 'me',
-      participants: state.members.map(m => m.id), note: '', activityId: p.activityId || '', sync: true
+    const t = T();
+    if (!t) return;
+    const e = id ? t.expenses.find(x => x.id === id) : null;
+    const editing = !!e;
+    const presetAct = preset && preset.activityId ? activityById(preset.activityId) : null;
+    const data = e || {
+      title: presetAct ? presetAct.title : '',
+      amount: presetAct && presetAct.cost ? presetAct.cost : '',
+      category: presetAct ? 'fun' : 'food',
+      date: presetAct ? presetAct.date : (t.days.some(d => d.date === todayStr()) ? todayStr() : t.startDate),
+      payerId: 'me',
+      activityId: presetAct ? presetAct.id : '',
+      participants: t.members.map(m => m.id),
+      note: '',
+      sync: true
     };
-    const catOpts = CATS.map(c => '<option value="' + c.id + '"' + (data.category === c.id ? ' selected' : '') + '>' + c.label + '</option>').join('');
-    const actOpts = '<option value="">不关联行程</option>' + state.days.map(d => '<optgroup label="DAY ' + d.day + ' · ' + esc(d.city) + '">' +
-      d.activities.map(a => '<option value="' + a.id + '"' + (data.activityId === a.id ? ' selected' : '') + '>' + esc(a.time) + ' ' + esc(a.title) + '</option>').join('') +
-    '</optgroup>').join('');
-    const body = '' +
-      '<div class="tv-form-grid">' +
-        field('账单名称', '<input id="tv-e-title" type="text" value="' + esc(data.title) + '" placeholder="例如 双廊渔家晚饭">', 'span2') +
+    const m = openModal(
+      modalTitle(editing ? '编辑账单' : '记一笔旅行账单', '这里填总额；记账本只记「我的 AA 份额」') +
+      '<div class="field-row">' +
+        field('账单名称', '<input id="tv-e-title" type="text" value="' + esc(data.title) + '" placeholder="例如 双廊渔家晚饭">') +
         field('总金额（元）', '<input id="tv-e-amount" type="number" min="0" step="0.01" value="' + (data.amount || '') + '" placeholder="0.00">') +
-        field('分类', '<select id="tv-e-cat">' + catOpts + '</select>') +
-        field('日期', '<input id="tv-e-date" type="date" value="' + esc(data.date) + '">') +
-        field('谁付的钱', '<select id="tv-e-payer">' + memberOptions(data.payerId) + '</select>') +
-        field('关联行程', '<select id="tv-e-act">' + actOpts + '</select>', 'span2') +
       '</div>' +
-      '<div class="tv-field"><span>谁参与 AA</span>' + memberChecks(data.participants) + '</div>' +
-      '<label class="tv-field"><span>备注</span><input id="tv-e-note" type="text" value="' + esc(data.note) + '" placeholder="可选"></label>' +
-      '<label class="tv-sync-check"><input type="checkbox" id="tv-e-sync"' + (data.sync === false ? '' : ' checked') + '><span>同步到记账本（只记我的 AA 份额）</span></label>' +
-      '<p class="tv-share-preview" id="tv-e-preview"></p>';
-    const m = openModal(modalShell(editing ? '编辑账单' : '记一笔旅行账单', '总额只用于对账；记账本里记的是我的份额', body,
-      (editing ? '<button type="button" class="tv-btn danger" id="tv-e-del">删除账单</button>' : '<button type="button" class="tv-btn" data-close>取消</button>') +
-      '<button type="button" class="tv-btn solid" id="tv-e-save">保存账单</button>'
-    ));
+      '<div class="field-row">' +
+        field('分类', '<select id="tv-e-cat">' + CATS.map(c => '<option value="' + c.id + '"' + (c.id === data.category ? ' selected' : '') + '>' + c.label + '</option>').join('') + '</select>') +
+        field('日期', dateInput('tv-e-date', data.date)) +
+      '</div>' +
+      '<div class="field-row">' +
+        field('谁付的钱', '<select id="tv-e-payer">' + memberOptions(data.payerId) + '</select>') +
+        field('关联行程（可选）', '<select id="tv-e-act">' + activityOptions(data.activityId) + '</select>') +
+      '</div>' +
+      '<div class="field"><label>谁参与分摊（AA）</label>' + memberChecks(data.participants) + '</div>' +
+      field('备注', '<input id="tv-e-note" type="text" value="' + esc(data.note) + '" placeholder="可选，例如 含早餐">') +
+      '<div class="tv-sync-box">' +
+        checkLine('tv-e-sync', '同步到记账本（只记我的分摊份额）', data.sync !== false) +
+        '<p class="tv-form-tip" id="tv-e-preview"></p>' +
+      '</div>' +
+      '<div class="modal-acts">' +
+        (editing ? '<button type="button" class="btn btn-danger" id="tv-e-del" style="margin-right:auto">删除账单</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-e-save">' + (editing ? '保存' : '记入账本') + '</button>' +
+      '</div>'
+    );
     if (!m) return;
-    const amountEl = m.querySelector('#tv-e-amount');
-    const preview = m.querySelector('#tv-e-preview');
-    const syncEl = m.querySelector('#tv-e-sync');
-    const calc = () => {
-      const parts = [];
-      m.querySelectorAll('.tv-checks input:checked').forEach(x => parts.push(x.value));
-      const amt = Number(amountEl.value) || 0;
-      const my = parts.indexOf('me') >= 0 ? yuan(splitCents(cents(amt), parts.length)[parts.indexOf('me')] || 0) : 0;
-      preview.innerHTML = parts.length
-        ? '记账本将记入 <b>' + money2(my) + '</b> · 总金额 ' + money(amt) + ' / ' + parts.length + ' 人' + (syncEl.checked ? '' : '（已关闭同步）')
-        : '<b>请至少勾选一位参与人</b>';
+    bindControls(m);
+    const updPreview = () => {
+      const amt = Number(m.querySelector('#tv-e-amount').value) || 0;
+      const ids = checkedIds(m);
+      const n = ids.length;
+      const mine = n > 0 ? (function () {
+        const arr = splitCents(cents(amt), n);
+        const i = ids.indexOf('me');
+        return i >= 0 ? arr[i] : 0;
+      })() : 0;
+      m.querySelector('#tv-e-preview').textContent = n ? (n + ' 人分摊，我的份额 ' + money2(yuan(mine)) + (m.querySelector('#tv-e-sync').checked ? ' 会写入记账本' : ' 不同步记账本')) : '还没选参与分摊的人';
     };
-    amountEl.addEventListener('input', calc);
-    m.querySelectorAll('.tv-checks input').forEach(x => x.addEventListener('change', calc));
-    syncEl.addEventListener('change', calc);
-    calc();
-    m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => App.closeModal(); });
+    m.querySelector('#tv-e-amount').addEventListener('input', updPreview);
+    m.querySelectorAll('.tv-checks input').forEach(x => x.addEventListener('change', updPreview));
+    m.querySelector('#tv-e-sync').addEventListener('change', updPreview);
+    updPreview();
+    const del = m.querySelector('#tv-e-del');
+    if (del) del.onclick = () => {
+      App.confirmDialog('删除账单', '「' + data.title + '」会从旅行账本和记账本一起删除。').then(ok => {
+        if (!ok) return;
+        if (e.recordId) dropRecord(e.recordId);
+        t.expenses = t.expenses.filter(x => x.id !== e.id);
+        t.hotels.forEach(h => { if (h.expenseId === e.id) h.expenseId = ''; });
+        persist(); App.closeModal(); render();
+        toast('账单已删除', 'ok');
+      });
+    };
     m.querySelector('#tv-e-save').onclick = () => {
       const title = m.querySelector('#tv-e-title').value.trim();
-      const amount = Number(amountEl.value);
+      const amount = Number(m.querySelector('#tv-e-amount').value);
+      const participants = checkedIds(m);
       if (!title) return toast('请填写账单名称', 'err');
-      if (!(amount > 0)) return toast('请输入正确的金额', 'err');
-      const parts = [];
-      m.querySelectorAll('.tv-checks input:checked').forEach(x => parts.push(x.value));
-      if (!parts.length) return toast('请至少选择一位参与人', 'err');
-      const date = m.querySelector('#tv-e-date').value || todayStr();
-      const payload = {
-        title: title, amount: amount, category: m.querySelector('#tv-e-cat').value,
-        date: date, day: dayOfDate(date), payerId: m.querySelector('#tv-e-payer').value,
-        participants: parts, note: m.querySelector('#tv-e-note').value.trim(),
-        activityId: m.querySelector('#tv-e-act').value || '', sync: syncEl.checked
+      if (!isFinite(amount) || amount <= 0) return toast('请输入正确的金额', 'err');
+      if (!participants.length) return toast('至少选一个分摊的人', 'err');
+      const date = m.querySelector('#tv-e-date').dataset.date || todayStr();
+      const patch = {
+        title: title, amount: Math.round(amount * 100) / 100,
+        category: m.querySelector('#tv-e-cat').value,
+        date: date, day: dayOfDate(date),
+        payerId: m.querySelector('#tv-e-payer').value || 'me',
+        activityId: m.querySelector('#tv-e-act').value || '',
+        participants: participants,
+        note: m.querySelector('#tv-e-note').value.trim(),
+        sync: m.querySelector('#tv-e-sync').checked
       };
-      let target;
-      if (editing) target = exp;
-      else { target = Object.assign({ id: uid('e') }, payload); state.expenses.push(target); }
-      if (editing) Object.assign(target, payload);
-      if (target.hotelId) {
-        const h = state.hotels.find(x => x.id === target.hotelId);
-        if (h) { h.amount = target.amount; h.payerId = target.payerId; h.participants = target.participants.slice(); h.checkIn = target.date; }
+      let target = e;
+      if (target) Object.assign(target, patch);
+      else {
+        target = Object.assign({ id: uid('e') }, patch);
+        t.expenses.push(target);
       }
       persist();
       syncRecord(target);
       App.closeModal(); render();
-      const mine = myShare(target);
-      toast(mine > 0 ? '已保存 · 记账本记入 ' + money2(mine) : '已保存（我没有参与分摊，不记入记账本）', 'ok');
+      toast(editing ? '账单已更新' : '已记入旅行账本', 'ok');
     };
-    const del = m.querySelector('#tv-e-del');
-    if (del) del.onclick = () => {
-      App.confirmDialog('删除账单', '记账本里对应的那笔也会一起删除。确定删除吗？').then(ok => {
-        if (!ok) return;
-        removeExpense(exp);
-        App.closeModal(); render();
-        toast('账单已删除', 'ok');
-      });
-    };
-  }
-
-  function removeExpense(exp) {
-    if (exp.recordId) dropRecord(exp.recordId);
-    const h = exp.hotelId ? state.hotels.find(x => x.id === exp.hotelId) : null;
-    if (h && h.expenseId === exp.id) h.expenseId = null;
-    state.expenses = state.expenses.filter(x => x.id !== exp.id);
-    persist();
   }
 
   /* ---------- 住宿 ---------- */
   function openHotelModal(id) {
-    const editing = !!id;
-    const h = editing ? state.hotels.find(x => x.id === id) : null;
+    const t = T();
+    if (!t) return;
+    const h = id ? t.hotels.find(x => x.id === id) : null;
+    const editing = !!h;
     const data = h || {
-      name: '', address: '', checkIn: state.days[0] ? state.days[0].date : todayStr(),
-      checkOut: state.days[1] ? state.days[1].date : todayStr(), amount: '', payerId: 'me',
-      participants: state.members.map(m => m.id), note: ''
+      name: '', address: '', checkIn: t.startDate, checkOut: t.endDate,
+      amount: '', payerId: 'me', participants: t.members.map(m => m.id), note: ''
     };
-    const m = openModal(modalShell(editing ? '编辑住宿' : '新增住宿', editing ? '修改后，已生成的住宿账单会同步更新' : '新增后会自动生成一笔住宿账单', 
-      '<div class="tv-form-grid">' +
-        field('酒店 / 民宿名称', '<input id="tv-h-name" type="text" value="' + esc(data.name) + '" placeholder="例如 既下山 · 大理古城">', 'span2') +
-        field('地址', '<input id="tv-h-addr" type="text" value="' + esc(data.address) + '" placeholder="可选">', 'span2') +
-        field('入住', '<input id="tv-h-in" type="date" value="' + esc(data.checkIn) + '">') +
-        field('退房', '<input id="tv-h-out" type="date" value="' + esc(data.checkOut) + '">') +
+    const hasExpense = !!(h && h.expenseId && t.expenses.some(e => e.id === h.expenseId));
+    const m = openModal(
+      modalTitle(editing ? '编辑住宿' : '加一个住宿', '一次旅行可以有很多个酒店 / 民宿') +
+      '<div class="field-row">' +
+        field('住宿名称', '<input id="tv-h-name" type="text" value="' + esc(data.name) + '" placeholder="例如 既下山 · 大理古城">') +
         field('房费总额（元）', '<input id="tv-h-amount" type="number" min="0" step="0.01" value="' + (data.amount || '') + '" placeholder="0.00">') +
-        field('谁付的钱', '<select id="tv-h-payer">' + memberOptions(data.payerId) + '</select>') +
       '</div>' +
-      '<div class="tv-field"><span>谁参与分摊</span>' + memberChecks(data.participants) + '</div>' +
-      '<label class="tv-field"><span>备注</span><input id="tv-h-note" type="text" value="' + esc(data.note) + '" placeholder="可选"></label>' +
-      (editing
-        ? (h.expenseId ? '' : '<label class="tv-sync-check"><input type="checkbox" id="tv-h-create" checked><span>同时生成住宿账单（并同步到记账本）</span></label>')
-        : '<label class="tv-sync-check"><input type="checkbox" id="tv-h-create" checked><span>同时生成住宿账单（并同步到记账本）</span></label>'),
-      (editing ? '<button type="button" class="tv-btn danger" id="tv-h-del">删除住宿</button>' : '<button type="button" class="tv-btn" data-close>取消</button>') +
-      '<button type="button" class="tv-btn solid" id="tv-h-save">保存住宿</button>'
-    ));
+      field('地址', '<input id="tv-h-address" type="text" value="' + esc(data.address) + '" placeholder="可选">') +
+      '<div class="field-row">' +
+        field('入住日期', dateInput('tv-h-in', data.checkIn)) +
+        field('退房日期', dateInput('tv-h-out', data.checkOut)) +
+      '</div>' +
+      '<div class="field-row">' +
+        field('谁付的钱', '<select id="tv-h-payer">' + memberOptions(data.payerId) + '</select>') +
+        field('备注', '<input id="tv-h-note" type="text" value="' + esc(data.note) + '" placeholder="可选">') +
+      '</div>' +
+      '<div class="field"><label>谁参与分摊（AA）</label>' + memberChecks(data.participants) + '</div>' +
+      '<div class="tv-sync-box">' + checkLine('tv-h-gen', '同时生成一笔住宿账单（并同步记账本我的份额）', editing ? hasExpense : true) + '</div>' +
+      '<div class="modal-acts">' +
+        (editing ? '<button type="button" class="btn btn-danger" id="tv-h-del" style="margin-right:auto">删除住宿</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-h-save">' + (editing ? '保存' : '添加') + '</button>' +
+      '</div>'
+    );
     if (!m) return;
-    m.querySelectorAll('[data-close]').forEach(b => { b.onclick = () => App.closeModal(); });
-    const collect = () => {
-      const parts = [];
-      m.querySelectorAll('.tv-checks input:checked').forEach(x => parts.push(x.value));
-      return {
-        name: m.querySelector('#tv-h-name').value.trim(),
-        address: m.querySelector('#tv-h-addr').value.trim(),
-        checkIn: m.querySelector('#tv-h-in').value || todayStr(),
-        checkOut: m.querySelector('#tv-h-out').value || m.querySelector('#tv-h-in').value || todayStr(),
-        amount: Number(m.querySelector('#tv-h-amount').value) || 0,
-        payerId: m.querySelector('#tv-h-payer').value,
-        note: m.querySelector('#tv-h-note').value.trim(),
-        participants: parts
-      };
-    };
-    m.querySelector('#tv-h-save').onclick = () => {
-      const payload = collect();
-      if (!payload.name) return toast('请填写住宿名称', 'err');
-      if (!(payload.amount > 0)) return toast('请输入房费金额', 'err');
-      if (!payload.participants.length) return toast('请至少选择一位参与人', 'err');
-      let hotel;
-      if (editing) { hotel = h; Object.assign(hotel, payload); }
-      else { hotel = Object.assign({ id: uid('h') }, payload); state.hotels.push(hotel); }
-      const nights = Math.max(1, Math.round((parseDate(hotel.checkOut) - parseDate(hotel.checkIn)) / 86400000));
-      const createExp = editing ? !!m.querySelector('#tv-h-create') : true;
-      if (hotel.expenseId) {
-        const exp = state.expenses.find(x => x.id === hotel.expenseId);
-        if (exp) {
-          Object.assign(exp, {
-            title: hotel.name + '（' + nights + ' 晚）', amount: hotel.amount, date: hotel.checkIn,
-            day: dayOfDate(hotel.checkIn), payerId: hotel.payerId, participants: hotel.participants.slice(), sync: true
-          });
-          persist(); syncRecord(exp);
-        }
-      } else if (createExp) {
-        const exp = {
-          id: uid('e'), hotelId: hotel.id, day: dayOfDate(hotel.checkIn), date: hotel.checkIn, category: 'stay',
-          title: hotel.name + '（' + nights + ' 晚）', amount: hotel.amount, payerId: hotel.payerId,
-          participants: hotel.participants.slice(), note: '', sync: true
-        };
-        state.expenses.push(exp);
-        hotel.expenseId = exp.id;
-        persist(); syncRecord(exp);
-      } else {
-        persist();
-      }
-      App.closeModal(); render();
-      toast(editing ? '住宿已更新' : '住宿已添加，并生成住宿账单', 'ok');
-    };
+    bindControls(m);
     const del = m.querySelector('#tv-h-del');
     if (del) del.onclick = () => {
-      App.confirmDialog('删除住宿', '对应的住宿账单也会一起删除。确定删除吗？').then(ok => {
+      App.confirmDialog('删除住宿', '「' + data.name + '」的住宿记录和关联账单会一起删除。').then(ok => {
         if (!ok) return;
-        const exp = hotel.expenseId ? state.expenses.find(x => x.id === hotel.expenseId) : null;
-        if (exp) removeExpense(exp);
-        state.hotels = state.hotels.filter(x => x.id !== hotel.id);
+        if (h.expenseId) {
+          const exp = t.expenses.find(e => e.id === h.expenseId);
+          if (exp && exp.recordId) dropRecord(exp.recordId);
+          t.expenses = t.expenses.filter(e => e.id !== h.expenseId);
+        }
+        t.hotels = t.hotels.filter(x => x.id !== h.id);
         persist(); App.closeModal(); render();
         toast('住宿已删除', 'ok');
       });
     };
+    m.querySelector('#tv-h-save').onclick = () => {
+      const name = m.querySelector('#tv-h-name').value.trim();
+      const amount = Number(m.querySelector('#tv-h-amount').value) || 0;
+      const checkIn = m.querySelector('#tv-h-in').dataset.date || t.startDate;
+      const checkOut = m.querySelector('#tv-h-out').dataset.date || checkIn;
+      const participants = checkedIds(m);
+      if (!name) return toast('请填写住宿名称', 'err');
+      if (!participants.length) return toast('至少选一个分摊的人', 'err');
+      if (parseDate(checkOut) < parseDate(checkIn)) return toast('退房日期不能早于入住日期', 'err');
+      const patch = {
+        name: name, address: m.querySelector('#tv-h-address').value.trim(),
+        checkIn: checkIn, checkOut: checkOut,
+        amount: Math.round(amount * 100) / 100,
+        payerId: m.querySelector('#tv-h-payer').value || 'me',
+        participants: participants,
+        note: m.querySelector('#tv-h-note').value.trim()
+      };
+      let target = h;
+      if (target) Object.assign(target, patch);
+      else {
+        target = Object.assign({ id: uid('h') }, patch);
+        t.hotels.push(target);
+      }
+      const gen = m.querySelector('#tv-h-gen').checked && amount > 0;
+      const linked = target.expenseId ? t.expenses.find(e => e.id === target.expenseId) : null;
+      if (gen) {
+        const expPatch = {
+          hotelId: target.id,
+          day: dayOfDate(checkIn),
+          date: checkIn,
+          category: 'stay',
+          title: name + '（' + nights(checkIn, checkOut) + ' 晚）',
+          amount: target.amount,
+          payerId: target.payerId,
+          participants: participants,
+          note: target.note,
+          sync: true
+        };
+        if (linked) Object.assign(linked, expPatch);
+        else {
+          const exp = Object.assign({ id: uid('e') }, expPatch);
+          t.expenses.push(exp);
+          target.expenseId = exp.id;
+        }
+        persist();
+        syncRecord(linked || t.expenses.find(e => e.id === target.expenseId));
+      } else if (linked) {
+        if (linked.recordId) dropRecord(linked.recordId);
+        t.expenses = t.expenses.filter(e => e.id !== linked.id);
+        target.expenseId = '';
+        persist();
+      } else {
+        persist();
+      }
+      App.closeModal(); render();
+      toast(editing ? '住宿已更新' : '住宿已添加', 'ok');
+    };
   }
 
   /* ---------------- 对账单图片 ---------------- */
-  function settleCanvas() {
+  function drawSettlement() {
+    const t = T();
     const s = settlement();
-    const colors = THEME_COLORS[state.theme] || THEME_COLORS.paper;
-    const W = 1080;
-    const pad = 78;
-    const headerH = 300;
-    const rowsH = s.rows.length * 84 + 120;
-    const transferH = Math.max(1, s.transfers.length) * 92 + 140;
-    const H = headerH + rowsH + transferH + 190;
-    const cv = document.createElement('canvas');
-    cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
-    const sans = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
-    const serif = '"Songti SC","Noto Serif CJK SC","STSong",serif';
+    const c = THEME_COLORS[state.theme] || THEME_COLORS.bloom;
+    const W = 900, H = 640;
+    const canvas = document.createElement('canvas');
+    const dpr = 2;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d');
+    g.scale(dpr, dpr);
 
-    ctx.fillStyle = colors.bg;
-    ctx.fillRect(0, 0, W, H);
-    /* 背景装饰 */
-    ctx.save();
-    ctx.globalAlpha = 0.08;
-    ctx.fillStyle = colors.accent;
-    ctx.beginPath(); ctx.arc(W - 70, 90, 230, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = colors.accent2;
-    ctx.beginPath(); ctx.arc(50, H - 120, 190, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    function rr(x, y, w, h, r) {
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.arcTo(x + w, y, x + w, y + h, r);
+      g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r);
+      g.arcTo(x, y, x + w, y, r);
+      g.closePath();
+    }
 
-    /* 顶部色条 */
-    ctx.fillStyle = colors.accent;
-    ctx.fillRect(0, 0, W, 10);
+    g.fillStyle = c.bg; g.fillRect(0, 0, W, H);
+    g.fillStyle = c.surface; rr(36, 36, W - 72, H - 72, 22); g.fill();
+    g.strokeStyle = c.line; g.lineWidth = 1; g.stroke();
 
-    let y = 92;
-    ctx.fillStyle = colors.faint;
-    ctx.font = '500 22px ' + sans;
-    ctx.fillText('旅行账本 · 对账单', pad, y);
-    y += 62;
-    ctx.fillStyle = colors.ink;
-    ctx.font = '700 52px ' + serif;
-    ctx.fillText(state.trip.title, pad, y);
-    y += 48;
-    ctx.fillStyle = colors.soft;
-    ctx.font = '400 24px ' + sans;
-    ctx.fillText(state.trip.startDate + ' — ' + state.trip.endDate + ' · ' + state.members.length + ' 人 · ' + state.trip.destination, pad, y);
+    /* 顶部标题 */
+    g.fillStyle = c.accent;
+    g.font = '600 22px "Songti SC", "Noto Serif SC", Georgia, serif';
+    g.fillText('旅行对账单', 78, 106);
+    g.fillStyle = c.ink;
+    g.font = '600 34px "Songti SC", "Noto Serif SC", Georgia, serif';
+    g.fillText(t ? t.title : '旅行', 78, 152);
+    g.fillStyle = c.faint;
+    g.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
+    g.fillText((t ? t.startDate + ' — ' + t.endDate + ' · ' + t.members.length + ' 人' : ''), 78, 182);
 
-    /* 总额 */
-    y += 54;
-    ctx.fillStyle = colors.accent;
-    ctx.font = '700 42px ' + serif;
-    ctx.fillText(money(yuan(s.totalCents)), pad, y);
-    ctx.fillStyle = colors.faint;
-    ctx.font = '400 20px ' + sans;
-    ctx.fillText('共同账单总额', pad + 260, y - 4);
+    /* 金额块 */
+    g.fillStyle = c.ink;
+    g.font = '600 44px "Songti SC", Georgia, serif';
+    g.fillText(money(yuan(s.totalCents)), 78, 258);
+    g.fillStyle = c.faint;
+    g.font = '13px "PingFang SC", sans-serif';
+    g.fillText('共同账单总额', 78, 282);
 
-    /* 我的花费 */
-    ctx.textAlign = 'right';
-    ctx.fillStyle = colors.ink;
-    ctx.font = '700 34px ' + serif;
-    ctx.fillText(money2(yuan(totalMyCents())), W - pad, y);
-    ctx.fillStyle = colors.faint;
-    ctx.font = '400 20px ' + sans;
-    ctx.fillText('我的花费（记账本口径）', W - pad, y + 30);
-    ctx.textAlign = 'left';
+    g.fillStyle = c.accent;
+    g.font = '600 22px "Songti SC", Georgia, serif';
+    g.fillText(money2(yuan(totalMyCents(t))), 520, 230);
+    g.fillStyle = c.faint;
+    g.font = '12px "PingFang SC", sans-serif';
+    g.fillText('我的花费（已按 AA 份额同步记账本）', 520, 252);
 
-    y += 52;
-    ctx.strokeStyle = colors.line;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+    /* 分隔线 */
+    g.strokeStyle = c.line;
+    g.setLineDash([6, 6]);
+    g.beginPath(); g.moveTo(78, 316); g.lineTo(W - 78, 316); g.stroke();
+    g.setLineDash([]);
 
-    /* 成员 */
-    y += 58;
-    ctx.fillStyle = colors.soft;
-    ctx.font = '600 22px ' + sans;
-    ctx.fillText('每人已付 / 应摊 / 净额', pad, y);
-    y += 42;
-    s.rows.forEach(r => {
-      ctx.fillStyle = colors.ink;
-      ctx.beginPath(); ctx.arc(pad + 22, y - 11, 22, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = colors.bg;
-      ctx.font = '600 20px ' + sans;
-      ctx.textAlign = 'center';
-      ctx.fillText(r.initial, pad + 22, y - 4);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = colors.ink;
-      ctx.font = '600 26px ' + sans;
-      ctx.fillText(r.name, pad + 62, y);
-      ctx.fillStyle = colors.soft;
-      ctx.font = '400 21px ' + sans;
-      ctx.fillText('已付 ' + money(yuan(r.paid)) + '  ·  应摊 ' + money(yuan(r.share)), pad + 160, y);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = r.net >= 0 ? colors.accent2 : colors.accent;
-      ctx.font = '600 24px ' + sans;
-      ctx.fillText((r.net >= 0 ? '应收 ' : '应付 ') + money(yuan(Math.abs(r.net))), W - pad, y);
-      ctx.textAlign = 'left';
-      y += 84;
+    /* 成员分摊 */
+    g.fillStyle = c.ink;
+    g.font = '600 16px "PingFang SC", sans-serif';
+    g.fillText('成员分摊', 78, 350);
+    s.rows.forEach((r, i) => {
+      const y = 388 + i * 44;
+      g.fillStyle = c.ink;
+      g.font = '600 15px "PingFang SC", sans-serif';
+      g.fillText(r.name, 78, y);
+      g.fillStyle = c.faint;
+      g.font = '12px "PingFang SC", sans-serif';
+      g.fillText('已付 ' + money(yuan(r.paid)) + ' · 应摊 ' + money(yuan(r.share)), 148, y);
+      g.fillStyle = r.net >= 0 ? c.accent2 : c.accent;
+      g.font = '600 15px "PingFang SC", sans-serif';
+      const txt = (r.net >= 0 ? '应收 ' : '应付 ') + money(yuan(Math.abs(r.net)));
+      g.fillText(txt, W - 78 - g.measureText(txt).width, y);
     });
 
-    /* 转账 */
-    y += 8;
-    ctx.strokeStyle = colors.line;
-    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
-    y += 56;
-    ctx.fillStyle = colors.soft;
-    ctx.font = '600 22px ' + sans;
-    ctx.fillText('转账方案', pad, y);
-    y += 46;
+    /* 转账方案 */
+    g.fillStyle = c.ink;
+    g.font = '600 16px "PingFang SC", sans-serif';
+    g.fillText('转账方案', 520, 350);
     if (!s.transfers.length) {
-      ctx.fillStyle = colors.faint;
-      ctx.font = '400 24px ' + sans;
-      ctx.fillText('刚好平账，不用转钱。', pad, y + 10);
+      g.fillStyle = c.faint;
+      g.font = '13px "PingFang SC", sans-serif';
+      g.fillText('刚好平账，不用转钱。', 520, 388);
     } else {
-      s.transfers.forEach(t => {
-        ctx.fillStyle = colors.ink;
-        ctx.font = '600 26px ' + sans;
-        ctx.fillText(t.from, pad, y);
-        ctx.fillStyle = colors.faint;
-        ctx.fillText('→', pad + 130, y);
-        ctx.fillStyle = colors.ink;
-        ctx.fillText(t.to, pad + 190, y);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = colors.accent;
-        ctx.font = '700 28px ' + sans;
-        ctx.fillText(money(yuan(t.cents)), W - pad, y);
-        ctx.textAlign = 'left';
-        y += 92;
+      s.transfers.slice(0, 5).forEach((tr, i) => {
+        const y = 388 + i * 44;
+        g.fillStyle = c.ink;
+        g.font = '14px "PingFang SC", sans-serif';
+        g.fillText(tr.from + ' → ' + tr.to, 520, y);
+        g.fillStyle = c.accent;
+        g.font = '600 15px "PingFang SC", sans-serif';
+        g.fillText(money(yuan(tr.cents)), 520, y + 20);
       });
     }
 
     /* 页脚 */
-    ctx.strokeStyle = colors.line;
-    ctx.beginPath(); ctx.moveTo(pad, H - 108); ctx.lineTo(W - pad, H - 108); ctx.stroke();
-    ctx.fillStyle = colors.faint;
-    ctx.font = '400 20px ' + sans;
-    ctx.fillText('财务管家 · 旅行账本', pad, H - 66);
-    ctx.textAlign = 'right';
-    ctx.fillText('生成于 ' + todayStr() + ' · 已按我的 AA 份额同步记账本', W - pad, H - 66);
-    ctx.textAlign = 'left';
-    return cv;
+    g.fillStyle = c.faint;
+    g.font = '11px "PingFang SC", sans-serif';
+    g.fillText('旅行账册 · 记账本只记录我的 AA 份额', 78, H - 66);
+    g.strokeStyle = c.accent;
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(W - 110, H - 96, 42, 0, Math.PI * 2); g.stroke();
+    g.save();
+    g.translate(W - 110, H - 96);
+    g.rotate(-0.12);
+    g.fillStyle = c.accent;
+    g.font = '600 15px "Songti SC", Georgia, serif';
+    g.textAlign = 'center';
+    g.fillText('旅行', 0, -4);
+    g.fillText('账册', 0, 16);
+    g.restore();
+    g.textAlign = 'left';
+    return canvas;
   }
 
-  function downloadBlob(blob, name) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  }
-
-  function fileBase() {
-    return '对账单-' + (state.trip.destination || '旅行') + '-' + (state.trip.endDate || todayStr());
-  }
-
-  function downloadSettlement() {
-    const cv = settleCanvas();
-    cv.toBlob(blob => {
-      if (!blob) return toast('生成图片失败', 'err');
-      downloadBlob(blob, fileBase() + '.png');
-      toast('对账单图片已下载', 'ok');
-    }, 'image/png');
+  function saveCanvas(canvas, name) {
+    return new Promise(resolve => {
+      canvas.toBlob(blob => {
+        if (!blob) return resolve(false);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        resolve(true);
+      }, 'image/png');
+    });
   }
 
   function copySettlement() {
-    const cv = settleCanvas();
-    cv.toBlob(async blob => {
+    const t = T();
+    if (!t) return;
+    const canvas = drawSettlement();
+    canvas.toBlob(async blob => {
       if (!blob) return toast('生成图片失败', 'err');
       try {
         if (navigator.clipboard && window.ClipboardItem) {
           await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          toast('对账单图片已复制，可直接粘贴发送', 'ok');
-          return;
+          toast('对账单图片已复制，可以直接粘贴到群里', 'ok');
+        } else {
+          await saveCanvas(canvas, '对账单-' + t.destination + '.png');
+          toast('当前浏览器不支持复制图片，已改为下载', 'ok');
         }
-        throw new Error('no clipboard');
       } catch (e) {
-        downloadBlob(blob, fileBase() + '.png');
-        toast('当前环境不支持复制图片，已改为下载', '');
+        await saveCanvas(canvas, '对账单-' + t.destination + '.png');
+        toast('复制失败，已改为下载图片', 'err');
       }
     }, 'image/png');
   }
 
-  /* ---------------- 其它 ---------------- */
-  function resetDemo() {
-    if (typeof App === 'undefined' || !App.confirmDialog) return;
-    App.confirmDialog('恢复示例数据', '会重置本机这趟旅行的行程、日志和账单（记账本里已生成的记录不会自动删除）。确定吗？').then(ok => {
-      if (!ok) return;
-      state = seedState();
-      persist(); render();
-      toast('已恢复示例数据', 'ok');
+  function downloadSettlement() {
+    const t = T();
+    if (!t) return;
+    const canvas = drawSettlement();
+    saveCanvas(canvas, '对账单-' + t.destination + '.png').then(ok => {
+      toast(ok ? '对账单图片已下载' : '生成图片失败', ok ? 'ok' : 'err');
     });
   }
 
+  function resetDemo() {
+    App.confirmDialog('恢复示例数据', '会清空当前所有旅行册，恢复为三本示例旅行册。确定吗？').then(ok => {
+      if (!ok) return;
+      state = seedState();
+      stateKey = userKey();
+      persist(); render();
+      toast('已恢复示例旅行册', 'ok');
+    });
+  }
+
+  /* ---------------- 对外 ---------------- */
   window.Travel = {
     render: render,
-    state: function () { return ensureState(); }
+    state: function () { return state; }
   };
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (state && state.view) render();
+    });
+  }
 })();
