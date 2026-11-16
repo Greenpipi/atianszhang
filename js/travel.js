@@ -1484,7 +1484,7 @@
     const isMe = mem.id === 'me';
     return '<div class="tv-memrow' + (isMe ? ' is-me' : '') + '" data-id="' + esc(mem.id) + '" data-cls="' + esc(mem.cls || '') + '">' +
       '<span class="tv-mem-tag">' + (isMe ? '本人' : '朋友') + '</span>' +
-      '<div class="tv-mem-box">' +
+      '<div class="tv-mem-line">' +
         '<input class="tv-mem-name" type="text" maxlength="12" value="' + esc(mem.name) + '" placeholder="' + (isMe ? '我的名字' : '朋友名字') + '">' +
         (isMe ? '' : '<button type="button" class="tv-mem-del" title="移除">×</button>') +
       '</div>' +
