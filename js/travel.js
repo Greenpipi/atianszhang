@@ -985,18 +985,28 @@
   }
 
   function renderTabs(t) {
-    const items = [
-      ['overview', '总览', ''],
-      ['plan', '行程', allActivities().length],
-      ['journal', '日志', t.journals.length],
-      ['expenses', '账本', t.expenses.length],
-      ['hotels', '住宿', t.hotels.length],
-      ['settle', '对账', '']
+    const groups = [
+      ['记录', [
+        ['overview', '总览', ''],
+        ['plan', '行程', allActivities().length],
+        ['journal', '日志', t.journals.length]
+      ]],
+      ['消费', [
+        ['expenses', '账本', t.expenses.length],
+        ['hotels', '住宿', t.hotels.length]
+      ]],
+      ['结算', [
+        ['settle', '对账', '']
+      ]]
     ];
-    return '<nav class="tv-tabs">' + items.map(it =>
-      '<button type="button" class="tv-tab' + (state.tab === it[0] ? ' on' : '') + '" data-tab="' + it[0] + '">' +
-        it[1] + (it[2] !== '' ? '<em>' + it[2] + '</em>' : '') +
-      '</button>').join('') + '</nav>';
+    return '<nav class="tv-tabs">' + groups.map(g =>
+      '<div class="tv-tab-group">' +
+        '<span class="tv-tabgroup-label">' + g[0] + '</span>' +
+        g[1].map(it =>
+          '<button type="button" class="tv-tab' + (state.tab === it[0] ? ' on' : '') + '" data-tab="' + it[0] + '">' +
+            it[1] + (it[2] !== '' ? '<em>' + it[2] + '</em>' : '') +
+          '</button>').join('') +
+      '</div>').join('') + '</nav>';
   }
 
   function renderTab(t) {

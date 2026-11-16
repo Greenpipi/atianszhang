@@ -464,11 +464,21 @@
 
 /* ---------------- 纸张标签页 ---------------- */
 #view-travel .tv-tabs {
-  display: flex; gap: 6px; overflow-x: auto;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto;
   padding: 0 4px;
   scrollbar-width: none;
 }
 #view-travel .tv-tabs::-webkit-scrollbar { display: none; }
+#view-travel .tv-tab-group { display: flex; align-items: center; gap: 2px; flex: none; }
+#view-travel .tv-tab-group + .tv-tab-group {
+  margin-left: 8px; padding-left: 16px;
+  border-left: 1px solid var(--tv-line);
+}
+#view-travel .tv-tabgroup-label {
+  padding-right: 7px;
+  font-size: 9.5px; letter-spacing: .2em; color: var(--tv-faint);
+  white-space: nowrap;
+}
 #view-travel .tv-tab {
   position: relative;
   appearance: none; border: 1px solid transparent; border-bottom: 0;
@@ -1475,6 +1485,8 @@
   #view-travel .tv-tripinfo { flex: 1 1 100%; }
   #view-travel .tv-tripinfo h3 { font-size: 21px; }
   #view-travel .tv-tabs { gap: 2px; }
+  #view-travel .tv-tab-group + .tv-tab-group { margin-left: 4px; padding-left: 10px; }
+  #view-travel .tv-tabgroup-label { font-size: 9px; letter-spacing: .12em; padding-right: 4px; }
   #view-travel .tv-tab { padding: 8px 11px 9px; font-size: 11.5px; letter-spacing: .06em; }
   #view-travel .tv-scrap-cover { grid-template-columns: 1fr; padding: 16px; gap: 20px; }
   #view-travel .tv-side { flex-direction: column; align-items: stretch; gap: 0; padding-top: 0; border-top: 0; }
