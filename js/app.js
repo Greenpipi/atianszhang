@@ -1476,11 +1476,12 @@ const App = {
     const inc = kind === 'income';
     const rm = (r.category === RENTAL_CAT && RENTAL_META[r.sub]) ? RENTAL_META[r.sub] : null;
     return `
-    <div class="rec-item${r.rental ? ' is-rental' : ''}" data-rid="${r.id}">
+    <div class="rec-item${r.rental ? ' is-rental' : ''}${r.list_id ? ' is-list' : ''}" data-rid="${r.id}">
       <div class="rec-icon ${inc ? 'inc' : ''}"${rm ? ' style="background:' + rm.color + '1F;color:' + rm.color + '"' : ''}>${inc ? '收' : (rm ? rm.emoji : esc((r.category || '?').slice(0, 1)))}</div>
       <div class="rec-main">
         <div class="rec-title">${esc(r.category)}
           ${this.ratingStars(r)}
+          ${r.list_id ? '<span class="badge badge-list" title="清单：' + esc(r.list_title || '') + '">🧾 ' + esc(r.list_title || '清单') + '</span>' : ''}
           ${r.rental && !hideRentalBadge ? '<span class="badge badge-green" title="归入出租屋">🏠 出租屋</span>' : ''}
           ${r.favorite ? '<span class="badge badge-green">心仪</span>' : ''}</div>
         ${(r.sub || r.note) ? '<div class="rec-note">' + esc(r.sub || '') + (r.sub && r.note ? ' · ' : '') + esc(r.note || '') + '</div>' : ''}
@@ -1502,7 +1503,12 @@ const App = {
   bindRecordsList(root, ledgerId) {
     root.querySelectorAll('.rec-item').forEach(item => {
       const rid = item.dataset.rid;
-      item.querySelector('[data-act="edit"]').onclick = () => this.editRecord(rid, ledgerId);
+      item.querySelector('[data-act="edit"]').onclick = () => this.openRecordEditor(rid, ledgerId);
+      // 点卡片任意位置也能打开编辑（删除按钮单独处理）
+      item.onclick = e => {
+        if (e.target.closest('[data-act]')) return;
+        this.openRecordEditor(rid, ledgerId);
+      };
       item.querySelector('[data-act="del"]').onclick = async () => {
         const ok = await this.confirmDialog('删除记录', '删除后无法恢复，确定删除这条记录吗？');
         if (!ok) return;
@@ -2368,8 +2374,8 @@ const App = {
         const amt = Math.abs(Number(r.amount) || 0);
         const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
         const title = r.sub || r.category || '未分类';
-        const meta = [r.category, r.note, multiLedger && lg ? lg.name : ''].filter(Boolean).join(' · ');
-        return '<div class="lrow" data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
+        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', multiLedger && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        return '<div class="lrow' + (r.list_id ? ' is-list' : '') + '" data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
           + '<span class="rec-ico">' + catEmoji(r.category) + '</span>'
           + '<div class="rec-main"><b>' + hlKw(title, kw) + '</b><span>' + hlKw(meta, kw) + '</span></div>'
           + '<span class="rec-amt' + (inc ? ' income' : ' val-expense') + '">' + (inc ? '+' : '−') + hlKw(fmtMoney(amt), kw) + '</span>'
@@ -2409,7 +2415,7 @@ const App = {
       };
     });
     host.querySelectorAll('.lrow[data-rid]').forEach(row => {
-      row.onclick = () => this.editRecord(row.dataset.rid, row.dataset.lid);
+      row.onclick = () => this.openRecordEditor(row.dataset.rid, row.dataset.lid);
     });
     const more = host.querySelector('[data-more]');
     if (more) more.onclick = () => { st.page++; this.renderRecTable(host, this.filteredRecs(), { kw: this.state.search.q }); };
@@ -2639,10 +2645,11 @@ const App = {
           <div class="wk-body">
             ${recs.length ? recs.map(r => {
               const inc = kindOfR(r) === 'income';
-              return `<div class="wk-rec${inc ? ' income' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}${r.note ? '｜' + esc(r.note) : ''}">
+              return `<div class="wk-rec${inc ? ' income' : ''}${r.list_id ? ' is-list' : ''}" data-rid="${r.id}" title="${esc(r.category)}${r.sub ? ' · ' + esc(r.sub) : ''}｜${fmtMoney(r.amount)}${r.note ? '｜' + esc(r.note) : ''}${r.list_id ? '｜清单：' + esc(r.list_title || '') : ''}">
                 <div class="wk-rec-cat">${catEmoji(r.category)} ${esc(r.category)}</div>
                 ${r.sub ? `<div class="wk-rec-sub">${subEmoji(r.sub)} ${esc(r.sub)}</div>` : ''}
                 ${r.note ? `<div class="wk-rec-note">${esc(r.note)}</div>` : ''}
+                ${r.list_id ? `<div class="wk-rec-list">🧾 ${esc(r.list_title || '清单')}</div>` : ''}
                 <div class="wk-rec-amt">${inc ? '+' : ''}${fmtMoney(r.amount)}</div>
               </div>`;
             }).join('') : '<div class="wk-empty">无记录</div>'}
@@ -2705,8 +2712,8 @@ const App = {
       const detailRows = selRecs.map(r => {
         const inc = kindOfR(r) === 'income';
         const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
-        const meta = [r.category, r.note, this.state.ledgers.length > 1 && lg ? lg.name : ''].filter(Boolean).join(' · ');
-        return '<div class="lrow" data-rid="' + r.id + '"><span class="rec-ico">' + catEmoji(r.category) + '</span>'
+        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', this.state.ledgers.length > 1 && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        return '<div class="lrow' + (r.list_id ? ' is-list' : '') + '" data-rid="' + r.id + '"><span class="rec-ico">' + catEmoji(r.category) + '</span>'
           + '<div class="rec-main"><b>' + esc(r.sub || r.category) + '</b><span>' + esc(meta) + '</span></div>'
           + '<span class="rec-amt' + (inc ? ' income' : '') + '">' + (inc ? '+' : '−') + fmtMoney(Math.abs(Number(r.amount) || 0)) + '</span></div>';
       }).join('');
@@ -2737,12 +2744,12 @@ const App = {
       b.onclick = (e) => { e.stopPropagation(); this.addRecordModal(lid, b.dataset.add, null, null, false, true); };
     });
     host.querySelectorAll('.m2-detail .lrow[data-rid]').forEach(row => {
-      row.onclick = () => this.editRecord(row.dataset.rid, lid);
+      row.onclick = () => this.openRecordEditor(row.dataset.rid, lid);
     });
     host.querySelectorAll('.wk-rec, .m2-rec').forEach(item => {
       item.onclick = () => {
         if (item._skipClick) { item._skipClick = false; return; }
-        this.editRecord(item.dataset.rid, lid);
+        this.openRecordEditor(item.dataset.rid, lid);
       };
       // 右键菜单：删除该账单
       item.oncontextmenu = (e) => {
@@ -3673,10 +3680,16 @@ const App = {
     return '<span class="rec-stars' + (info.neg ? ' neg' : '') + '">' + (info.neg ? '−' : '') + '★'.repeat(full) + (half ? '½' : '') + '</span>';
   },
 
-  /* ---------- 新增记账：工作台（单笔 / 清单） ---------- */
-  addRecordModal(ledgerId, date, preCat, preSub, rental, continuous) {
+  /* ---------- 新增 / 编辑记账：工作台（单笔 / 清单） ----------
+     edit 传入 { record } 编辑单笔，或 { records: [...], listId } 编辑整张清单。
+     编辑态沿用同一个弹窗，保存改为更新已有记录（清单里删掉的行会被同步删除）。 */
+  addRecordModal(ledgerId, date, preCat, preSub, rental, continuous, edit) {
     const cats = this.catsOf(ledgerId);
     if (!cats.length) return this.toast('当前账本还没有分类，请先到设置里添加分类', 'err');
+    const editRec = edit && edit.record ? edit.record : null;
+    const editList = edit && edit.records && edit.records.length ? edit.records : null;
+    if (editRec) { preCat = editRec.category; preSub = editRec.sub; date = editRec.date || date; }
+    if (editList) { preCat = editList[0].category; preSub = editList[0].sub; date = editList[0].date || date; }
     const today = todayStr();
     const wd = d => {
       const dt = new Date(String(d) + 'T00:00:00');
@@ -3692,11 +3705,23 @@ const App = {
     if (rental && !preCat && catOf(RENTAL_CAT)) { cat = RENTAL_CAT; sub = subsOf(cat)[0] || ''; }
     let platforms = this.platformsOf();
 
+    const single0 = editRec ? (() => {
+      const ri = this.ratingInfo(editRec);
+      return {
+        amount: Number(editRec.amount) ? String(Number(editRec.amount)) : '',
+        note: editRec.note || '', remark: editRec.remark || '',
+        fav: !!editRec.favorite, rental: !!editRec.rental,
+        status: editRec.status || '使用中', rating: ri.mag, neg: ri.neg,
+        tags: recTags(editRec).slice(), platform: editRec.purchase_platform || '',
+        spec: editRec.attribute || '', imgs: this.recImages(editRec)
+      };
+    })() : { amount: '', note: '', remark: '', fav: false, rental: !!rental, status: '使用中', rating: 0, neg: false, tags: [], platform: '', spec: '', imgs: [] };
+
     const st = {
-      mode: 'single', kind: kindOf(cat), cat, sub,
+      mode: editList ? 'list' : 'single', kind: kindOf(cat), cat, sub,
       date: date || today,
-      single: { amount: '', note: '', remark: '', fav: false, rental: !!rental, status: '使用中', rating: 0, neg: false, tags: [], platform: '', spec: '', imgs: [] },
-      listTitle: '', drawer: null, rows: []
+      single: single0,
+      listTitle: editList ? (editList[0].list_title || '') : '', drawer: null, rows: []
     };
     let seq = 0;
     const newRow = (seed) => ({
@@ -3704,16 +3729,38 @@ const App = {
       rental: false, price: '', qty: '1', note: '', wish: false, status: '使用中',
       tags: [], platform: '', spec: '', remark: '', imgs: []
     });
-    st.rows.push(newRow());
+    // 云端记录 → 清单行：note 里存的是「标题（×N）」，金额 = 单价 × 数量，这里还原成单价/数量
+    const rowFromRecord = (r) => {
+      const note = String(r.note || '');
+      const mm = note.match(/（×(\d+)）\s*$/);
+      const qty = mm ? Math.max(1, parseInt(mm[1], 10)) : 1;
+      const title = mm ? note.slice(0, mm.index) : note;
+      const amount = Number(r.amount) || 0;
+      return {
+        id: ++seq, recId: r.id, _orig: r,
+        title, cat: r.category || st.cat, sub: r.sub || '',
+        rental: !!r.rental,
+        price: qty > 1 ? Math.round((amount / qty) * 100) / 100 : amount,
+        qty: String(qty), note: '', wish: !!r.favorite, status: r.status || '使用中',
+        tags: recTags(r).slice(), platform: r.purchase_platform || '',
+        spec: r.attribute || '', remark: r.remark || '', imgs: this.recImages(r)
+      };
+    };
+    if (editList) {
+      editList.slice().sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+        .forEach(r => st.rows.push(rowFromRecord(r)));
+    } else {
+      st.rows.push(newRow());
+    }
 
     const mask = this.openModal(`
       <div class="lgwb" id="lgwb">
         <header class="mh">
           <div class="mh-left">
             <span class="eyebrow" id="lgDateEyebrow">${esc(st.date)} · ${wd(st.date)}</span>
-            <div class="mh-title"><h1>记一笔</h1></div>
+            <div class="mh-title"><h1 id="lgTitle">${editList ? '编辑清单' : editRec ? '编辑账单' : '记一笔'}</h1></div>
           </div>
-          <div class="mode-switch" id="lgModeSwitch">
+          <div class="mode-switch" id="lgModeSwitch"${(editRec || editList) ? ' hidden' : ''}>
             <button type="button" data-mode="single" class="on">单笔</button>
             <button type="button" data-mode="list">清单</button>
           </div>
@@ -3808,7 +3855,7 @@ const App = {
                   <tfoot><tr class="row-add"><td colspan="9"><button type="button" id="lgAddRow">＋ 添加一行</button></td></tr></tfoot>
                 </table>
               </div>
-              <div class="list-tip"><span class="tip-dot"></span>每一行都会生成一笔独立账单；勾选「好物」的行会同时进入好物仓库</div>
+              <div class="list-tip"><span class="tip-dot"></span>每一行都会生成一笔账单并归入同一张清单，可在记账本里整单编辑；勾选「好物」的行会同时进入好物仓库</div>
             </section>
           </div>
           <aside class="inspector" id="lgInspector">
@@ -3835,6 +3882,8 @@ const App = {
     const root = mask.querySelector('.lgwb');
     const modal = mask.querySelector('.modal');
     const $ = id => mask.querySelector('#' + id);
+    const listTitleEl = $('lgListTitle');
+    if (listTitleEl) listTitleEl.addEventListener('input', e => { st.listTitle = e.target.value; });
     const pops = [];
     const closePops = () => {
       while (pops.length) {
@@ -4193,7 +4242,7 @@ const App = {
       $('lgTotalSub').textContent = total > 0 ? (count > 1 ? count + ' 笔' : '') + (goods ? (count > 1 ? ' · ' : '') + goods + ' 件好物' : '') : '';
       const lc = $('lgListCount');
       if (lc) lc.textContent = st.rows.filter(r => String(r.title).trim() || parseFloat(r.price)).length + ' 行';
-      $('lgSave').textContent = continuous ? '保存并继续' : '保存';
+      $('lgSave').textContent = continuous ? '保存并继续' : ((editRec || editList) ? '保存修改' : '保存');
     };
     const wishIco = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.5a1 1 0 0 1 1-1Z"/></svg>';
     const paintWishStrip = () => {
@@ -4447,11 +4496,14 @@ const App = {
       }
       let since = '';
       if (f.fav) {
-        if (f.status === '未使用') since = '';
+        // 编辑时状态没变就沿用原来的「已陪伴」起始日，避免每次改金额都重置成今天
+        const keepSince = editRec && editRec.favorite && String(editRec.status || '') === String(f.status || '');
+        if (keepSince) since = editRec.status_since || '';
+        else if (f.status === '未使用') since = '';
         else if (f.status === '已弃用' || f.status === '已磬用') since = fmtWishSince(todayStr(), 1, amount);
         else since = todayStr();
       }
-      this.optimisticAdd({
+      const payload = {
         ledger_id: ledgerId, category: st.cat, sub: st.sub, amount,
         note: String(f.note || '').trim(),
         remark: String(f.remark || '').trim(),
@@ -4465,7 +4517,25 @@ const App = {
         date: st.date, image: null, kind: kindOf(st.cat),
         status: f.fav ? f.status : '',
         status_since: f.fav ? since : ''
-      });
+      };
+      if (editRec) {
+        const patch = { ...payload };
+        delete patch.image;
+        // 图片还没拉下来就不写 images，免得把云端已有图片覆盖成空
+        if (editRec._imgLoaded !== true) delete patch.images;
+        Store.update('records', editRec.id, patch).then(() => {
+          const rec = this.state.records.find(x => x.id === editRec.id);
+          if (rec) Object.assign(rec, patch);
+          this.touchQuickMru(st.cat, st.sub);
+          this.refreshQuickBar(ledgerId);
+          this._cacheSnapshot();
+          this.refreshCurrentView();
+          this.closeModal();
+          this.toast('已保存修改', 'ok');
+        }).catch(e => this.toast('保存失败：' + ((e && e.message) || e), 'err'));
+        return true;
+      }
+      this.optimisticAdd(payload);
       this.touchQuickMru(st.cat, st.sub);
       this.refreshQuickBar(ledgerId);
       if (continuous) {
@@ -4512,19 +4582,26 @@ const App = {
         this.toast('至少填写一行明细', 'err');
         return false;
       }
+      const isEditList = !!editList;
+      const listId = isEditList ? (editList[0].list_id || uid()) : uid();
+      const listTitle = String(st.listTitle || '').trim() || '未命名清单';
+      const updates = [];
       let total = 0;
       valid.forEach(r => {
         const price = Math.round((parseFloat(r.price) || 0) * 100) / 100;
         const qty = Math.max(1, Math.round(parseFloat(r.qty) || 1));
         const amount = Math.round(price * qty * 100) / 100;
         total += amount;
+        const orig = r._orig || null;
         let since = '';
         if (r.wish) {
-          if (r.status === '未使用') since = '';
+          const keepSince = orig && orig.favorite && String(orig.status || '') === String(r.status || '');
+          if (keepSince) since = orig.status_since || '';
+          else if (r.status === '未使用') since = '';
           else if (r.status === '已弃用' || r.status === '已磬用') since = fmtWishSince(todayStr(), 1, amount);
           else since = todayStr();
         }
-        this.optimisticAdd({
+        const payload = {
           ledger_id: ledgerId, category: r.cat, sub: r.sub, amount,
           note: String(r.title).trim() + (qty > 1 ? '（×' + qty + '）' : ''),
           remark: String(r.remark || '').trim(),
@@ -4534,14 +4611,39 @@ const App = {
           images: r.wish ? r.imgs.slice() : [],
           purchase_platform: r.wish ? r.platform : '',
           attribute: r.wish ? String(r.spec || '').trim() : '',
-          rating: 0,
+          rating: orig ? (Number(orig.rating) || 0) : 0,
           date: st.date, image: null, kind: kindOf(r.cat),
           status: r.wish ? r.status : '',
-          status_since: since
-        });
+          status_since: r.wish ? since : '',
+          list_id: listId, list_title: listTitle
+        };
+        if (orig) {
+          const patch = { ...payload };
+          delete patch.image;
+          // 图片没加载出来就别回写；取消好物时则要清空
+          if (r.wish && orig._imgLoaded !== true) delete patch.images;
+          updates.push({ id: orig.id, patch });
+        } else {
+          this.optimisticAdd(payload);
+        }
         this.touchQuickMru(r.cat, r.sub);
       });
       this.refreshQuickBar(ledgerId);
+      if (isEditList) {
+        // 被删掉的行同步删记录；其余逐条更新（标题改动作用于整张清单）
+        const kept = new Set(valid.filter(r => r.recId).map(r => r.recId));
+        editList.forEach(x => { if (!kept.has(x.id)) this.optimisticRemove(x.id); });
+        Promise.all(updates.map(u => Store.update('records', u.id, u.patch).then(() => {
+          const rec = this.state.records.find(x => x.id === u.id);
+          if (rec) Object.assign(rec, u.patch);
+        }))).then(() => {
+          this._cacheSnapshot();
+          this.refreshCurrentView();
+          this.closeModal();
+          this.toast('已保存清单修改 · 合计 ' + fmtMoney(total), 'ok');
+        }).catch(e => this.toast('保存失败：' + ((e && e.message) || e), 'err'));
+        return true;
+      }
       if (continuous) {
         st.rows = [newRow()];
         closeDrawer();
@@ -4571,12 +4673,44 @@ const App = {
     });
 
     /* ---------- 初始绘制 ---------- */
+    $('lgAmt').value = st.single.amount;
+    $('lgNote').value = st.single.note;
+    rem.value = st.single.remark;
+    if (listTitleEl) listTitleEl.value = st.listTitle;
+    if ($('lgRental')) $('lgRental').checked = !!st.single.rental;
     paintRail();
     fitRemark();
     paintSingleGood();
     paintStars();
     paintTotals();
+    if (st.mode === 'list') setMode('list');
+    // 编辑态：图片列不在轻量查询里，弹窗先出，图片异步补进来
+    if (editRec || editList) {
+      const recs = editRec ? [editRec] : editList.filter(r => r.favorite);
+      this.ensureImages(recs).then(changed => {
+        if (!changed) return;
+        if (editRec) { st.single.imgs = this.recImages(editRec); paintSingleGood(); }
+        else {
+          st.rows.forEach(row => { if (row._orig) row.imgs = this.recImages(row._orig); });
+          renderRows();
+          if (st.drawer) renderDrawer();
+        }
+      }).catch(e => console.warn('图片加载失败', e));
+      return;
+    }
     setTimeout(() => { const a = $('lgAmt'); if (a) a.focus(); }, 60);
+  },
+
+  /* 记账本卡片 → 用「记一笔」工作台打开编辑：单笔显示这一笔，清单显示整张清单 */
+  openRecordEditor(rid, ledgerId) {
+    const r = this.state.records.find(x => x.id === rid);
+    if (!r) return;
+    const lid = ledgerId || r.ledger_id;
+    if (r.list_id) {
+      const rows = this.state.records.filter(x => x.list_id === r.list_id && x.ledger_id === r.ledger_id);
+      return this.addRecordModal(lid, r.date, null, null, false, false, { listId: r.list_id, records: rows });
+    }
+    this.addRecordModal(lid, r.date, null, null, false, false, { record: r });
   },
 
   /* ---------- 视图：出租屋（主账本中标记了「出租屋」的记录） ---------- */

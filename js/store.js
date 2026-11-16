@@ -233,12 +233,18 @@ const Store = {
      列表、统计、预算、好物卡片全部用不到原图，图片改为进入页面时按需单条拉取。
      首屏因此不再下载全部图片，本地快照也不会撑爆 localStorage 配额。 */
   RECORD_COLS: 'id,ledger_id,category,sub,amount,note,remark,favorite,tags,rental,'
-    + 'purchase_platform,attribute,rating,date,kind,status,status_since,created_at',
+    + 'purchase_platform,attribute,rating,date,kind,status,status_since,list_id,list_title,created_at',
 
   /* 核心列兜底：云端 schema 缺 optional 列时只退到这一组，绝不再 select('*')。
      select('*') 会把 records.images 的 base64 图片全部拉下来（每条几十上百 KB），
      数据一多就是几十 MB，首页会长时间空白。 */
   RECORD_COLS_CORE: 'id,ledger_id,category,sub,amount,note,favorite,date,kind,created_at',
+
+  /* 按已知缺失列过滤后的 records 查询列集 */
+  _recordCols() {
+    const base = this._recordColsOk === false ? this.RECORD_COLS_CORE : this.RECORD_COLS;
+    return base.split(',').filter(c => !this._noCols.has('records.' + c));
+  },
 
   /* 按 id 批量取图片（records.images，缺列时回退老的单图 image） */
   async fetchImages(ids) {
@@ -279,14 +285,20 @@ const Store = {
   async list(table) {
     if (this.mode === 'supabase') {
       try {
-        const cols = table === 'records'
-          ? (this._recordColsOk === false ? this.RECORD_COLS_CORE : this.RECORD_COLS)
-          : null;
+        // 逐列降级：云端还没加新列（如 list_id）时只剥掉这一列重试，其余列照常返回，
+        // 不会因为一个可选列缺失就退回核心列集、把备注/标签/评分等一起丢掉。
+        const cols = table === 'records' ? this._recordCols().join(',') : null;
         try {
           return await this._listPaged(table, cols);
         } catch (e2) {
           // 只有「列缺失」才降级；网络/超时错误直接抛出，避免用更重的查询再打一次
           if (!cols || this._isTableErr(e2) || !this._isColErr(e2)) throw e2;
+          const col = this._colName(e2);
+          if (col) {
+            this._noCols.add(table + '.' + col);
+            console.warn('records 缺少列 ' + col + '，已自动跳过', e2);
+            return await this.list(table);
+          }
           this._recordColsOk = false;
           console.warn('records 轻量列集不可用，改用核心列集', e2);
           return await this._listPaged(table, this.RECORD_COLS_CORE);
