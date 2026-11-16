@@ -1576,5 +1576,93 @@
   .travel-modal .tv-imgpick-row .btn { flex: 1 0 100%; }
 }
 
+/* ---------------- 总览 · 三列模块 ---------------- */
+#view-travel .tv-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+#view-travel .tv-grid3 .tv-panel,
+#view-travel .tv-grid-even .tv-panel { display: flex; flex-direction: column; }
+#view-travel .tv-grid3 .tv-bud-total,
+#view-travel .tv-grid3 .tv-budget-note { margin-top: auto; }
+#view-travel .tv-catbar-name em { display: block; margin-left: 0; font-style: normal; font-size: 9.5px; line-height: 1.2; color: var(--tv-faint); }
+#view-travel .tv-mini-journals { display: flex; flex-direction: column; overflow: hidden; }
+
+/* 住宿缩略 */
+#view-travel .tv-hotel-mini-list { display: flex; flex-direction: column; gap: 8px; }
+#view-travel .tv-hotel-mini {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 9px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 9px;
+  text-align: left; cursor: pointer;
+  transition: border-color .18s, transform .18s;
+}
+#view-travel .tv-hotel-mini:hover { border-color: var(--tv-accent); transform: translateY(-1px); }
+#view-travel .tv-hotel-mini img,
+#view-travel .tv-hotel-mini-none {
+  width: 50px; height: 40px; flex: none;
+  border-radius: 6px; object-fit: cover;
+  display: grid; place-items: center;
+}
+#view-travel .tv-hotel-mini-none { background: var(--tv-surface2); font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-hotel-mini-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-hotel-mini-main b { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-travel .tv-hotel-mini-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-hotel-mini-amt { margin-left: auto; flex: none; font-family: var(--tv-serif); font-size: 13px; font-weight: 600; color: var(--tv-accent); }
+
+/* ---------------- 昨日 / 今日 / 明日 ---------------- */
+#view-travel .tv-daylane { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+#view-travel .tv-daylane-card.is-today { background: var(--tv-paper); border-color: color-mix(in srgb, var(--tv-accent) 40%, var(--tv-line)); }
+#view-travel .tv-lane-meta { display: flex; flex-direction: column; gap: 2px; margin: 1px 0 7px; }
+#view-travel .tv-lane-meta b { font-family: var(--tv-serif); font-size: 15px; font-weight: 600; }
+#view-travel .tv-lane-meta span { font-size: 10px; color: var(--tv-faint); line-height: 1.55; }
+#view-travel .tv-lane-list { display: flex; flex-direction: column; }
+#view-travel .tv-lane-act {
+  display: flex; align-items: flex-start; gap: 9px;
+  width: 100%; padding: 7px 0;
+  border-bottom: 1px dashed var(--tv-line);
+  background: transparent; color: inherit; text-align: left;
+  font-family: var(--tv-sans); cursor: pointer;
+}
+#view-travel .tv-lane-act:last-child { border-bottom: 0; }
+#view-travel .tv-lane-act:hover .tv-lane-act-body b { color: var(--tv-accent); }
+#view-travel .tv-lane-act em { flex: none; width: 34px; padding-top: 1px; font-style: normal; font-size: 10px; color: var(--tv-accent); }
+#view-travel .tv-lane-act-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+#view-travel .tv-lane-act-body b { font-size: 12px; font-weight: 600; line-height: 1.5; transition: color .18s; }
+#view-travel .tv-lane-act-body i { font-style: normal; font-size: 10px; color: var(--tv-faint); line-height: 1.5; }
+#view-travel .tv-lane-act-cost { flex: none; font-size: 10.5px; color: var(--tv-soft); white-space: nowrap; padding-top: 1px; }
+
+/* ---------------- 内页头部 · 今日概览 ---------------- */
+#view-travel .tv-trip-sum {
+  margin-left: auto; flex: none;
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: right;
+  padding-left: 18px;
+  border-left: 1px dashed var(--tv-line);
+}
+#view-travel .tv-ts-line { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; }
+#view-travel .tv-ts-line em { font-style: normal; font-size: 9.5px; letter-spacing: .16em; color: var(--tv-faint); }
+#view-travel .tv-ts-line b { font-family: var(--tv-serif); font-size: 14px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-ts-line b.c-day { color: var(--tv-accent2); }
+#view-travel .tv-ts-line b.c-spent { color: var(--tv-accent); }
+#view-travel .tv-ts-line b.c-budget { color: var(--tv-sun); }
+
+@media (max-width: 1080px) {
+  #view-travel .tv-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-travel .tv-daylane { grid-template-columns: 1fr 1fr; }
+  #view-travel .tv-daylane-card:nth-child(1) { grid-column: 1 / -1; }
+}
+@media (max-width: 860px) {
+  #view-travel .tv-grid3 { grid-template-columns: 1fr; }
+  #view-travel .tv-daylane { grid-template-columns: 1fr; }
+  #view-travel .tv-trip-sum {
+    width: 100%; flex-direction: row; justify-content: space-between; align-items: center;
+    margin-left: 0; padding: 9px 0 0;
+    border-left: 0; border-top: 1px dashed var(--tv-line);
+    text-align: left;
+  }
+  #view-travel .tv-ts-line { gap: 5px; }
+}
+
+
 
 

@@ -953,6 +953,12 @@
 
   function renderTripBar(t) {
     const days = dateRange(t.startDate, t.endDate).length;
+    const today = todayStr();
+    const curDay = t.days.find(d => d.date === today);
+    const dayNo = curDay ? curDay.day : (today < t.startDate ? 1 : (t.days.length ? t.days[t.days.length - 1].day : 1));
+    const dayCap = curDay ? '今天' : (today < t.startDate ? '未出发' : '已结束');
+    const mine = totalMyCents(t);
+    const budget = totalBudgetCents(t);
     return '<div class="tv-tripbar">' +
         '<button type="button" class="tv-back" data-act="back-library"><span>←</span> 全部旅行册</button>' +
         '<div class="tv-tripinfo">' +
@@ -969,6 +975,11 @@
             '<span class="tv-member-count">' + t.members.length + ' 人同行</span>' +
             '<div class="tv-people">' + t.members.map(m => '<span class="tv-avatar sm ' + esc(m.cls) + '" title="' + esc(m.name) + '">' + esc(m.initial) + '</span>').join('') + '</div>' +
           '</div>' +
+        '</div>' +
+        '<div class="tv-trip-sum">' +
+          '<span class="tv-ts-line"><em>' + dayCap + '</em><b class="c-day">DAY ' + dayNo + '</b></span>' +
+          '<span class="tv-ts-line"><em>已花</em><b class="c-spent">' + money(yuan(mine)) + '</b></span>' +
+          '<span class="tv-ts-line"><em>总预算</em><b class="c-budget">' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b></span>' +
         '</div>' +
       '</div>';
   }
@@ -1038,11 +1049,7 @@
     const per = t.members.length ? Math.round(total / t.members.length) : 0;
     const today = todayStr();
     const day = t.days.find(d => d.date === today) || t.days[0];
-    const cats = CATS.map(c => Object.assign({}, c, {
-      amount: t.expenses.filter(e => e.category === c.id).reduce((a, e) => a + cents(e.amount), 0)
-    })).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
-    const catMax = Math.max.apply(null, cats.map(c => c.amount).concat([1]));
-    const recent = t.journals.slice().sort((a, b) => (b.date + (b.created || 0)).localeCompare(a.date + (a.created || 0))).slice(0, 2);
+    const recent = t.journals.slice().sort((a, b) => (b.date + (b.created || 0)).localeCompare(a.date + (a.created || 0))).slice(0, 3);
     const dayPhotos = t.days.filter(d => d.photo).slice(0, 2);
 
     return '<div class="tv-scrap-cover">' +
@@ -1076,9 +1083,13 @@
         statCard('我的花费', money(yuan(mine)), '已按 AA 份额计算', 'accent') +
         statCard('人均', money(yuan(per)), t.members.length + ' 人均摊') +
       '</div>' +
-      '<div class="tv-grid2">' +
+      '<div class="tv-grid3">' +
         '<section class="tv-panel">' +
-          '<div class="tv-panel-head"><h4>分类预算</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
+          '<div class="tv-panel-head"><h4>总花费明细</h4><button type="button" class="tv-link" data-act="go-expenses">全部账单</button></div>' +
+          spendDetail(t) +
+        '</section>' +
+        '<section class="tv-panel">' +
+          '<div class="tv-panel-head"><h4>我的预算</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
           budgetOverview(t) +
           '<div class="tv-budget-note">按「我的花费」计算，不含朋友那份。每类可单独设预算，下方为合计。</div>' +
         '</section>' +
@@ -1107,37 +1118,80 @@
           '</div>' +
         '</section>' +
       '</div>' +
-      '<div class="tv-grid2">' +
-        '<section class="tv-panel tv-panel-day">' +
-          '<div class="tv-panel-head"><h4>' + (day && day.date === today ? '今天 · DAY ' + day.day : '行程速览 · DAY ' + (day ? day.day : 1)) + '</h4><button type="button" class="tv-link" data-act="go-plan">全部行程</button></div>' +
-          (day ? '<div class="tv-mini-day">' +
-            (day.photo ? '<img class="tv-mini-photo" src="' + esc(day.photo) + '" alt="" loading="lazy">' : '') +
-            '<div class="tv-mini-day-body">' +
-              '<div class="tv-mini-day-head"><b>' + esc(day.city) + '</b><span>' + esc(cnDate(day.date)) + ' · ' + esc(day.weather || '') + '</span></div>' +
-              day.activities.slice(0, 3).map(a => '<button type="button" class="tv-mini-act" data-act="edit-activity" data-id="' + a.id + '"><em>' + esc(a.time) + '</em><span>' + esc(a.title) + '</span></button>').join('') +
-            '</div>' +
-          '</div>' : '<p class="tv-empty">还没有行程，点上面「加行程」安排第一天。</p>') +
+      '<div class="tv-grid2 tv-grid-even">' +
+        '<section class="tv-panel">' +
+          '<div class="tv-panel-head"><h4>住宿</h4><button type="button" class="tv-link" data-act="go-hotels">全部住宿</button></div>' +
+          hotelsMini(t) +
         '</section>' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>最近日志</h4><button type="button" class="tv-link" data-act="go-journal">全部日志</button></div>' +
-          (recent.length ? recent.map(j => {
+          (recent.length ? '<div class="tv-mini-journals">' + recent.map(j => {
             const mood = MOOD[j.mood] || MOOD.calm;
             return '<button type="button" class="tv-mini-journal" data-act="edit-journal" data-id="' + j.id + '">' +
               '<span class="tv-mood-dot" style="background:' + mood.color + '">' + mood.emoji + '</span>' +
               '<span class="tv-mini-journal-main"><b>' + esc(mood.label) + ' · ' + esc(shortDate(j.date)) + '</b>' + esc(j.text.slice(0, 36)) + (j.text.length > 36 ? '…' : '') + '</span>' +
             '</button>';
-          }).join('') : '<p class="tv-empty">还没有日志，记录一下今天的心情。</p>') +
+          }).join('') + '</div>' : '<p class="tv-empty">还没有日志，记录一下今天的心情。</p>') +
         '</section>' +
       '</div>' +
-      '<section class="tv-panel">' +
-        '<div class="tv-panel-head"><h4>分类花费</h4><span class="tv-hint">按共同账单总额</span></div>' +
-        (cats.length ? '<div class="tv-catbars">' + cats.map(c => '<div class="tv-catbar">' +
-          '<span class="tv-catmark" style="--c:' + c.color + '">' + c.mark + '</span>' +
-          '<span class="tv-catbar-name">' + c.label + '</span>' +
-          '<span class="tv-catbar-track"><i style="width:' + Math.max(3, Math.round(c.amount / catMax * 100)) + '%;background:' + c.color + '"></i></span>' +
-          '<b>' + money(yuan(c.amount)) + '</b>' +
-        '</div>').join('') + '</div>' : '<p class="tv-empty">还没有账单，先记第一笔吧。</p>') +
+      dayLane(t);
+  }
+
+  /* 昨日 / 今日 / 明日：每天的全部行程，三列并排不限高 */
+  function dayLane(t) {
+    if (!t.days.length) return '';
+    const today = todayStr();
+    let idx = t.days.findIndex(d => d.date === today);
+    if (idx < 0) idx = today < t.startDate ? 0 : t.days.length - 1;
+    const heads = ['昨日行程', '今日行程', '明日行程'];
+    return '<div class="tv-daylane">' + [-1, 0, 1].map((off, i) => {
+      const d = t.days[idx + off];
+      if (!d) return '<section class="tv-panel tv-daylane-card"><div class="tv-panel-head"><h4>' + heads[i] + '</h4></div><p class="tv-empty">这天不在本次旅行范围内。</p></section>';
+      const isToday = d.date === today;
+      const acts = d.activities || [];
+      return '<section class="tv-panel tv-daylane-card' + (isToday ? ' is-today' : '') + '">' +
+        '<div class="tv-panel-head"><h4>' + (isToday ? '今日行程' : heads[i]) + '</h4><span class="tv-hint">DAY ' + d.day + ' · ' + esc(cnDate(d.date)) + '</span></div>' +
+        '<div class="tv-lane-meta"><b>' + esc(d.city) + '</b><span>' + esc(d.theme || '') + (d.weather ? ' · ' + esc(d.weather) : '') + '</span></div>' +
+        (acts.length ? '<div class="tv-lane-list">' + acts.map(a =>
+          '<button type="button" class="tv-lane-act" data-act="edit-activity" data-id="' + esc(a.id) + '">' +
+            '<em>' + esc(a.time || '--:--') + '</em>' +
+            '<span class="tv-lane-act-body"><b>' + esc(a.title) + '</b>' + (a.place ? '<i>' + esc(a.place) + '</i>' : '') + '</span>' +
+            (a.cost ? '<span class="tv-lane-act-cost">' + money(a.cost) + '</span>' : '') +
+          '</button>').join('') + '</div>' : '<p class="tv-empty">这天还没有安排。</p>') +
       '</section>';
+    }).join('') + '</div>';
+  }
+
+  /* 总花费明细：按分类列出共同账单总额，点击去账本查看 */
+  function spendDetail(t) {
+    const rows = catSpend(t).filter(c => c.all > 0).sort((a, b) => b.all - a.all);
+    if (!rows.length) return '<p class="tv-empty">还没有账单，先记第一笔吧。</p>';
+    const max = Math.max.apply(null, rows.map(c => c.all).concat([1]));
+    const total = totalAllCents(t);
+    return '<div class="tv-catbars">' + rows.map(c => '<div class="tv-catbar">' +
+        '<span class="tv-catmark" style="--c:' + c.color + '">' + c.mark + '</span>' +
+        '<span class="tv-catbar-name">' + c.label + '<em>' + c.items.length + ' 笔</em></span>' +
+        '<span class="tv-catbar-track"><i style="width:' + Math.max(3, Math.round(c.all / max * 100)) + '%;background:' + c.color + '"></i></span>' +
+        '<b>' + money(yuan(c.all)) + '</b>' +
+      '</div>').join('') + '</div>' +
+      '<div class="tv-bud-total"><span>合计总花费</span><b>' + money(yuan(total)) + '</b></div>';
+  }
+
+  /* 住宿缩略：最多两条，保持在日志同高 */
+  function hotelsMini(t) {
+    const list = (t.hotels || []).slice(0, 2);
+    if (!list.length) return '<p class="tv-empty">还没有住宿记录，去「住宿」加一间。</p>';
+    return '<div class="tv-hotel-mini-list">' + list.map(h => {
+      const n = nights(h.checkIn, h.checkOut);
+      return '<button type="button" class="tv-hotel-mini" data-act="edit-hotel" data-id="' + esc(h.id) + '">' +
+        (h.photo ? '<img src="' + esc(h.photo) + '" alt="" loading="lazy">' : '<span class="tv-hotel-mini-none">宿</span>') +
+        '<span class="tv-hotel-mini-main">' +
+          '<b>' + esc(h.name) + '</b>' +
+          '<em>' + esc(shortDate(h.checkIn)) + ' — ' + esc(shortDate(h.checkOut)) + ' · ' + n + ' 晚</em>' +
+        '</span>' +
+        '<span class="tv-hotel-mini-amt">' + money(yuan(cents(h.amount))) + '</span>' +
+      '</button>';
+    }).join('') + '</div>';
   }
 
   function statCard(label, value, foot, cls, act) {
@@ -1459,6 +1513,8 @@
     else if (act === 'go-plan') { state.tab = 'plan'; persist(); render(); }
     else if (act === 'go-journal') { state.tab = 'journal'; persist(); render(); }
     else if (act === 'go-settle') { state.tab = 'settle'; persist(); render(); }
+    else if (act === 'go-expenses') { state.tab = 'expenses'; persist(); render(); }
+    else if (act === 'go-hotels') { state.tab = 'hotels'; persist(); render(); }
     else if (act === 'copy-settle') copySettlement();
     else if (act === 'download-settle') downloadSettlement();
     else if (act === 'person-settle') downloadPersonSettle(ds.id);
