@@ -164,7 +164,7 @@
       destination: '大理',
       startDate: '2026-11-15',
       endDate: '2026-11-18',
-      budget: 6000,
+      budgets: { stay: 2400, food: 1400, ticket: 400, transport: 700, fun: 500, shop: 400, other: 200 },
       createdAt: 1,
       cover: photo('dali ancient town travel photography, cangshan mountain and erhai lake in distance, warm autumn afternoon, film grain, dreamy travel journal cover', 'portrait_4_3'),
       members: [
@@ -269,7 +269,7 @@
       destination: '京都',
       startDate: '2026-11-05',
       endDate: '2026-11-08',
-      budget: 12000,
+      budgets: { stay: 5000, food: 2400, ticket: 1500, transport: 1800, fun: 700, shop: 400, other: 200 },
       createdAt: 2,
       cover: photo('kyoto autumn temple with red maple leaves, traditional wooden street, soft film photography, travel journal cover', 'portrait_4_3'),
       members: defaultMembers(),
@@ -335,7 +335,7 @@
       destination: '泉州',
       startDate: '2026-06-13',
       endDate: '2026-06-15',
-      budget: 3000,
+      budgets: { stay: 900, food: 800, ticket: 300, transport: 500, fun: 300, shop: 100, other: 100 },
       createdAt: 3,
       cover: photo('quanzhou old town red brick lanes, kaiyuan temple twin pagodas, southern fujian architecture, warm evening light, travel journal cover', 'portrait_4_3'),
       members: defaultMembers(),
@@ -436,7 +436,7 @@
       if (!Array.isArray(t.expenses)) t.expenses = [];
       if (!Array.isArray(t.journals)) t.journals = [];
       if (!t.cover) t.cover = photo(t.destination + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
-      if (t.budget == null) t.budget = 0;
+      if (!t.budgets) t.budgets = budgetsOf(t);
     });
     return s;
   }
@@ -558,14 +558,84 @@
     t = t || T();
     return t ? t.expenses.reduce((s, e) => s + cents(e.amount), 0) : 0;
   }
-  function budgetCents(t) {
-    t = t || T();
-    return t ? cents(t.budget || 0) : 0;
+  /* ---------------- 分类预算 / 分类花费 ---------------- */
+  const BUDGET_IDS = CATS.map(c => c.id);
+
+  /* 兼容旧的单笔总预算：按各类「我的花费」占比自动拆分到各分类 */
+  function budgetsOf(t) {
+    const out = {};
+    BUDGET_IDS.forEach(id => { out[id] = 0; });
+    if (!t) return out;
+    if (t.budgets && typeof t.budgets === 'object') {
+      BUDGET_IDS.forEach(id => { out[id] = Math.max(0, Math.round(Number(t.budgets[id]) || 0)); });
+      return out;
+    }
+    const legacy = Math.max(0, Math.round(Number(t.budget) || 0));
+    if (!legacy) return out;
+    const mine = {};
+    let sum = 0;
+    BUDGET_IDS.forEach(id => { mine[id] = 0; });
+    (t.expenses || []).forEach(e => {
+      const v = shareCents(e, 'me');
+      if (mine[e.category] != null) mine[e.category] += v;
+      sum += v;
+    });
+    if (!sum) {
+      const base = Math.floor(legacy / BUDGET_IDS.length);
+      let rest = legacy - base * BUDGET_IDS.length;
+      BUDGET_IDS.forEach((id, i) => { out[id] = base + (i < rest ? 1 : 0); });
+      return out;
+    }
+    let left = legacy;
+    BUDGET_IDS.forEach((id, i) => {
+      if (i === BUDGET_IDS.length - 1) { out[id] = left; return; }
+      const v = Math.min(left, Math.round(legacy * mine[id] / sum));
+      out[id] = v; left -= v;
+    });
+    return out;
+  }
+  function totalBudgetCents(t) {
+    const b = budgetsOf(t);
+    return BUDGET_IDS.reduce((s, id) => s + cents(b[id]), 0);
+  }
+  function catSpend(t) {
+    return CATS.map(c => {
+      const items = (t ? t.expenses : []).filter(e => e.category === c.id);
+      return {
+        id: c.id, label: c.label, mark: c.mark, color: c.color,
+        all: items.reduce((s, e) => s + cents(e.amount), 0),
+        mine: items.reduce((s, e) => s + shareCents(e, 'me'), 0),
+        items
+      };
+    });
+  }
+  function memberName(t, id) {
+    const m = (t.members || []).find(x => x.id === id);
+    return m ? m.name : (id === 'me' ? '我' : '朋友');
+  }
+
+  /* 我 与某位成员之间的账：对方欠我 / 我欠对方，以及每一笔明细 */
+  function pairStats(t, mid) {
+    let theyOwe = 0, iOwe = 0;
+    const items = [];
+    (t.expenses || []).forEach(e => {
+      const ps = e.participants || [];
+      if (ps.indexOf(mid) < 0) return;
+      if (e.payerId === 'me') {
+        const c = shareCents(e, mid);
+        if (c > 0) { theyOwe += c; items.push({ exp: e, cents: c, dir: 1 }); }
+      } else if (e.payerId === mid) {
+        const c = shareCents(e, 'me');
+        if (c > 0) { iOwe += c; items.push({ exp: e, cents: c, dir: -1 }); }
+      }
+    });
+    items.sort((a, b) => String(a.exp.date).localeCompare(String(b.exp.date)));
+    return { theyOwe, iOwe, net: theyOwe - iOwe, items };
   }
 
   function settlement() {
     const t = T();
-    if (!t) return { rows: [], transfers: [], totalCents: 0 };
+    if (!t) return { rows: [], pairs: [], transfers: [], totalCents: 0, meName: '我' };
     const rows = t.members.map(m => Object.assign({}, m, { paid: 0, share: 0, net: 0 }));
     const byId = Object.fromEntries(rows.map(r => [r.id, r]));
     t.expenses.forEach(e => {
@@ -576,18 +646,48 @@
       ps.forEach((pid, i) => { if (byId[pid]) byId[pid].share += parts[i] || 0; });
     });
     rows.forEach(r => { r.net = r.paid - r.share; });
-    const debtors = rows.filter(r => r.net < -0.5).map(r => ({ id: r.id, name: r.name, cents: -r.net })).sort((a, b) => b.cents - a.cents);
-    const creditors = rows.filter(r => r.net > 0.5).map(r => ({ id: r.id, name: r.name, cents: r.net })).sort((a, b) => b.cents - a.cents);
+
+    /* 两人之间的往来：谁欠谁、每笔消费各分担多少 */
+    const debts = {};
+    const addDebt = (a, b, c, e) => {
+      if (!c) return;
+      if (!debts[a]) debts[a] = {};
+      if (!debts[a][b]) debts[a][b] = { cents: 0, items: [] };
+      debts[a][b].cents += c;
+      debts[a][b].items.push({ exp: e, cents: c });
+    };
+    t.expenses.forEach(e => {
+      const payer = e.payerId;
+      const ps = e.participants || [];
+      const parts = splitCents(cents(e.amount), ps.length);
+      ps.forEach((pid, i) => { if (pid !== payer) addDebt(pid, payer, parts[i] || 0, e); });
+    });
+
+    const seen = {};
     const transfers = [];
-    let i = 0, j = 0, guard = 0;
-    while (i < debtors.length && j < creditors.length && guard++ < 200) {
-      const pay = Math.min(debtors[i].cents, creditors[j].cents);
-      if (pay > 0) transfers.push({ from: debtors[i].name, fromId: debtors[i].id, to: creditors[j].name, toId: creditors[j].id, cents: pay });
-      debtors[i].cents -= pay; creditors[j].cents -= pay;
-      if (debtors[i].cents <= 0.5) i++;
-      if (creditors[j].cents <= 0.5) j++;
-    }
-    return { rows, transfers, totalCents: totalAllCents(t) };
+    Object.keys(debts).forEach(a => {
+      Object.keys(debts[a]).forEach(b => {
+        const key = [a, b].sort().join('|');
+        if (seen[key]) return;
+        seen[key] = 1;
+        const ab = (debts[a] && debts[a][b] && debts[a][b].cents) || 0;
+        const ba = (debts[b] && debts[b][a] && debts[b][a].cents) || 0;
+        const net = ab - ba;
+        if (Math.abs(net) > 0.5) {
+          const fromId = net > 0 ? a : b;
+          const toId = net > 0 ? b : a;
+          transfers.push({ fromId, toId, from: memberName(t, fromId), to: memberName(t, toId), cents: Math.abs(net) });
+        }
+      });
+    });
+    transfers.sort((x, y) => y.cents - x.cents);
+
+    const me = t.members.find(m => m.id === 'me') || { name: '我' };
+    const pairs = t.members.filter(m => m.id !== 'me').map(m => Object.assign(
+      { id: m.id, name: m.name, initial: m.initial, cls: m.cls },
+      pairStats(t, m.id)
+    ));
+    return { rows, pairs, transfers, totalCents: totalAllCents(t), meName: me.name };
   }
 
   /* ---------------- 与记账本同步 ---------------- */
@@ -935,7 +1035,6 @@
     const s = settlement();
     const total = totalAllCents(t);
     const mine = totalMyCents(t);
-    const budget = budgetCents(t);
     const per = t.members.length ? Math.round(total / t.members.length) : 0;
     const today = todayStr();
     const day = t.days.find(d => d.date === today) || t.days[0];
@@ -979,18 +1078,32 @@
       '</div>' +
       '<div class="tv-grid2">' +
         '<section class="tv-panel">' +
-          '<div class="tv-panel-head"><h4>预算进度</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
-          budgetBar(budget, mine) +
-          '<div class="tv-budget-note">预算按「我的花费」计算，不含朋友那份。' + (budget ? '' : ' 还没填预算，点右上角「修改预算」设置一个吧。') + '</div>' +
+          '<div class="tv-panel-head"><h4>分类预算</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
+          budgetOverview(t) +
+          '<div class="tv-budget-note">按「我的花费」计算，不含朋友那份。每类可单独设预算，下方为合计。</div>' +
         '</section>' +
         '<section class="tv-panel">' +
-          '<div class="tv-panel-head"><h4>成员分摊</h4><button type="button" class="tv-link" data-act="go-settle">查看对账</button></div>' +
+          '<div class="tv-panel-head"><h4>谁该给谁钱</h4><button type="button" class="tv-link" data-act="go-settle">看每笔明细</button></div>' +
           '<div class="tv-members">' +
-            s.rows.map(r => '<div class="tv-member-row">' +
-              '<span class="tv-avatar lg ' + esc(r.cls) + '">' + esc(r.initial) + '</span>' +
-              '<div class="tv-member-main"><b>' + esc(r.name) + '</b><span>已付 ' + money(yuan(r.paid)) + ' · 应摊 ' + money(yuan(r.share)) + '</span></div>' +
-              '<span class="tv-net ' + (r.net >= 0 ? 'pos' : 'neg') + '">' + (r.net >= 0 ? '+' : '−') + money(yuan(Math.abs(r.net))).slice(1) + '</span>' +
-            '</div>').join('') +
+            s.rows.map(r => {
+              const p = s.pairs.find(x => x.id === r.id);
+              let netTxt = '我';
+              let cls = '';
+              if (r.id === 'me') {
+                const recv = s.pairs.reduce((a, p) => a + Math.max(0, p.net), 0);
+                netTxt = recv > 0.5 ? '待收 ' + money(yuan(recv)) : '已结清';
+                cls = recv > 0.5 ? 'pos' : '';
+              } else if (p) {
+                if (p.net > 0.5) { netTxt = '需付我 ' + money(yuan(p.net)); cls = 'pos'; }
+                else if (p.net < -0.5) { netTxt = '我需付 ' + money(yuan(-p.net)); cls = 'neg'; }
+                else netTxt = '已结清';
+              }
+              return '<div class="tv-member-row">' +
+                '<span class="tv-avatar lg ' + esc(r.cls) + '">' + esc(r.initial) + '</span>' +
+                '<div class="tv-member-main"><b>' + esc(r.name) + '</b><span>已垫付 ' + money(yuan(r.paid)) + ' · 应承担 ' + money(yuan(r.share)) + '</span></div>' +
+                '<span class="tv-net ' + cls + '">' + netTxt + '</span>' +
+              '</div>';
+            }).join('') +
           '</div>' +
         '</section>' +
       '</div>' +
@@ -1035,6 +1148,26 @@
     const over = budget > 0 && used > budget;
     return '<div class="tv-bigbar"><span class="tv-bigbar-track"><i class="' + (over ? 'over' : '') + '" style="width:' + (budget > 0 ? Math.max(2, pct) : 0) + '%"></i></span>' +
       '<div class="tv-bigbar-foot"><span>' + money(yuan(used)) + ' / ' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</span><b>' + (budget > 0 ? pct + '%' : '—') + '</b></div></div>';
+  }
+
+  /* 分类预算总览：每类一行「已花 / 预算」 */
+  function budgetOverview(t) {
+    const b = budgetsOf(t);
+    const rows = catSpend(t).filter(c => b[c.id] > 0 || c.mine > 0);
+    const totalBudget = totalBudgetCents(t);
+    if (!rows.length) return '<p class="tv-empty">还没设置预算。点右上角「修改预算」，给每个分类填上计划金额。</p>';
+    return '<div class="tv-bud-list">' + rows.map(c => {
+      const bc = cents(b[c.id]);
+      const pct = bc > 0 ? Math.min(100, Math.round(c.mine / bc * 100)) : 0;
+      const over = bc > 0 && c.mine > bc;
+      return '<div class="tv-bud-row">' +
+        '<span class="tv-bud-mark" style="--c:' + c.color + '">' + c.mark + '</span>' +
+        '<span class="tv-bud-label">' + c.label + '</span>' +
+        '<span class="tv-bud-num' + (over ? ' over' : '') + '">' + money(yuan(c.mine)) + '<em> / ' + (bc > 0 ? money(yuan(bc)) : '未设') + '</em></span>' +
+        '<span class="tv-bud-track"><i class="' + (over ? 'over' : '') + '" style="width:' + (bc > 0 ? Math.max(2, pct) : 0) + '%;background:' + c.color + '"></i></span>' +
+      '</div>';
+    }).join('') + '</div>' +
+      '<div class="tv-bud-total"><span>合计预算</span><b>' + money(yuan(totalBudget)) + '</b></div>';
   }
 
   /* ---------- 行程 ---------- */
@@ -1191,8 +1324,11 @@
   /* ---------- 对账 ---------- */
   function renderSettle(t) {
     const s = settlement();
+    const cats = catSpend(t).filter(c => c.mine > 0);
+    const budgets = budgetsOf(t);
+    const totalMine = totalMyCents(t);
     return '<div class="tv-section-head">' +
-        '<div><span class="tv-eyebrow">Settlement</span><h3>分摊对账</h3><p>整趟旅行结束后，按最少转账次数结清。复制出来是一张图片，直接发群里就行。</p></div>' +
+        '<div><span class="tv-eyebrow">Settlement</span><h3>对账单</h3><p>每一笔钱都拆到消费项目，谁该给谁、为什么给，点开就能核对。</p></div>' +
         '<div class="tv-settle-acts">' +
           '<button type="button" class="tv-btn solid" data-act="copy-settle">复制对账单图片</button>' +
           '<button type="button" class="tv-btn" data-act="download-settle">下载图片</button>' +
@@ -1201,27 +1337,83 @@
       '<div class="tv-settle-hero">' +
         '<div class="tv-settle-stamp">对<br>账<br>单</div>' +
         '<div class="tv-settle-title"><span>' + esc(t.title) + '</span><h3>' + money(yuan(s.totalCents)) + '</h3><p>' + esc(t.startDate) + ' — ' + esc(t.endDate) + ' · ' + t.members.length + ' 人</p></div>' +
-        '<div class="tv-settle-mine"><span>我的花费</span><b>' + money2(yuan(totalMyCents(t))) + '</b><em>已按 AA 份额入账</em></div>' +
+        '<div class="tv-settle-mine"><span>我的花费</span><b>' + money2(yuan(totalMine)) + '</b><em>已按 AA 份额入账</em></div>' +
       '</div>' +
-      '<div class="tv-grid2">' +
-        '<section class="tv-panel">' +
-          '<div class="tv-panel-head"><h4>每个人</h4><span class="tv-hint">已付 / 应摊 / 净额</span></div>' +
-          '<div class="tv-settle-rows">' + s.rows.map(r => '<div class="tv-settle-row">' +
-            '<span class="tv-avatar lg ' + esc(r.cls) + '">' + esc(r.initial) + '</span>' +
-            '<div><b>' + esc(r.name) + '</b><span>已付 ' + money(yuan(r.paid)) + ' · 应摊 ' + money(yuan(r.share)) + '</span></div>' +
-            '<strong class="' + (r.net >= 0 ? 'pos' : 'neg') + '">' + (r.net >= 0 ? '应收 ' : '应付 ') + money(yuan(Math.abs(r.net))) + '</strong>' +
-          '</div>').join('') + '</div>' +
-        '</section>' +
-        '<section class="tv-panel">' +
-          '<div class="tv-panel-head"><h4>转账方案</h4><span class="tv-hint">' + (s.transfers.length || '无需') + ' 笔结清</span></div>' +
-          (s.transfers.length ? '<div class="tv-transfer-list">' + s.transfers.map(tr => '<div class="tv-transfer">' +
-            '<span class="tv-avatar sm ' + esc(member(tr.fromId).cls) + '">' + esc(member(tr.fromId).initial) + '</span>' +
-            '<b>' + esc(tr.from) + '</b><i>→</i><span class="tv-avatar sm ' + esc(member(tr.toId).cls) + '">' + esc(member(tr.toId).initial) + '</span><b>' + esc(tr.to) + '</b>' +
-            '<strong>' + money(yuan(tr.cents)) + '</strong>' +
-          '</div>').join('') + '</div>' : '<p class="tv-empty">刚好平账，不用转钱。</p>') +
-          '<p class="tv-settle-note">对账单只统计本旅行账本。记账本里的金额是我的分摊份额，不是账单总额。</p>' +
-        '</section>' +
-      '</div>';
+      '<section class="tv-panel">' +
+        '<div class="tv-panel-head"><h4>我的分类花费</h4><span class="tv-hint">金额为我的 AA 份额 · 点击展开明细</span></div>' +
+        (cats.length ? '<div class="tv-cat-folds">' + cats.map(c => {
+          const budgetCents = cents(budgets[c.id]);
+          const over = budgetCents > 0 && c.mine > budgetCents;
+          return '<details class="tv-cat-fold">' +
+            '<summary>' +
+              '<span class="tv-bud-mark" style="--c:' + c.color + '">' + c.mark + '</span>' +
+              '<span class="tv-cat-fold-name">' + c.label + '</span>' +
+              '<span class="tv-cat-fold-count">' + c.items.length + ' 笔</span>' +
+              '<span class="tv-cat-fold-amt' + (over ? ' over' : '') + '">' + money(yuan(c.mine)) + '<em>' + (budgetCents > 0 ? ' / 预算 ' + money(yuan(budgetCents)) : '') + '</em></span>' +
+              '<span class="tv-cat-fold-caret">›</span>' +
+            '</summary>' +
+            '<div class="tv-cat-fold-body">' +
+              c.items.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map(e => {
+                const md = CAT[e.category] || CAT.other;
+                return '<div class="tv-cat-item">' +
+                  '<span class="tv-cat-item-date">' + esc(shortDate(e.date)) + '</span>' +
+                  '<span class="tv-cat-item-main"><b>' + esc(e.title) + '</b><em>' + esc(md.label) + ' · 总额 ' + money(yuan(cents(e.amount))) + '</em></span>' +
+                  '<span class="tv-cat-item-share">' + money2(yuan(shareCents(e, 'me'))) + '<em>我的份额</em></span>' +
+                '</div>';
+              }).join('') +
+            '</div>' +
+          '</details>';
+        }).join('') + '</div>' : '<p class="tv-empty">还没有账单，先记一笔吧。</p>') +
+        '<div class="tv-bud-total"><span>我的花费合计</span><b>' + money2(yuan(totalMine)) + '</b></div>' +
+      '</section>' +
+      '<section class="tv-panel">' +
+        '<div class="tv-panel-head"><h4>每个人的对账单</h4><span class="tv-hint">谁欠谁、欠在哪几笔，一目了然</span></div>' +
+        (s.pairs.length ? '<div class="tv-pairs">' + s.pairs.map(p => {
+          const meName = s.meName;
+          const settled = Math.abs(p.net) < 0.5;
+          const toMe = p.net > 0;
+          const line = settled
+            ? '你和 ' + esc(p.name) + ' 已经结清'
+            : toMe
+              ? esc(p.name) + ' 需付给 ' + esc(meName) + ' <b>' + money2(yuan(p.net)) + '</b>'
+              : esc(meName) + ' 需付给 ' + esc(p.name) + ' <b>' + money2(yuan(-p.net)) + '</b>';
+          return '<article class="tv-pair">' +
+            '<div class="tv-pair-head">' +
+              '<span class="tv-avatar lg ' + esc(p.cls) + '">' + esc(p.initial) + '</span>' +
+              '<div class="tv-pair-who"><b>' + esc(p.name) + '</b><span>' + p.items.length + ' 笔共同消费</span></div>' +
+              '<div class="tv-pair-sum ' + (settled ? '' : toMe ? 'pos' : 'neg') + '">' + line + '</div>' +
+            '</div>' +
+            (p.items.length ? '<details class="tv-pair-detail">' +
+              '<summary>查看这 ' + p.items.length + ' 笔明细</summary>' +
+              '<div class="tv-pair-items">' + p.items.map(it => {
+                const mineShare = it.dir === 1;
+                return '<div class="tv-pair-item">' +
+                  '<span class="tv-pair-date">' + esc(shortDate(it.exp.date)) + '</span>' +
+                  '<span class="tv-pair-main"><b>' + esc(it.exp.title) + '</b><em>' + (mineShare ? esc(p.name) + ' 应分摊' : meName + ' 应分摊') + ' · 消费总额 ' + money(yuan(cents(it.exp.amount))) + '</em></span>' +
+                  '<span class="tv-pair-amt ' + (mineShare ? 'pos' : 'neg') + '">' + (mineShare ? '+' : '−') + money2(yuan(it.cents)).slice(1) + '</span>' +
+                '</div>';
+              }).join('') + '</div>' +
+              '<div class="tv-pair-foot">' +
+                '<span>对方应承担 <b>' + money2(yuan(p.theyOwe)) + '</b></span>' +
+                '<span>我应承担 <b>' + money2(yuan(p.iOwe)) + '</b></span>' +
+              '</div>' +
+            '</details>' : '') +
+            '<div class="tv-pair-acts">' +
+              '<span>只统计你和 ' + esc(p.name) + ' 之间的消费，不掺其他人的账</span>' +
+              '<button type="button" class="tv-btn" data-act="person-settle" data-id="' + esc(p.id) + '">生成 ' + esc(p.name) + ' 的对账单</button>' +
+            '</div>' +
+          '</article>';
+        }).join('') + '</div>' : '<p class="tv-empty">还没有其他同行人，先在上方「编辑册子」里添加吧。</p>') +
+      '</section>' +
+      '<section class="tv-panel">' +
+        '<div class="tv-panel-head"><h4>结清转账</h4><span class="tv-hint">' + (s.transfers.length || '无需') + ' 笔</span></div>' +
+        (s.transfers.length ? '<div class="tv-transfer-list">' + s.transfers.map(tr => '<div class="tv-transfer">' +
+          '<span class="tv-avatar sm ' + esc(member(tr.fromId).cls) + '">' + esc(member(tr.fromId).initial) + '</span>' +
+          '<b>' + esc(tr.from) + '</b><i>→</i><span class="tv-avatar sm ' + esc(member(tr.toId).cls) + '">' + esc(member(tr.toId).initial) + '</span><b>' + esc(tr.to) + '</b>' +
+          '<strong>' + money(yuan(tr.cents)) + '</strong>' +
+        '</div>').join('') + '</div>' : '<p class="tv-empty">刚好平账，不用转钱。</p>') +
+        '<p class="tv-settle-note">对账单只统计本旅行账本；记账本里记录的是我的 AA 分摊金额，不是消费总额。</p>' +
+      '</section>';
   }
 
   /* ---------------- 事件绑定 ---------------- */
@@ -1269,6 +1461,7 @@
     else if (act === 'go-settle') { state.tab = 'settle'; persist(); render(); }
     else if (act === 'copy-settle') copySettlement();
     else if (act === 'download-settle') downloadSettlement();
+    else if (act === 'person-settle') downloadPersonSettle(ds.id);
     else if (act === 'reset-demo') resetDemo();
   }
 
@@ -1371,10 +1564,7 @@
         field('出发日期', dateInput('tv-t-start', data.startDate)) +
         field('结束日期', dateInput('tv-t-end', data.endDate)) +
       '</div>' +
-      '<div class="field-row">' +
-        field('我的预算（元）', '<input id="tv-t-budget" type="number" min="0" step="100" value="' + (data.budget || '') + '" placeholder="例如 6000">') +
-        field('旅行状态', '<select id="tv-t-status">' + TRIP_STATUSES.map(s => '<option value="' + s.id + '"' + (s.id === curStatus ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select>') +
-      '</div>' +
+      field('旅行状态', '<select id="tv-t-status">' + TRIP_STATUSES.map(s => '<option value="' + s.id + '"' + (s.id === curStatus ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select>') +
       field('封面图片链接（可选）', '<input id="tv-t-cover" type="text" value="' + esc(data.cover || '') + '" placeholder="留空按目的地自动生成，也可以直接点封面图更换">') +
       '<div class="field"><label>同行成员</label>' +
         '<div class="tv-memlist" id="tv-t-memlist">' + members.map(memRow).join('') + '</div>' +
@@ -1430,7 +1620,6 @@
       const dest = m.querySelector('#tv-t-dest').value.trim() || defaultDest;
       const start = m.querySelector('#tv-t-start').dataset.date || todayStr();
       const end = m.querySelector('#tv-t-end').dataset.date || start;
-      const budget = Number(m.querySelector('#tv-t-budget').value) || 0;
       const status = m.querySelector('#tv-t-status').value || curStatus;
       const coverIn = m.querySelector('#tv-t-cover').value.trim();
       if (!title) return toast('请填写旅行册标题', 'err');
@@ -1440,7 +1629,7 @@
       const nextMembers = readMembers();
       if (editing) {
         applyMembers(trip, nextMembers);
-        Object.assign(trip, { title: title, destination: dest, budget: budget, cover: cover, status: status });
+        Object.assign(trip, { title: title, destination: dest, cover: cover, status: status });
         if (trip.startDate !== start || trip.endDate !== end) {
           trip.startDate = start; trip.endDate = end;
           trip.days = buildDays(start, end, dest, trip.days);
@@ -1459,7 +1648,7 @@
           destination: dest,
           startDate: start,
           endDate: end,
-          budget: budget,
+          budgets: budgetsOf(null),
           status: status,
           cover: cover,
           createdAt: Date.now(),
@@ -1509,27 +1698,47 @@
   function openBudgetModal() {
     const t = T();
     if (!t) return;
+    const b = budgetsOf(t);
     const m = openModal(
-      modalTitle('设置旅行预算', '预算按我的花费计算，不含朋友那份') +
-      field('预算金额（元）', '<input id="tv-budget-input" type="number" min="0" step="100" value="' + (t.budget || '') + '" placeholder="例如 6000">') +
-      '<div class="tv-quick-amounts">' + [3000, 5000, 8000, 12000].map(v => '<button type="button" data-amount="' + v + '">' + v + '</button>').join('') + '</div>' +
-      '<p class="tv-form-tip">当前我的花费已累计 <b>' + money2(yuan(totalMyCents())) + '</b></p>' +
+      modalTitle('分类预算', '每种消费单独设预算，合计就是这趟旅行的总预算') +
+      '<div class="tv-bud-edit">' + CATS.map(c =>
+        '<label class="tv-bud-edit-row">' +
+          '<span class="tv-bud-mark" style="--c:' + c.color + '">' + c.mark + '</span>' +
+          '<span class="tv-bud-edit-name">' + c.label + '</span>' +
+          '<input class="tv-bud-input" type="number" min="0" step="10" data-cat="' + c.id + '" value="' + (b[c.id] || '') + '" placeholder="0">' +
+        '</label>'
+      ).join('') + '</div>' +
+      '<div class="tv-bud-total"><span>合计预算</span><b id="tv-bud-sum">' + money(yuan(totalBudgetCents(t))) + '</b></div>' +
+      '<p class="tv-form-tip">预算按「我的花费」计算；当前已累计 <b>' + money2(yuan(totalMyCents(t))) + '</b>。</p>' +
       '<div class="modal-acts">' +
         '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
         '<button type="button" class="btn btn-primary" id="tv-budget-save">保存预算</button>' +
       '</div>'
     );
     if (!m) return;
-    const input = m.querySelector('#tv-budget-input');
-    m.querySelectorAll('[data-amount]').forEach(b => { b.onclick = () => { input.value = b.dataset.amount; input.focus(); }; });
-    m.querySelector('#tv-budget-save').onclick = () => {
-      const v = Number(input.value);
-      if (!isFinite(v) || v < 0) return toast('请输入正确的预算金额', 'err');
-      t.budget = Math.round(v);
-      persist(); App.closeModal(); render();
-      toast('预算已更新为 ' + money(t.budget), 'ok');
+    const inputs = Array.from(m.querySelectorAll('.tv-bud-input'));
+    const readBudgets = () => {
+      const out = {};
+      CATS.forEach(c => { out[c.id] = 0; });
+      inputs.forEach(inp => {
+        const v = Number(inp.value);
+        out[inp.dataset.cat] = isFinite(v) && v > 0 ? Math.round(v) : 0;
+      });
+      return out;
     };
-    setTimeout(() => input.focus(), 80);
+    const sumEl = m.querySelector('#tv-bud-sum');
+    const paintSum = () => {
+      const nb = readBudgets();
+      const total = BUDGET_IDS.reduce((s, id) => s + cents(nb[id]), 0);
+      sumEl.textContent = money(yuan(total));
+    };
+    inputs.forEach(inp => inp.addEventListener('input', paintSum));
+    m.querySelector('#tv-budget-save').onclick = () => {
+      t.budgets = readBudgets();
+      persist(); App.closeModal(); render();
+      toast('分类预算已更新', 'ok');
+    };
+    setTimeout(() => { if (inputs[0]) inputs[0].focus(); }, 80);
   }
 
   /* ---------- 照片：点击图片上传本地文件 / 粘贴链接 ---------- */
@@ -2215,19 +2424,30 @@
     /* 成员分摊 */
     g.fillStyle = c.ink;
     g.font = '600 16px "PingFang SC", sans-serif';
-    g.fillText('成员分摊', 78, 350);
-    s.rows.forEach((r, i) => {
+    g.fillText('谁该给谁钱', 78, 350);
+    const lines = [{ name: '我的花费（AA 后）', note: '已同步记账本', right: money2(yuan(totalMyCents(t))), tone: 'pos' }].concat(
+      s.pairs.map(p => {
+        const settled = Math.abs(p.net) < 0.5;
+        const toMe = p.net > 0;
+        return {
+          name: p.name,
+          note: p.items.length + ' 笔共同消费',
+          right: settled ? '已结清' : (toMe ? '需付我 ' : '我需付 ') + money2(yuan(Math.abs(p.net))),
+          tone: settled ? '' : (toMe ? 'pos' : 'neg')
+        };
+      })
+    );
+    lines.forEach((r, i) => {
       const y = 388 + i * 44;
       g.fillStyle = c.ink;
       g.font = '600 15px "PingFang SC", sans-serif';
       g.fillText(r.name, 78, y);
       g.fillStyle = c.faint;
       g.font = '12px "PingFang SC", sans-serif';
-      g.fillText('已付 ' + money(yuan(r.paid)) + ' · 应摊 ' + money(yuan(r.share)), 148, y);
-      g.fillStyle = r.net >= 0 ? c.accent2 : c.accent;
+      g.fillText(r.note, 168, y);
+      g.fillStyle = r.tone === 'neg' ? c.accent : c.accent2;
       g.font = '600 15px "PingFang SC", sans-serif';
-      const txt = (r.net >= 0 ? '应收 ' : '应付 ') + money(yuan(Math.abs(r.net)));
-      g.fillText(txt, W - 78 - g.measureText(txt).width, y);
+      g.fillText(r.right, W - 78 - g.measureText(r.right).width, y);
     });
 
     /* 转账方案 */
@@ -2268,6 +2488,118 @@
     g.restore();
     g.textAlign = 'left';
     return canvas;
+  }
+
+  /* 单个成员的对账单：只包含「我」与这位成员之间的往来 */
+  function drawPersonStatement(mid) {
+    const t = T();
+    if (!t) return null;
+    const s = settlement();
+    const p = s.pairs.find(x => x.id === mid);
+    if (!p) return null;
+    const c = THEME_COLORS[state.theme] || THEME_COLORS.bloom;
+    const items = p.items.slice(0, 18);
+    const W = 760, H = 380 + Math.max(1, items.length) * 54 + 100;
+    const canvas = document.createElement('canvas');
+    const dpr = 2;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext('2d');
+    g.scale(dpr, dpr);
+
+    function rr(x, y, w, h, r) {
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.arcTo(x + w, y, x + w, y + h, r);
+      g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r);
+      g.arcTo(x, y, x + w, y, r);
+      g.closePath();
+    }
+
+    g.fillStyle = c.bg; g.fillRect(0, 0, W, H);
+    g.fillStyle = c.surface; rr(32, 32, W - 64, H - 64, 20); g.fill();
+    g.strokeStyle = c.line; g.lineWidth = 1; g.stroke();
+
+    g.fillStyle = c.accent;
+    g.font = '600 20px "Songti SC", "Noto Serif SC", Georgia, serif';
+    g.fillText('个人对账单', 68, 94);
+    g.fillStyle = c.ink;
+    g.font = '600 30px "Songti SC", "Noto Serif SC", Georgia, serif';
+    g.fillText(p.name, 68, 136);
+    g.fillStyle = c.faint;
+    g.font = '13px "PingFang SC", "Microsoft YaHei", sans-serif';
+    g.fillText(t.title + ' · ' + t.startDate + ' — ' + t.endDate, 68, 162);
+
+    const settled = Math.abs(p.net) < 0.5;
+    const toMe = p.net > 0;
+    const headLine = settled ? '已和 ' + s.meName + ' 结清'
+      : toMe ? p.name + ' 需付给 ' + s.meName + ' ' + money2(yuan(p.net))
+      : s.meName + ' 需付给 ' + p.name + ' ' + money2(yuan(-p.net));
+    g.fillStyle = settled ? c.accent2 : c.accent;
+    g.font = '600 26px "Songti SC", Georgia, serif';
+    g.fillText(headLine, 68, 218);
+    g.fillStyle = c.faint;
+    g.font = '12px "PingFang SC", sans-serif';
+    g.fillText('共 ' + p.items.length + ' 笔共同消费 · 金额为 AA 后各自应承担的部分', 68, 244);
+
+    g.strokeStyle = c.line;
+    g.beginPath(); g.moveTo(68, 266); g.lineTo(W - 68, 266); g.stroke();
+
+    if (!items.length) {
+      g.fillStyle = c.faint;
+      g.font = '14px "PingFang SC", sans-serif';
+      g.fillText('这趟旅行没有和 ' + p.name + ' 之间的共同消费。', 68, 316);
+    }
+    items.forEach((it, i) => {
+      const y = 306 + i * 54;
+      g.fillStyle = c.faint;
+      g.font = '12px "PingFang SC", sans-serif';
+      g.fillText(shortDate(it.exp.date), 68, y);
+      g.fillStyle = c.ink;
+      g.font = '600 14px "PingFang SC", sans-serif';
+      g.fillText(String(it.exp.title || '').slice(0, 14), 118, y);
+      g.fillStyle = c.faint;
+      g.font = '12px "PingFang SC", sans-serif';
+      g.fillText((it.dir === 1 ? p.name : s.meName) + ' 应分摊 · 总额 ' + money(yuan(cents(it.exp.amount))), 118, y + 20);
+      g.fillStyle = it.dir === 1 ? c.accent2 : c.accent;
+      g.font = '600 15px "PingFang SC", sans-serif';
+      const txt = (it.dir === 1 ? '+' : '−') + money2(yuan(it.cents)).slice(1);
+      g.fillText(txt, W - 68 - g.measureText(txt).width, y);
+    });
+
+    g.fillStyle = c.ink;
+    g.font = '600 13px "PingFang SC", sans-serif';
+    g.fillText('对方应承担 ' + money2(yuan(p.theyOwe)), 68, H - 118);
+    g.fillText('我应承担 ' + money2(yuan(p.iOwe)), 300, H - 118);
+    g.fillStyle = c.faint;
+    g.font = '11px "PingFang SC", sans-serif';
+    g.fillText('旅行账册 · 记账本只记录我的 AA 份额', 68, H - 68);
+
+    g.strokeStyle = c.accent; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(W - 110, H - 96, 38, 0, Math.PI * 2); g.stroke();
+    g.save();
+    g.translate(W - 110, H - 96);
+    g.rotate(-0.12);
+    g.fillStyle = c.accent;
+    g.font = '600 14px "Songti SC", Georgia, serif';
+    g.textAlign = 'center';
+    g.fillText('个人', 0, -4);
+    g.fillText('对账', 0, 16);
+    g.restore();
+    g.textAlign = 'left';
+    return canvas;
+  }
+
+  function downloadPersonSettle(mid) {
+    const t = T();
+    if (!t) return;
+    const p = settlement().pairs.find(x => x.id === mid);
+    if (!p) return toast('没有找到这个人的账单', 'err');
+    const canvas = drawPersonStatement(mid);
+    if (!canvas) return toast('生成图片失败', 'err');
+    saveCanvas(canvas, '对账单-' + t.title + '-' + p.name + '.png').then(ok => {
+      toast(ok ? p.name + ' 的对账单已下载' : '生成图片失败', ok ? 'ok' : 'err');
+    });
   }
 
   function saveCanvas(canvas, name) {

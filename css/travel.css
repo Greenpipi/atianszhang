@@ -1061,6 +1061,145 @@
 #view-travel .tv-transfer strong { margin-left: auto; font-family: var(--tv-serif); font-size: 14px; color: var(--tv-accent); }
 #view-travel .tv-settle-note { margin: 4px 0 0; font-size: 10px; line-height: 1.65; color: var(--tv-faint); }
 
+/* ---------------- 分类预算 ---------------- */
+#view-travel .tv-bud-list { display: flex; flex-direction: column; gap: 7px; }
+#view-travel .tv-bud-row {
+  display: grid;
+  grid-template-columns: 22px minmax(48px, auto) 1fr;
+  grid-template-areas: "mark label num" "track track track";
+  align-items: center; gap: 3px 7px;
+}
+#view-travel .tv-bud-mark {
+  grid-area: mark;
+  width: 20px; height: 20px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(58, 38, 40, .14);
+  background: color-mix(in srgb, var(--c, #a34a5a) 10%, #fff);
+  color: var(--c, #a34a5a);
+  font-size: 10px; font-weight: 600;
+}
+#view-travel .tv-bud-label { grid-area: label; font-size: 11.5px; color: var(--tv-soft); }
+#view-travel .tv-bud-num { grid-area: num; justify-self: end; font-family: var(--tv-serif); font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-bud-num em { font-style: normal; font-weight: 400; font-size: 10.5px; color: var(--tv-faint); }
+#view-travel .tv-bud-num.over { color: #b23a3a; }
+#view-travel .tv-bud-track { grid-area: track; height: 4px; border-radius: 99px; background: var(--tv-line); overflow: hidden; }
+#view-travel .tv-bud-track i { display: block; height: 100%; border-radius: 99px; }
+#view-travel .tv-bud-track i.over { background: #b23a3a !important; }
+#view-travel .tv-bud-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 11px; padding-top: 9px;
+  border-top: 1px solid var(--tv-line);
+  font-size: 11.5px; color: var(--tv-faint); letter-spacing: .06em;
+}
+#view-travel .tv-bud-total b { font-family: var(--tv-serif); font-size: 16px; color: var(--tv-ink); }
+
+/* ---------------- 分类折叠（对账页） ---------------- */
+#view-travel .tv-cat-folds { display: flex; flex-direction: column; gap: 5px; }
+#view-travel .tv-cat-fold { border-bottom: 1px solid var(--tv-line); }
+#view-travel .tv-cat-fold:last-child { border-bottom: 0; }
+#view-travel .tv-cat-fold > summary {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 2px; cursor: pointer; list-style: none;
+}
+#view-travel .tv-cat-fold > summary::-webkit-details-marker { display: none; }
+#view-travel .tv-cat-fold-name { font-size: 12.5px; font-weight: 600; }
+#view-travel .tv-cat-fold-count { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-cat-fold-amt { margin-left: auto; font-family: var(--tv-serif); font-size: 13.5px; font-weight: 600; }
+#view-travel .tv-cat-fold-amt em { font-style: normal; font-size: 10px; font-weight: 400; color: var(--tv-faint); }
+#view-travel .tv-cat-fold-amt.over { color: #b23a3a; }
+#view-travel .tv-cat-fold-caret { flex: none; color: var(--tv-faint); font-size: 13px; transition: transform .2s; }
+#view-travel .tv-cat-fold[open] .tv-cat-fold-caret { transform: rotate(90deg); }
+#view-travel .tv-cat-fold-body { padding: 2px 0 10px 30px; }
+#view-travel .tv-cat-item { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-cat-item:last-child { border-bottom: 0; }
+#view-travel .tv-cat-item-date { flex: none; width: 34px; font-size: 10px; color: var(--tv-faint); padding-top: 2px; }
+#view-travel .tv-cat-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-cat-item-main b { font-size: 12px; font-weight: 600; }
+#view-travel .tv-cat-item-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-cat-item-share { margin-left: auto; text-align: right; font-family: var(--tv-serif); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-cat-item-share em { display: block; font-style: normal; font-family: var(--tv-sans); font-size: 9.5px; font-weight: 400; color: var(--tv-faint); }
+
+/* ---------------- 每个人的对账单 ---------------- */
+#view-travel .tv-pairs { display: flex; flex-direction: column; gap: 12px; }
+#view-travel .tv-pair {
+  padding: 13px 15px;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-line);
+  border-radius: 4px 14px 12px 5px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset;
+}
+#view-travel .tv-pair-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#view-travel .tv-pair-who { display: flex; flex-direction: column; gap: 1px; }
+#view-travel .tv-pair-who b { font-size: 13px; font-weight: 600; }
+#view-travel .tv-pair-who span { font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-pair-sum { margin-left: auto; font-size: 12px; color: var(--tv-soft); }
+#view-travel .tv-pair-sum b { font-family: var(--tv-serif); font-size: 16px; }
+#view-travel .tv-pair-sum.pos b { color: var(--tv-accent2); }
+#view-travel .tv-pair-sum.neg b { color: var(--tv-accent); }
+#view-travel .tv-pair-detail { margin-top: 8px; }
+#view-travel .tv-pair-detail > summary {
+  cursor: pointer; list-style: none;
+  font-size: 10.5px; letter-spacing: .06em; color: var(--tv-accent);
+  padding: 5px 0;
+}
+#view-travel .tv-pair-detail > summary::-webkit-details-marker { display: none; }
+#view-travel .tv-pair-detail > summary::before { content: "▸ "; }
+#view-travel .tv-pair-detail[open] > summary::before { content: "▾ "; }
+#view-travel .tv-pair-items { border-top: 1px dashed var(--tv-line); margin-top: 4px; }
+#view-travel .tv-pair-item { display: flex; align-items: flex-start; gap: 9px; padding: 7px 0; border-bottom: 1px dashed var(--tv-line); }
+#view-travel .tv-pair-item:last-child { border-bottom: 0; }
+#view-travel .tv-pair-date { flex: none; width: 32px; font-size: 10px; color: var(--tv-faint); padding-top: 2px; }
+#view-travel .tv-pair-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#view-travel .tv-pair-main b { font-size: 12px; font-weight: 600; }
+#view-travel .tv-pair-main em { font-style: normal; font-size: 10px; color: var(--tv-faint); }
+#view-travel .tv-pair-amt { margin-left: auto; font-family: var(--tv-serif); font-size: 13px; font-weight: 600; white-space: nowrap; }
+#view-travel .tv-pair-amt.pos { color: var(--tv-accent2); }
+#view-travel .tv-pair-amt.neg { color: var(--tv-accent); }
+#view-travel .tv-pair-foot {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  margin-top: 7px; font-size: 10.5px; color: var(--tv-faint);
+}
+#view-travel .tv-pair-foot b { color: var(--tv-ink); font-family: var(--tv-serif); font-size: 12.5px; }
+#view-travel .tv-pair-acts {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 9px;
+  border-top: 1px solid var(--tv-line);
+}
+#view-travel .tv-pair-acts span { font-size: 10px; color: var(--tv-faint); line-height: 1.5; }
+
+/* ---------------- 分类预算弹窗 ---------------- */
+.travel-modal .tv-bud-edit { display: flex; flex-direction: column; gap: 7px; }
+.travel-modal .tv-bud-edit-row { display: flex; align-items: center; gap: 9px; }
+.travel-modal .tv-bud-mark {
+  width: 22px; height: 22px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(58, 38, 40, .14);
+  background: color-mix(in srgb, var(--c, #a34a5a) 10%, #fff);
+  color: var(--c, #a34a5a);
+  font-size: 10px; font-weight: 600;
+}
+.travel-modal .tv-bud-edit-name { flex: none; width: 56px; font-size: 12px; color: #5c4a4b; }
+.travel-modal .tv-bud-input {
+  flex: 1; min-width: 0; height: 34px;
+  padding: 0 10px;
+  background: #fffdf8;
+  border: 1px solid rgba(58, 38, 40, .17);
+  border-radius: 8px 10px 8px 11px;
+  font-family: inherit; font-size: 13px; color: #3a2628;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.travel-modal .tv-bud-input:focus { border-color: #a34a5a; box-shadow: 0 0 0 3px rgba(163, 74, 90, .12); }
+.travel-modal .tv-bud-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid rgba(58, 38, 40, .16);
+  font-size: 12px; color: #a98a8c;
+}
+.travel-modal .tv-bud-total b { font-family: "Fraunces", "Songti SC", Georgia, serif; font-size: 18px; color: #3a2628; }
+
 /* ---------------- 弹窗：沿用记账本控件，山茶配色 ---------------- */
 .travel-modal {
   --tm-ink: #3a2628;
