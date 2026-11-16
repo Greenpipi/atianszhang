@@ -474,7 +474,8 @@
   }
 
   function persist() {
-    try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); } catch (e) { console.warn('保存旅行数据失败', e); }
+    try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); return true; }
+    catch (e) { console.warn('保存旅行数据失败', e); return false; }
   }
 
   /* 当前翻开的旅行册 */
@@ -723,7 +724,7 @@
             return '<article class="tv-book" data-act="open-trip" data-id="' + esc(t.id) + '" style="--rot:' + rots[i % rots.length] + 'deg">' +
               '<div class="tv-book-stack s1"></div><div class="tv-book-stack s2"></div>' +
               '<div class="tv-book-cover">' +
-                '<img src="' + esc(t.cover) + '" alt="' + esc(t.destination) + '" loading="lazy">' +
+                '<img src="' + esc(t.cover) + '" alt="' + esc(t.destination) + '" loading="lazy" data-act="edit-cover" data-id="' + esc(t.id) + '" title="点击更换封面">' +
                 '<span class="tv-book-tape"></span>' +
                 '<span class="tv-book-stamp">' + esc(String(t.destination || '旅').slice(0, 2)) + '</span>' +
                 '<div class="tv-book-tools">' +
@@ -819,9 +820,9 @@
     return renderOverview(t);
   }
 
-  function polaroid(src, caption, cls, rot) {
+  function polaroid(src, caption, cls, rot, attrs) {
     return '<figure class="tv-polaroid ' + (cls || '') + '" style="--rot:' + (rot || -2) + 'deg">' +
-      '<img src="' + esc(src) + '" alt="' + esc(caption) + '" loading="lazy">' +
+      '<img src="' + esc(src) + '" alt="' + esc(caption) + '" loading="lazy"' + (attrs ? ' ' + attrs : '') + '>' +
       '<figcaption>' + esc(caption) + '</figcaption>' +
       '<span class="tv-tape"></span>' +
     '</figure>';
@@ -846,8 +847,8 @@
 
     return '<div class="tv-scrap-cover">' +
         '<div class="tv-scrap-photos">' +
-          polaroid(t.cover, t.destination + ' · ' + String(t.startDate).slice(0, 4), 'tv-polaroid-lg', -3) +
-          dayPhotos.map((d, i) => polaroid(d.photo, d.city, 'tv-polaroid-sm', i === 0 ? 4 : -6)).join('') +
+          polaroid(t.cover, t.destination + ' · ' + String(t.startDate).slice(0, 4), 'tv-polaroid-lg', -3, 'data-act="edit-cover"') +
+          dayPhotos.map((d, i) => polaroid(d.photo, d.city, 'tv-polaroid-sm', i === 0 ? 4 : -6, 'data-act="edit-day-photo" data-day="' + d.day + '"')).join('') +
           '<span class="tv-washi"></span>' +
         '</div>' +
         '<div class="tv-scrap-copy">' +
@@ -956,7 +957,7 @@
             '<button type="button" class="tv-mini-btn" data-act="new-activity" data-day="' + day.day + '" title="给这一天加行程">＋</button>' +
           '</header>' +
           '<div class="tv-day-scrap">' +
-            (day.photo ? polaroid(day.photo, day.city, 'tv-day-photo', idx % 2 ? 2.2 : -2.2) : '') +
+            (day.photo ? polaroid(day.photo, day.city, 'tv-day-photo', idx % 2 ? 2.2 : -2.2, 'data-act="edit-day-photo" data-day="' + day.day + '"') : '') +
             '<div class="tv-timeline">' +
               ((day.activities || []).length ? day.activities.map(a => {
                 const linked = expensesOfActivity(a.id);
@@ -1002,7 +1003,7 @@
           '</div>' +
           '<p class="tv-postcard-weather">' + esc(j.weather || '') + '</p>' +
           '<div class="tv-postcard-body">' +
-            (d && d.photo ? '<img class="tv-postcard-photo" src="' + esc(d.photo) + '" alt="" loading="lazy">' : '') +
+            ((j.photo || (d && d.photo)) ? '<img class="tv-postcard-photo" src="' + esc(j.photo || d.photo) + '" alt="" loading="lazy" data-act="edit-journal-photo" data-id="' + esc(j.id) + '" title="点击更换照片">' : '') +
             '<p class="tv-postcard-text">' + esc(j.text) + '</p>' +
           '</div>' +
           '<span class="tv-postcard-edit">点击编辑</span>' +
@@ -1066,8 +1067,8 @@
         const payer = member(h.payerId);
         return '<article class="tv-hotel" data-act="edit-hotel" data-id="' + h.id + '">' +
           (h.photo
-            ? '<div class="tv-hotel-photo"><img src="' + esc(h.photo) + '" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
-            : '<div class="tv-hotel-photo tv-hotel-photo-none"><span class="tv-hotel-key">KEY</span></div>') +
+            ? '<div class="tv-hotel-photo" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击更换照片"><img src="' + esc(h.photo) + '" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
+            : '<div class="tv-hotel-photo tv-hotel-photo-none" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击添加照片"><span class="tv-hotel-key">KEY</span></div>') +
           '<div class="tv-hotel-body">' +
             '<div class="tv-hotel-top"><span class="tv-hotel-night">' + nt + ' 晚</span><h4>' + esc(h.name) + '</h4><p>' + esc(h.address || '') + '</p></div>' +
             '<div class="tv-hotel-mid">' +
@@ -1150,6 +1151,10 @@
     else if (act === 'edit-trip') openTripModal(ds.id || (T() && T().id));
     else if (act === 'delete-trip') deleteTrip(ds.id);
     else if (act === 'edit-budget') openBudgetModal();
+    else if (act === 'edit-cover') openImageModal('cover', ds.id);
+    else if (act === 'edit-day-photo') openImageModal('day', ds.day);
+    else if (act === 'edit-hotel-photo') openImageModal('hotel', ds.id);
+    else if (act === 'edit-journal-photo') openImageModal('journal', ds.id);
     else if (act === 'new-expense') openExpenseModal(null, { activityId: ds.activity || '' });
     else if (act === 'edit-expense') openExpenseModal(ds.id);
     else if (act === 'new-activity') openActivityModal(null, Number(ds.day) || 1);
@@ -1353,6 +1358,175 @@
       toast('预算已更新为 ' + money(t.budget), 'ok');
     };
     setTimeout(() => input.focus(), 80);
+  }
+
+  /* ---------- 照片：点击图片上传本地文件 / 粘贴链接 ---------- */
+  function photoDefault(kind, trip, item) {
+    if (kind === 'cover') {
+      return photo((trip.destination || '旅行') + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
+    }
+    if (kind === 'day') {
+      return photo((item.city || trip.destination || '旅行') + ' day ' + (item.day || 1) + ' travel scenery, local street and landscape, warm film photography', 'landscape_4_3');
+    }
+    if (kind === 'hotel') {
+      return photo((item.name || 'hotel') + ' in ' + (trip.destination || '') + ', hotel exterior or cozy interior, travel photography', 'landscape_4_3');
+    }
+    const d = trip.days.find(x => x.day === item.day);
+    return (d && d.photo) || '';
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      if (!/^image\//.test(file.type || '')) return reject(new Error('请选择图片文件'));
+      if (file.size > 12 * 1024 * 1024) return reject(new Error('图片超过 12MB，换一张试试'));
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('读取图片失败'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('这张图片格式暂不支持'));
+        img.onload = () => {
+          try {
+            const MAX = 1280;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            const ratio = Math.min(1, MAX / Math.max(w, h));
+            w = Math.max(1, Math.round(w * ratio));
+            h = Math.max(1, Math.round(h * ratio));
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(c.toDataURL('image/jpeg', .82));
+          } catch (e) { reject(new Error('图片处理失败')); }
+        };
+        img.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function openImageModal(kind, refId) {
+    const t = T();
+    if (!t) return;
+    let trip = t, item = null, current = '', def = '';
+    let heading = '更换照片';
+    if (kind === 'cover') {
+      trip = refId ? (state.trips.find(x => x.id === refId) || t) : t;
+      current = trip.cover || '';
+      def = photoDefault('cover', trip);
+      heading = '更换旅行册封面';
+    } else if (kind === 'day') {
+      item = t.days.find(d => String(d.day) === String(refId)) || t.days[0];
+      if (!item) return toast('这本旅行册还没有日期', 'err');
+      current = item.photo || '';
+      def = photoDefault('day', t, item);
+      heading = '换一张 DAY ' + item.day + ' 照片';
+    } else if (kind === 'hotel') {
+      item = t.hotels.find(h => h.id === refId);
+      if (!item) return;
+      current = item.photo || '';
+      def = photoDefault('hotel', t, item);
+      heading = '更换住宿照片';
+    } else {
+      item = t.journals.find(j => j.id === refId);
+      if (!item) return;
+      current = item.photo || '';
+      def = photoDefault('journal', t, item);
+      heading = '更换日志照片';
+    }
+
+    let pending = current || '';
+    const m = openModal(
+      modalTitle(heading, '点击上传本地图片，或粘贴一张图片链接') +
+      '<div class="tv-imgpick">' +
+        '<div class="tv-imgpick-prev' + ((pending || def) ? '' : ' empty') + '" id="tv-img-prev">' +
+          ((pending || def) ? '<img src="' + esc(pending || def) + '" alt="">' : '<span>还没有照片</span>') +
+        '</div>' +
+        '<div class="tv-imgpick-row">' +
+          '<button type="button" class="btn btn-primary" id="tv-img-upload">上传本地图片</button>' +
+          '<button type="button" class="btn btn-ghost" id="tv-img-default">恢复默认图</button>' +
+          '<input type="file" id="tv-img-file" accept="image/*" hidden>' +
+        '</div>' +
+        '<div class="field"><label>或粘贴图片链接</label>' +
+          '<div class="tv-imgpick-link">' +
+            '<input id="tv-img-url" type="text" value="' + esc(pending.indexOf('data:') === 0 ? '' : pending) + '" placeholder="https://...">' +
+            '<button type="button" class="btn" id="tv-img-use">预览</button>' +
+          '</div>' +
+        '</div>' +
+        '<p class="tv-form-tip" id="tv-img-status">上传的图片会自动压缩，只保存在本机。</p>' +
+      '</div>' +
+      '<div class="modal-acts">' +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-img-save">保存图片</button>' +
+      '</div>'
+    );
+    if (!m) return;
+
+    const box = m.querySelector('#tv-img-prev');
+    const status = m.querySelector('#tv-img-status');
+    const setPreview = src => {
+      if (src) {
+        box.classList.remove('empty');
+        box.innerHTML = '<img src="' + esc(src) + '" alt="">';
+      } else {
+        box.classList.add('empty');
+        box.innerHTML = '<span>还没有照片</span>';
+      }
+    };
+
+    const fileIn = m.querySelector('#tv-img-file');
+    m.querySelector('#tv-img-upload').onclick = () => fileIn.click();
+    fileIn.onchange = async () => {
+      const f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      status.textContent = '正在处理图片…';
+      try {
+        const url = await fileToDataUrl(f);
+        pending = url;
+        setPreview(url);
+        m.querySelector('#tv-img-url').value = '';
+        status.textContent = '本地图片已就绪，点「保存图片」生效。';
+      } catch (e) {
+        status.textContent = '上传失败：' + (e.message || '未知错误');
+        toast(e.message || '图片上传失败', 'err');
+      }
+      fileIn.value = '';
+    };
+
+    m.querySelector('#tv-img-default').onclick = () => {
+      pending = '';
+      setPreview(def);
+      m.querySelector('#tv-img-url').value = '';
+      status.textContent = def ? '已恢复默认生成的图片。' : '保存后使用默认图片。';
+    };
+
+    const urlIn = m.querySelector('#tv-img-url');
+    const useUrl = () => {
+      const v = urlIn.value.trim();
+      if (!v) return toast('先粘贴一个图片链接', 'err');
+      pending = v;
+      setPreview(v);
+      status.textContent = '链接已预览，点「保存图片」生效。';
+    };
+    m.querySelector('#tv-img-use').onclick = useUrl;
+    urlIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); useUrl(); } });
+
+    m.querySelector('#tv-img-save').onclick = () => {
+      const next = pending || def;
+      if (!next) return toast('还没有选择图片', 'err');
+      let old = '';
+      if (kind === 'cover') { old = trip.cover || ''; trip.cover = next; }
+      else { old = item.photo || ''; item.photo = next; }
+      if (!persist()) {
+        if (kind === 'cover') trip.cover = old; else item.photo = old;
+        return toast('图片太大，本机存储放不下，换一张小一点的试试', 'err');
+      }
+      App.closeModal();
+      render();
+      toast('照片已更新', 'ok');
+    };
   }
 
   /* ---------- 行程 ---------- */

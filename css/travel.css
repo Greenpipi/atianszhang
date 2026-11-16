@@ -1225,5 +1225,35 @@
   }
 }
 
+/* ---------------- 点击照片换图 ---------------- */
+#view-travel .tv-polaroid > img,
+#view-travel .tv-hotel-photo,
+#view-travel .tv-postcard-photo { cursor: pointer; }
+#view-travel .tv-polaroid > img:hover,
+#view-travel .tv-postcard-photo:hover { filter: brightness(1.03) saturate(1.04); }
+#view-travel .tv-hotel-photo:hover img { transform: scale(1.03); }
+
+.travel-modal .tv-imgpick { display: flex; flex-direction: column; gap: 14px; }
+.travel-modal .tv-imgpick-prev {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  display: grid; place-items: center;
+  overflow: hidden;
+  border: 1px solid #E4DDD1;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(135deg, #FBF8F2 0 12px, #F6F1E8 12px 24px);
+}
+.travel-modal .tv-imgpick-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.travel-modal .tv-imgpick-prev.empty span { font-size: 12px; letter-spacing: .06em; color: #A99E8E; }
+.travel-modal .tv-imgpick-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.travel-modal .tv-imgpick-row .btn { flex: 1 1 0; min-width: 120px; }
+.travel-modal .tv-imgpick-link { display: flex; gap: 8px; align-items: center; }
+.travel-modal .tv-imgpick-link input { flex: 1; min-width: 0; }
+.travel-modal .tv-imgpick-link .btn { flex: none; }
+@media (max-width: 520px) {
+  .travel-modal .tv-imgpick-row .btn { flex: 1 0 100%; }
+}
+
 
 
