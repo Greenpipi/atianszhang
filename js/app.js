@@ -645,6 +645,7 @@ const App = {
       this.state.budgets = budgets;
       this.state.templates = templates;
       this.state.bills = bills || [];
+      this.checkListColumns();
       this._cacheSnapshot();
       if (!this.state.currentLedgerId || !ledgers.find(l => l.id === this.state.currentLedgerId)) {
         const personal = ledgers.filter(l => l.type === 'personal');
@@ -663,6 +664,17 @@ const App = {
     } finally {
       this.state.loading = false;
     }
+  },
+
+  /* 清单分组所需的云端列缺失时给出一次性提示（否则保存会静默退化成普通单笔） */
+  checkListColumns() {
+    if (Store.mode !== 'supabase') return;
+    const miss = Store.missingCol('records', 'list_id') || Store.missingCol('records', 'list_title');
+    if (!miss) { this._listSchemaOk = true; return; }
+    this._listSchemaOk = false;
+    if (this._listHinted) return;
+    this._listHinted = true;
+    this.toast('清单分组未启用：请到 设置 → 云端同步 → 重新执行一次建表 SQL（自动补 list_id / list_title）', 'err');
   },
 
   /* ---------- 本地快照缓存（离线优先秒开） ---------- */
@@ -4586,6 +4598,9 @@ const App = {
       const listId = isEditList ? (editList[0].list_id || uid()) : uid();
       const listTitle = String(st.listTitle || '').trim() || '未命名清单';
       const updates = [];
+      if (!isEditList && this._listSchemaOk === false) {
+        this.toast('云端缺少 list_id/list_title 两列，本次清单只能按单笔保存；请到设置页重新执行一次建表 SQL', 'err');
+      }
       let total = 0;
       valid.forEach(r => {
         const price = Math.round((parseFloat(r.price) || 0) * 100) / 100;
@@ -5154,6 +5169,12 @@ const App = {
             <button class="btn btn-sm btn-purple" id="sql-copy-run">复制执行命令（第 2 步）</button>
             <code style="font-size:12px;color:var(--muted)">select public.setup_finance_tables();</code>
           </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-ghost" id="sql-list-cols">复制清单分组补列 SQL</button>
+            <span style="font-size:12px;color:${this._listSchemaOk === false ? 'var(--danger)' : 'var(--muted)'}">
+              ${this._listSchemaOk === false ? '数据库缺少 list_id / list_title，清单暂时无法分组保存' : '清单分组列已就绪'}
+            </span>
+          </div>
         </details>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px dashed var(--line)">
           <button class="btn btn-ghost" id="data-export">导出数据（JSON）</button>
@@ -5238,6 +5259,13 @@ const App = {
     };
     el.querySelector('#sql-copy-run').onclick = async () => {
       try { await navigator.clipboard.writeText('select public.setup_finance_tables();'); this.toast('执行命令已复制，粘贴并 Run 即可', 'ok'); }
+      catch (e) { this.toast('复制失败，请手动选择复制', 'err'); }
+    };
+    const listColsBtn = el.querySelector('#sql-list-cols');
+    if (listColsBtn) listColsBtn.onclick = async () => {
+      const sql = "alter table records add column if not exists list_id text not null default '';\n"
+        + "alter table records add column if not exists list_title text not null default '';";
+      try { await navigator.clipboard.writeText(sql); this.toast('已复制，去 Supabase SQL Editor 粘贴并 Run，然后刷新页面', 'ok'); }
       catch (e) { this.toast('复制失败，请手动选择复制', 'err'); }
     };
     el.querySelector('#data-export').onclick = async () => {
@@ -6351,6 +6379,8 @@ begin
     attribute text not null default '',
     status_since text not null default '',
     remark text not null default '',
+    list_id text not null default '',
+    list_title text not null default '',
     created_at timestamptz not null default now()
   ) $ddl$;
 
@@ -6432,6 +6462,10 @@ begin
 
   -- 编辑弹窗「备注」多行文本框（与 note/描述 分开）
   execute $ddl$ alter table records add column if not exists remark text not null default '' $ddl$;
+
+  -- 清单批量记账的分组标识（同一张清单共用一个 list_id 与标题）
+  execute $ddl$ alter table records add column if not exists list_id text not null default '' $ddl$;
+  execute $ddl$ alter table records add column if not exists list_title text not null default '' $ddl$;
 
   -- 老表补列（create table if not exists 不会给已存在的表加列，这里逐列补齐，幂等）
   execute $ddl$ alter table ledgers    add column if not exists kind     text         not null default '' $ddl$;
