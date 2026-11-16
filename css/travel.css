@@ -784,8 +784,18 @@
   font-family: var(--tv-serif); font-size: 11px; letter-spacing: .08em;
   transform: rotate(-3deg);
 }
-#view-travel .tv-day-title { flex: 1; min-width: 0; }
+#view-travel .tv-day-title {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; background: transparent;
+  padding: 2px 4px; margin: -2px -4px;
+  border-radius: 8px;
+  text-align: left; cursor: pointer;
+  transition: background .18s;
+}
+#view-travel .tv-day-title:hover { background: var(--tv-surface2); }
 #view-travel .tv-day-title h4 { margin: 0; font-family: var(--tv-serif); font-size: 20px; font-weight: 600; }
+#view-travel .tv-day-edit { margin-left: 6px; font-family: var(--tv-sans); font-size: 11px; color: var(--tv-faint); opacity: .7; }
+#view-travel .tv-day-title:hover .tv-day-edit { color: var(--tv-accent); opacity: 1; }
 #view-travel .tv-day-title p { margin: 3px 0 0; font-size: 11px; color: var(--tv-faint); }
 #view-travel .tv-day-total { font-size: 10.5px; letter-spacing: .06em; color: var(--tv-soft); }
 #view-travel .tv-day-scrap { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 22px; align-items: start; }
@@ -1215,32 +1225,34 @@
 .travel-modal .tv-mood-opt:hover { border-color: var(--mood); transform: translateY(-1px); }
 .travel-modal .tv-mood-opt.on { border-color: var(--mood); background: color-mix(in srgb, var(--mood) 10%, #fffdf8); color: var(--mood); font-weight: 600; }
 
-/* 同行成员编辑 */
-.travel-modal .tv-memlist { display: flex; flex-direction: column; gap: 8px; }
-.travel-modal .tv-memrow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px;
+/* 同行成员编辑：一行两列，小标题 本人 / 朋友 */
+.travel-modal .tv-memlist { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.travel-modal .tv-memrow { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.travel-modal .tv-mem-tag { font-size: 10px; letter-spacing: .1em; color: #A99E8E; padding-left: 2px; }
+.travel-modal .tv-memrow.is-me .tv-mem-tag { color: #A34A5A; }
+.travel-modal .tv-mem-box {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 9px 8px 11px;
   background: #FFFDF8;
   border: 1px solid #E8E0D4;
   border-radius: 10px;
+  transition: border-color .18s, box-shadow .18s;
 }
-.travel-modal .tv-memrow .tv-avatar { width: 28px; height: 28px; font-size: 11px; }
+.travel-modal .tv-mem-box:focus-within { border-color: #D9C3BE; box-shadow: 0 0 0 3px rgba(163, 74, 90, .08); }
 .travel-modal .tv-mem-name {
   flex: 1; min-width: 0;
   border: 0; background: transparent;
-  padding: 4px 2px;
+  padding: 0;
   font-family: inherit; font-size: 13.5px; color: #3A2628;
-  border-bottom: 1px dashed transparent;
   outline: none;
 }
-.travel-modal .tv-mem-name:focus { border-bottom-color: #A34A5A; }
-.travel-modal .tv-mem-fixed { flex: none; font-size: 10px; letter-spacing: .08em; color: #A99E8E; }
+.travel-modal .tv-mem-name::placeholder { color: #C2B8A9; }
 .travel-modal .tv-mem-del {
-  flex: none; width: 24px; height: 24px;
+  flex: none; width: 22px; height: 22px;
   display: grid; place-items: center;
   border: 0; border-radius: 50%;
   background: transparent; color: #B5A695;
-  font-size: 16px; line-height: 1; cursor: pointer;
+  font-size: 15px; line-height: 1; cursor: pointer;
 }
 .travel-modal .tv-mem-del:hover { background: #F6EAEA; color: #A34A5A; }
 .travel-modal .tv-addmem {

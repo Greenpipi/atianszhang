@@ -1014,7 +1014,10 @@
           '<span class="tv-page-holes"></span>' +
           '<header class="tv-day-head">' +
             '<span class="tv-day-num">DAY ' + day.day + '</span>' +
-            '<div class="tv-day-title"><h4>' + esc(day.city) + '</h4><p>' + esc(cnDate(day.date)) + ' · ' + esc(day.theme || '') + (day.weather ? ' · ' + esc(day.weather) : '') + '</p></div>' +
+            '<button type="button" class="tv-day-title" data-act="edit-day" data-day="' + day.day + '" title="修改这一天的地点 / 主题">' +
+              '<h4>' + esc(day.city) + '<span class="tv-day-edit">✎</span></h4>' +
+              '<p>' + esc(cnDate(day.date)) + ' · ' + esc(day.theme || '') + (day.weather ? ' · ' + esc(day.weather) : '') + '</p>' +
+            '</button>' +
             '<span class="tv-day-total">计划 ' + money(yuan(planned)) + '</span>' +
             '<button type="button" class="tv-mini-btn" data-act="new-activity" data-day="' + day.day + '" title="给这一天加行程">＋</button>' +
           '</header>' +
@@ -1221,6 +1224,7 @@
     else if (act === 'edit-expense') openExpenseModal(ds.id);
     else if (act === 'new-activity') openActivityModal(null, Number(ds.day) || 1);
     else if (act === 'edit-activity') openActivityModal(ds.id);
+    else if (act === 'edit-day') openDayModal(Number(ds.day));
     else if (act === 'new-journal') openJournalModal(null);
     else if (act === 'edit-journal') openJournalModal(ds.id);
     else if (act === 'new-hotel') openHotelModal(null);
@@ -1353,10 +1357,6 @@
     const memList = m.querySelector('#tv-t-memlist');
     const bindMemRows = () => {
       memList.querySelectorAll('.tv-memrow').forEach(row => {
-        const inp = row.querySelector('.tv-mem-name');
-        inp.oninput = () => {
-          row.querySelector('.tv-avatar').textContent = inp.value.trim().slice(0, 1) || '新';
-        };
         const del = row.querySelector('.tv-mem-del');
         if (del) del.onclick = () => row.remove();
       });
@@ -1446,10 +1446,13 @@
 
   /* ---------- 同行成员 ---------- */
   function memRow(mem) {
-    return '<div class="tv-memrow" data-id="' + esc(mem.id) + '" data-cls="' + esc(mem.cls || '') + '">' +
-      '<span class="tv-avatar ' + esc(mem.cls || '') + '">' + esc(mem.initial || '新') + '</span>' +
-      '<input class="tv-mem-name" type="text" maxlength="12" value="' + esc(mem.name) + '" placeholder="同行人名字">' +
-      (mem.id === 'me' ? '<span class="tv-mem-fixed">本人</span>' : '<button type="button" class="tv-mem-del" title="移除">×</button>') +
+    const isMe = mem.id === 'me';
+    return '<div class="tv-memrow' + (isMe ? ' is-me' : '') + '" data-id="' + esc(mem.id) + '" data-cls="' + esc(mem.cls || '') + '">' +
+      '<span class="tv-mem-tag">' + (isMe ? '本人' : '朋友') + '</span>' +
+      '<div class="tv-mem-box">' +
+        '<input class="tv-mem-name" type="text" maxlength="12" value="' + esc(mem.name) + '" placeholder="' + (isMe ? '我的名字' : '朋友名字') + '">' +
+        (isMe ? '' : '<button type="button" class="tv-mem-del" title="移除">×</button>') +
+      '</div>' +
     '</div>';
   }
 
@@ -1705,6 +1708,36 @@
     list.sort();
     return list.map(v => '<option value="' + v + '"' + (v === selected ? ' selected' : '') + '>' + v + '</option>').join('');
   }
+  /* 修改某一天的城市 / 主题 / 天气（多目的地行程，每天地址可以不同） */
+  function openDayModal(dayNo) {
+    const t = T();
+    if (!t) return;
+    const d = t.days.find(x => x.day === dayNo);
+    if (!d) return;
+    const m = openModal(
+      modalTitle('DAY ' + d.day + ' · ' + shortDate(d.date), '目的地不止一个时，可以给每一天填不同的城市 / 地点') +
+      field('城市 / 地点', '<input id="tv-d-city" type="text" value="' + esc(d.city || '') + '" placeholder="例如 昆明 / 大理 / 丽江">') +
+      '<div class="field-row">' +
+        field('当天主题', '<input id="tv-d-theme" type="text" value="' + esc(d.theme || '') + '" placeholder="例如 抵达 · 古城慢逛">') +
+        field('天气', '<input id="tv-d-weather" type="text" value="' + esc(d.weather || '') + '" placeholder="例如 晴 19°">') +
+      '</div>' +
+      '<div class="modal-acts">' +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-d-save">保存</button>' +
+      '</div>'
+    );
+    if (!m) return;
+    m.querySelector('#tv-d-save').onclick = () => {
+      const city = m.querySelector('#tv-d-city').value.trim();
+      if (!city) return toast('请填写这一天的城市 / 地点', 'err');
+      d.city = city;
+      d.theme = m.querySelector('#tv-d-theme').value.trim();
+      d.weather = m.querySelector('#tv-d-weather').value.trim();
+      persist(); App.closeModal(); render();
+      toast('DAY ' + d.day + ' 已更新', 'ok');
+    };
+  }
+
   function openActivityModal(id, presetDay) {
     const t = T();
     if (!t) return;

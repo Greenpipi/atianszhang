@@ -6216,12 +6216,14 @@ const App = {
     mask.onclick = e => { if (e.target === mask) this.closeModal(); };
     mask.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.closeModal());
     root.appendChild(mask);
+    document.documentElement.classList.add('modal-lock');
     return mask;
   },
   closeModal() {
     // 只关最顶层弹窗（嵌套时底层编辑弹窗保持打开）
     const root = document.getElementById('modal-root');
     if (root.lastElementChild) root.lastElementChild.remove();
+    if (!root.children.length) document.documentElement.classList.remove('modal-lock');
   },
 
   /* 小类图标选择器：选中后回调 key；传空字符串表示按小类自动匹配 */

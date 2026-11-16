@@ -779,6 +779,9 @@ mark{background:#F6EEDC;color:inherit;border-radius:3px;padding:0 1px}
   position:fixed;inset:0;background:rgba(60,56,49,.4);backdrop-filter:blur(3px);
   display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;animation:fadeIn .15s;
 }
+/* 弹窗打开时锁住背景页面滚动，滚轮/触控只作用于弹窗内容 */
+html.modal-lock{overflow:hidden!important;scrollbar-gutter:stable}
+html.modal-lock body{overflow:hidden!important}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{
   background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(64,60,52,.18);
