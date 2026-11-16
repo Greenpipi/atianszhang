@@ -908,7 +908,7 @@
             return '<article class="tv-book" data-act="open-trip" data-id="' + esc(t.id) + '" style="--rot:' + rots[i % rots.length] + 'deg">' +
               '<div class="tv-book-stack s1"></div><div class="tv-book-stack s2"></div>' +
               '<div class="tv-book-cover">' +
-                '<img src="' + esc(t.cover) + '" alt="' + esc(t.destination) + '" loading="lazy" data-act="edit-cover" data-id="' + esc(t.id) + '" title="点击更换封面">' +
+                '<img src="' + esc(t.cover) + '" referrerpolicy="no-referrer" alt="' + esc(t.destination) + '" loading="lazy" data-act="edit-cover" data-id="' + esc(t.id) + '" title="点击更换封面">' +
                 '<span class="tv-book-tape"></span>' +
                 '<span class="tv-book-stamp st-' + statusOf(t) + '">' + statusLabel(t) + '</span>' +
                 '<span class="tv-book-moods">' + coverMoods(t) + '</span>' +
@@ -1020,7 +1020,7 @@
 
   function polaroid(src, caption, cls, rot, attrs) {
     return '<figure class="tv-polaroid ' + (cls || '') + '" style="--rot:' + (rot || -2) + 'deg">' +
-      '<img src="' + esc(src) + '" alt="' + esc(caption) + '" loading="lazy"' + (attrs ? ' ' + attrs : '') + '>' +
+      '<img src="' + esc(src) + '" referrerpolicy="no-referrer" alt="' + esc(caption) + '" loading="lazy"' + (attrs ? ' ' + attrs : '') + '>' +
       '<figcaption>' + esc(caption) + '</figcaption>' +
       '<span class="tv-tape"></span>' +
     '</figure>';
@@ -1194,7 +1194,7 @@
     return '<div class="tv-hotel-mini-list">' + list.map(h => {
       const n = nights(h.checkIn, h.checkOut);
       return '<button type="button" class="tv-hotel-mini" data-act="edit-hotel" data-id="' + esc(h.id) + '">' +
-        (h.photo ? '<img src="' + esc(h.photo) + '" alt="" loading="lazy">' : '<span class="tv-hotel-mini-none">宿</span>') +
+        (h.photo ? '<img src="' + esc(h.photo) + '" referrerpolicy="no-referrer" alt="" loading="lazy">' : '<span class="tv-hotel-mini-none">宿</span>') +
         '<span class="tv-hotel-mini-main">' +
           '<b>' + esc(h.name) + '</b>' +
           '<em>' + esc(shortDate(h.checkIn)) + ' — ' + esc(shortDate(h.checkOut)) + ' · ' + n + ' 晚</em>' +
@@ -1300,7 +1300,7 @@
           '</div>' +
           '<p class="tv-postcard-weather">' + esc(j.weather || '') + '</p>' +
           '<div class="tv-postcard-body">' +
-            ((j.photo || (d && d.photo)) ? '<img class="tv-postcard-photo" src="' + esc(j.photo || d.photo) + '" alt="" loading="lazy" data-act="edit-journal-photo" data-id="' + esc(j.id) + '" title="点击更换照片">' : '') +
+            ((j.photo || (d && d.photo)) ? '<img class="tv-postcard-photo" src="' + esc(j.photo || d.photo) + '" referrerpolicy="no-referrer" alt="" loading="lazy" data-act="edit-journal-photo" data-id="' + esc(j.id) + '" title="点击更换照片">' : '') +
             '<p class="tv-postcard-text">' + esc(j.text) + '</p>' +
           '</div>' +
           '<span class="tv-postcard-edit">点击编辑</span>' +
@@ -1364,7 +1364,7 @@
         const payer = member(h.payerId);
         return '<article class="tv-hotel" data-act="edit-hotel" data-id="' + h.id + '">' +
           (h.photo
-            ? '<div class="tv-hotel-photo" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击更换照片"><img src="' + esc(h.photo) + '" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
+            ? '<div class="tv-hotel-photo" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击更换照片"><img src="' + esc(h.photo) + '" referrerpolicy="no-referrer" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
             : '<div class="tv-hotel-photo tv-hotel-photo-none" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击添加照片"><span class="tv-hotel-key">KEY</span></div>') +
           '<div class="tv-hotel-body">' +
             '<div class="tv-hotel-top"><span class="tv-hotel-night">' + nt + ' 晚</span><h4>' + esc(h.name) + '</h4><p>' + esc(h.address || '') + '</p></div>' +
@@ -1889,7 +1889,7 @@
       modalTitle(heading, '点击上传本地图片，或粘贴一张图片链接') +
       '<div class="tv-imgpick">' +
         '<div class="tv-imgpick-prev' + ((pending || def) ? '' : ' empty') + '" id="tv-img-prev">' +
-          ((pending || def) ? '<img src="' + esc(pending || def) + '" alt="">' : '<span>还没有照片</span>') +
+          ((pending || def) ? '<img src="' + esc(pending || def) + '" referrerpolicy="no-referrer" alt="">' : '<span>还没有照片</span>') +
         '</div>' +
         '<div class="tv-imgpick-row">' +
           '<button type="button" class="btn btn-primary" id="tv-img-upload">上传本地图片</button>' +
@@ -1922,14 +1922,29 @@
 
     const box = m.querySelector('#tv-img-prev');
     const status = m.querySelector('#tv-img-status');
-    const setPreview = src => {
-      if (src) {
-        box.classList.remove('empty');
-        box.innerHTML = '<img src="' + esc(src) + '" alt="">';
-      } else {
+    // 图床（微博/小红书等）带 Referer 会 403，统一用 no-referrer 请求
+    const setPreview = (src, onLoaded) => {
+      if (!src) {
         box.classList.add('empty');
         box.innerHTML = '<span>还没有照片</span>';
+        return null;
       }
+      box.classList.remove('empty');
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.alt = '';
+      img.onload = () => {
+        if (typeof onLoaded === 'function') onLoaded(true);
+      };
+      img.onerror = () => {
+        box.classList.add('empty');
+        box.innerHTML = '<span>这张图加载不出来</span>';
+        if (typeof onLoaded === 'function') onLoaded(false);
+      };
+      img.src = src;
+      box.innerHTML = '';
+      box.appendChild(img);
+      return img;
     };
 
     const fileIn = m.querySelector('#tv-img-file');
@@ -1941,6 +1956,7 @@
       try {
         const url = await fileToDataUrl(f);
         pending = url;
+        urlBad = false;
         setPreview(url);
         m.querySelector('#tv-img-url').value = '';
         status.textContent = '本地图片已就绪，点「保存图片」生效。';
@@ -1953,18 +1969,40 @@
 
     m.querySelector('#tv-img-default').onclick = () => {
       pending = '';
+      urlBad = false;
       setPreview(def);
       m.querySelector('#tv-img-url').value = '';
       status.textContent = def ? '已恢复默认生成的图片。' : '保存后使用默认图片。';
     };
 
     const urlIn = m.querySelector('#tv-img-url');
+    let urlBad = false;
     const useUrl = () => {
       const v = urlIn.value.trim();
       if (!v) return toast('先粘贴一个图片链接', 'err');
-      pending = v;
-      setPreview(v);
-      status.textContent = '链接已预览，点「保存图片」生效。';
+      if (!/^(https?:\/\/|data:image\/)/i.test(v)) return toast('链接要以 http(s):// 开头', 'err');
+      status.textContent = '正在加载预览…';
+      setPreview(v, ok => {
+        urlBad = !ok;
+        if (ok) {
+          pending = v;
+          status.textContent = '链接已预览，点「保存图片」生效。';
+        } else {
+          const hotlink = /sinaimg\.cn|xiaohongshu|xhscdn\.com|douyinpic\.com|hdslb\.com|weibo\.com/i.test(v);
+          status.textContent = '';
+          const tip = document.createElement('span');
+          tip.textContent = hotlink
+            ? '这个图床（微博 / 小红书等）禁止外站直接引用，链接本身没坏，但浏览器拿不到图。右键图片「另存为」后点上面的「上传本地图片」即可；'
+            : '链接加载失败，可能已失效或图床限制外链。可以换成「上传本地图片」；';
+          const a = document.createElement('a');
+          a.href = v; a.target = '_blank'; a.rel = 'noreferrer';
+          a.className = 'tv-link';
+          a.textContent = '打开原图';
+          status.appendChild(tip);
+          status.appendChild(a);
+          toast('这张图被图床拦了，建议上传本地图片', 'err');
+        }
+      });
     };
     m.querySelector('#tv-img-use').onclick = useUrl;
     urlIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); useUrl(); } });
@@ -1988,6 +2026,7 @@
     }
 
     m.querySelector('#tv-img-save').onclick = () => {
+      if (urlBad) return toast('这张图还没加载成功，换一个链接或上传本地图片', 'err');
       const next = pending || def;
       if (!next) return toast('还没有选择图片', 'err');
       let old = '';
