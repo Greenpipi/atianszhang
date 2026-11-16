@@ -591,7 +591,34 @@
   }
 
   /* ---------------- 与记账本同步 ---------------- */
-  function resolveTarget(catId) {
+  /* 记账本里当前个人账本的大类 / 小类 */
+  function ledgerCategories() {
+    const app = typeof App !== 'undefined' ? App : null;
+    if (!app || !app.state) return [];
+    const ledgers = app.state.ledgers || [];
+    const ledger = ledgers.find(l => l.type === 'personal') || (app.curLedger && app.curLedger());
+    if (!ledger) return [];
+    const cats = (app.state.categories || []).filter(c => c.ledger_id === ledger.id && c.kind !== 'income');
+    if (cats.length) return cats;
+    return CATS.map(c => ({ name: c.label, subs: [] }));
+  }
+
+  /* 记账本大类名 → 旅行分类 id（用于图标 / 分类统计） */
+  function travelCatId(catName, subName) {
+    for (const id in RECORD_MAP) {
+      if (RECORD_MAP[id][0] === catName) return id;
+    }
+    const s = String(catName || '') + String(subName || '');
+    if (/食|餐|饮|咖啡|外卖/.test(s)) return 'food';
+    if (/住|酒店|民宿|房租/.test(s)) return 'stay';
+    if (/交通|车|油|打车|机票|地铁/.test(s)) return 'transport';
+    if (/门票|景点|景区/.test(s)) return 'ticket';
+    if (/娱乐|玩乐|电影|游戏/.test(s)) return 'fun';
+    if (/购物|日用|服饰|美妆/.test(s)) return 'shop';
+    return 'other';
+  }
+
+  function resolveTarget(exp) {
     const app = typeof App !== 'undefined' ? App : null;
     if (!app || !app.state) return null;
     const ledgers = app.state.ledgers || [];
@@ -599,7 +626,15 @@
     if (!ledger) return null;
     const cats = (app.state.categories || []).filter(c => c.ledger_id === ledger.id && c.kind !== 'income');
     if (!cats.length) return null;
-    const pair = RECORD_MAP[catId] || RECORD_MAP.other;
+    if (exp && exp.ledgerCat) {
+      const own = cats.find(c => c.name === exp.ledgerCat);
+      if (own) {
+        const subs = Array.isArray(own.subs) ? own.subs : [];
+        const sub = subs.indexOf(exp.ledgerSub) >= 0 ? exp.ledgerSub : (subs[0] || '');
+        return { ledger_id: ledger.id, category: own.name, sub: sub, kind: 'expense' };
+      }
+    }
+    const pair = RECORD_MAP[(exp && exp.category) || 'other'] || RECORD_MAP.other;
     const cat = cats.find(c => c.name === pair[0]) || cats[0];
     const subs = Array.isArray(cat.subs) ? cat.subs : [];
     const sub = subs.indexOf(pair[1]) >= 0 ? pair[1] : (subs[0] || '');
@@ -608,7 +643,7 @@
 
   function recordPayload(exp) {
     const t = T();
-    const target = resolveTarget(exp.category);
+    const target = resolveTarget(exp);
     const mine = myShare(exp);
     if (!target || mine <= 0) return null;
     const n = (exp.participants || []).length;
@@ -1890,6 +1925,29 @@
       note: '',
       sync: true
     };
+    const lcats = ledgerCategories();
+    const subsOf = name => {
+      const c = lcats.find(x => x.name === name);
+      return (c && Array.isArray(c.subs)) ? c.subs : [];
+    };
+    let initCat = lcats.length ? lcats[0].name : '';
+    let initSub = '';
+    if (lcats.length) {
+      if (data.ledgerCat && lcats.some(c => c.name === data.ledgerCat)) {
+        initCat = data.ledgerCat;
+      } else {
+        const pair = RECORD_MAP[data.category] || RECORD_MAP.other;
+        const hit = lcats.find(c => c.name === pair[0]);
+        if (hit) initCat = hit.name;
+      }
+      const subs = subsOf(initCat);
+      initSub = subs.indexOf(data.ledgerSub) >= 0 ? data.ledgerSub : (subs[0] || '');
+    }
+    const subHTML = name => {
+      const subs = subsOf(name);
+      if (!subs.length) return '<option value="">无小类</option>';
+      return subs.map(v => '<option value="' + esc(v) + '"' + (v === initSub ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    };
     const m = openModal(
       modalTitle(editing ? '编辑账单' : '记一笔旅行账单', '这里填总额；记账本只记「我的 AA 份额」') +
       '<div class="field-row">' +
@@ -1897,13 +1955,14 @@
         field('总金额（元）', '<input id="tv-e-amount" type="number" min="0" step="0.01" value="' + (data.amount || '') + '" placeholder="0.00">') +
       '</div>' +
       '<div class="field-row">' +
-        field('分类', '<select id="tv-e-cat">' + CATS.map(c => '<option value="' + c.id + '"' + (c.id === data.category ? ' selected' : '') + '>' + c.label + '</option>').join('') + '</select>') +
-        field('日期', dateInput('tv-e-date', data.date)) +
+        field('大类', '<select id="tv-e-cat">' + lcats.map(c => '<option value="' + esc(c.name) + '"' + (c.name === initCat ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>') +
+        field('小类', '<select id="tv-e-sub">' + subHTML(initCat) + '</select>') +
       '</div>' +
       '<div class="field-row">' +
+        field('日期', dateInput('tv-e-date', data.date)) +
         field('谁付的钱', '<select id="tv-e-payer">' + memberOptions(data.payerId) + '</select>') +
-        field('关联行程（可选）', '<select id="tv-e-act">' + activityOptions(data.activityId) + '</select>') +
       '</div>' +
+      field('关联行程（可选）', '<select id="tv-e-act">' + activityOptions(data.activityId) + '</select>') +
       '<div class="field"><label>谁参与分摊（AA）</label>' + memberChecks(data.participants) + '</div>' +
       field('备注', '<input id="tv-e-note" type="text" value="' + esc(data.note) + '" placeholder="可选，例如 含早餐">') +
       '<div class="tv-sync-box">' +
@@ -1918,6 +1977,15 @@
     );
     if (!m) return;
     bindControls(m);
+    const catSel = m.querySelector('#tv-e-cat');
+    const subSel = m.querySelector('#tv-e-sub');
+    catSel.addEventListener('change', () => {
+      const subs = subsOf(catSel.value);
+      subSel.innerHTML = subs.length
+        ? subs.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('')
+        : '<option value="">无小类</option>';
+      App.enhanceSelects(m);
+    });
     const updPreview = () => {
       const amt = Number(m.querySelector('#tv-e-amount').value) || 0;
       const ids = checkedIds(m);
@@ -1954,7 +2022,9 @@
       const date = m.querySelector('#tv-e-date').dataset.date || todayStr();
       const patch = {
         title: title, amount: Math.round(amount * 100) / 100,
-        category: m.querySelector('#tv-e-cat').value,
+        ledgerCat: catSel.value,
+        ledgerSub: subSel.value,
+        category: travelCatId(catSel.value, subSel.value),
         date: date, day: dayOfDate(date),
         payerId: m.querySelector('#tv-e-payer').value || 'me',
         activityId: m.querySelector('#tv-e-act').value || '',

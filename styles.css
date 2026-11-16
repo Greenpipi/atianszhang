@@ -57,6 +57,10 @@ body{
 }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+/* 数字输入框去掉上下箭头（金额等场景不需要步进按钮） */
+input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 /* 触屏设备（手机/平板）：输入类控件 16px——iOS Safari 聚焦小于 16px 的输入框会自动放大页面，且缩放后不恢复 */
 @media (pointer: coarse){
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea{font-size:16px!important}
