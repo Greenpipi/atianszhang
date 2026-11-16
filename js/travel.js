@@ -731,20 +731,25 @@
     ).slice(0, n);
   }
 
-  /* 封面上随机大小贴 2-3 个这本册子里的心情 emoji */
+  /* 封面上随机大小贴 2-3 个心情 emoji（可用封面编辑器手动挑选） */
   function coverMoods(t) {
-    const seen = {};
-    const list = [];
-    latestJournals(t, 8).forEach(j => {
-      const md = MOOD[j.mood];
-      if (md && !seen[md.id]) { seen[md.id] = 1; list.push(md); }
-    });
+    let list;
+    if (Array.isArray(t.coverMoods) && t.coverMoods.length) {
+      list = t.coverMoods.map(id => MOOD[id]).filter(Boolean);
+    } else {
+      const seen = {};
+      list = [];
+      latestJournals(t, 8).forEach(j => {
+        const md = MOOD[j.mood];
+        if (md && !seen[md.id]) { seen[md.id] = 1; list.push(md); }
+      });
+    }
     if (!list.length) return '';
     let h = 0;
     for (let i = 0; i < String(t.id).length; i++) h = (h * 31 + String(t.id).charCodeAt(i)) % 997;
     return list.slice(0, 3).map((md, i) => {
-      const size = [23, 31, 19][i] + (h + i * 7) % 9;
-      const rot = [-9, 8, -5][i] + (h + i * 3) % 6;
+      const size = [34, 21, 27][i] + (h + i * 11) % 7;
+      const rot = [-11, 9, -6][i] + (h + i * 5) % 8;
       return '<span class="tv-book-mood mm' + i + '" style="font-size:' + size + 'px;--rot:' + rot + 'deg">' + md.emoji + '</span>';
     }).join('');
   }
@@ -826,9 +831,7 @@
           '<div class="tv-tripmeta">' +
             '<span>' + esc(shortDate(t.startDate)) + ' — ' + esc(shortDate(t.endDate)) + '</span>' +
             '<i></i>' +
-            '<button type="button" class="tv-member-link" data-act="edit-members" title="编辑同行成员">' +
-              t.members.length + ' 人同行 <span>✎</span>' +
-            '</button>' +
+            '<span class="tv-member-count">' + t.members.length + ' 人同行</span>' +
             '<div class="tv-people">' + t.members.map(m => '<span class="tv-avatar sm ' + esc(m.cls) + '" title="' + esc(m.name) + '">' + esc(m.initial) + '</span>').join('') + '</div>' +
           '</div>' +
         '</div>' +
@@ -1207,7 +1210,6 @@
     if (act === 'open-trip') openTrip(ds.id);
     else if (act === 'back-library') { state.view = 'library'; persist(); render(); }
     else if (act === 'new-trip') openTripModal(null);
-    else if (act === 'edit-members') openMembersModal();
     else if (act === 'edit-trip') openTripModal(ds.id || (T() && T().id));
     else if (act === 'delete-trip') deleteTrip(ds.id);
     else if (act === 'edit-budget') openBudgetModal();
@@ -1315,6 +1317,7 @@
     const trip = editing ? state.trips.find(x => x.id === id) : null;
     const defaultDest = editing ? trip.destination : '';
     const curStatus = editing ? statusOf(trip) : 'plan';
+    const members = editing ? trip.members : defaultMembers();
     const data = trip || {
       title: '', destination: '', startDate: todayStr(), endDate: todayStr(),
       budget: '', cover: ''
@@ -1334,7 +1337,11 @@
         field('旅行状态', '<select id="tv-t-status">' + TRIP_STATUSES.map(s => '<option value="' + s.id + '"' + (s.id === curStatus ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select>') +
       '</div>' +
       field('封面图片链接（可选）', '<input id="tv-t-cover" type="text" value="' + esc(data.cover || '') + '" placeholder="留空按目的地自动生成，也可以直接点封面图更换">') +
-      '<p class="tv-form-tip">同行成员在旅行册页面的「N 人同行」处编辑，增减成员会同步更新 AA 分摊。</p>' +
+      '<div class="field"><label>同行成员</label>' +
+        '<div class="tv-memlist" id="tv-t-memlist">' + members.map(memRow).join('') + '</div>' +
+        '<button type="button" class="tv-addmem" id="tv-t-mem-add">＋ 添加同行人</button>' +
+        '<p class="tv-form-tip">增减成员会同步更新 AA 分摊，已产生的账单会重新计算。</p>' +
+      '</div>' +
       '<div class="modal-acts">' +
         (editing ? '<button type="button" class="btn btn-danger" id="tv-t-del" style="margin-right:auto">删除这本</button>' : '') +
         '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
@@ -1343,6 +1350,44 @@
     );
     if (!m) return;
     bindControls(m);
+    const memList = m.querySelector('#tv-t-memlist');
+    const bindMemRows = () => {
+      memList.querySelectorAll('.tv-memrow').forEach(row => {
+        const inp = row.querySelector('.tv-mem-name');
+        inp.oninput = () => {
+          row.querySelector('.tv-avatar').textContent = inp.value.trim().slice(0, 1) || '新';
+        };
+        const del = row.querySelector('.tv-mem-del');
+        if (del) del.onclick = () => row.remove();
+      });
+    };
+    bindMemRows();
+    m.querySelector('#tv-t-mem-add').onclick = () => {
+      if (memList.children.length >= 12) return toast('最多 12 位同行人', 'err');
+      const cls = 'c' + ((memList.children.length - 1) % 5 + 1);
+      memList.insertAdjacentHTML('beforeend', memRow({ id: uid('m'), name: '', initial: '新', cls: cls }));
+      bindMemRows();
+      const last = memList.lastElementChild;
+      if (last) last.querySelector('.tv-mem-name').focus();
+    };
+    const readMembers = () => {
+      const next = [];
+      memList.querySelectorAll('.tv-memrow').forEach(row => {
+        const name = row.querySelector('.tv-mem-name').value.trim();
+        if (!name) return;
+        const mid = row.dataset.id;
+        next.push({
+          id: mid,
+          name: name,
+          initial: name.slice(0, 1),
+          cls: mid === 'me' ? 'me' : (row.dataset.cls || 'c1')
+        });
+      });
+      if (!next.some(x => x.id === 'me')) {
+        next.unshift({ id: 'me', name: '我', initial: '我', cls: 'me' });
+      }
+      return next;
+    };
     const del = m.querySelector('#tv-t-del');
     if (del) del.onclick = () => { App.closeModal(); deleteTrip(trip.id); };
     m.querySelector('#tv-t-save').onclick = () => {
@@ -1357,7 +1402,9 @@
       if (!dest) return toast('请填写目的地', 'err');
       if (parseDate(end) < parseDate(start)) return toast('结束日期不能早于出发日期', 'err');
       const cover = coverIn || (trip && trip.cover) || photo(dest + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
+      const nextMembers = readMembers();
       if (editing) {
+        applyMembers(trip, nextMembers);
         Object.assign(trip, { title: title, destination: dest, budget: budget, cover: cover, status: status });
         if (trip.startDate !== start || trip.endDate !== end) {
           trip.startDate = start; trip.endDate = end;
@@ -1381,7 +1428,7 @@
           status: status,
           cover: cover,
           createdAt: Date.now(),
-          members: defaultMembers(),
+          members: nextMembers,
           days: buildDays(start, end, dest, []),
           hotels: [],
           expenses: [],
@@ -1406,68 +1453,18 @@
     '</div>';
   }
 
-  function openMembersModal() {
-    const t = T();
-    if (!t) return;
-    const m = openModal(
-      modalTitle('同行成员', '增减成员会同步更新 AA 分摊，已生成的账单会重新计算') +
-      '<div class="tv-memlist" id="tv-memlist">' + t.members.map(memRow).join('') + '</div>' +
-      '<button type="button" class="tv-addmem" id="tv-mem-add">＋ 添加同行人</button>' +
-      '<div class="modal-acts">' +
-        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
-        '<button type="button" class="btn btn-primary" id="tv-mem-save">保存成员</button>' +
-      '</div>'
-    );
-    if (!m) return;
-    const list = m.querySelector('#tv-memlist');
-    const bindRows = () => {
-      list.querySelectorAll('.tv-memrow').forEach(row => {
-        const inp = row.querySelector('.tv-mem-name');
-        inp.oninput = () => {
-          row.querySelector('.tv-avatar').textContent = inp.value.trim().slice(0, 1) || '新';
-        };
-        const del = row.querySelector('.tv-mem-del');
-        if (del) del.onclick = () => row.remove();
-      });
+  /* 成员变化后同步清理账单 / 住宿里的付款人与分摊人 */
+  function applyMembers(t, next) {
+    if (!next || !next.length) return;
+    const ids = next.map(x => x.id);
+    t.members = next;
+    const fix = list => {
+      if (ids.indexOf(list.payerId) < 0) list.payerId = 'me';
+      list.participants = (list.participants || []).filter(p => ids.indexOf(p) >= 0);
+      if (!list.participants.length) list.participants = ['me'];
     };
-    bindRows();
-    m.querySelector('#tv-mem-add').onclick = () => {
-      if (list.children.length >= 12) return toast('最多 12 位同行人', 'err');
-      const cls = 'c' + ((list.children.length - 1) % 5 + 1);
-      list.insertAdjacentHTML('beforeend', memRow({ id: uid('m'), name: '', initial: '新', cls: cls }));
-      bindRows();
-      const last = list.lastElementChild;
-      if (last) last.querySelector('.tv-mem-name').focus();
-    };
-    m.querySelector('#tv-mem-save').onclick = () => {
-      const next = [];
-      list.querySelectorAll('.tv-memrow').forEach(row => {
-        const name = row.querySelector('.tv-mem-name').value.trim();
-        if (!name) return;
-        const id = row.dataset.id;
-        next.push({
-          id: id,
-          name: name,
-          initial: name.slice(0, 1),
-          cls: id === 'me' ? 'me' : (row.dataset.cls || 'c1')
-        });
-      });
-      if (!next.length) return toast('至少保留一位成员', 'err');
-      if (!next.some(x => x.id === 'me')) {
-        next.unshift({ id: 'me', name: '我', initial: '我', cls: 'me' });
-      }
-      const ids = next.map(x => x.id);
-      t.members = next;
-      const fix = list => {
-        if (ids.indexOf(list.payerId) < 0) list.payerId = 'me';
-        list.participants = (list.participants || []).filter(p => ids.indexOf(p) >= 0);
-        if (!list.participants.length) list.participants = ['me'];
-      };
-      t.expenses.forEach(fix);
-      t.hotels.forEach(fix);
-      persist(); App.closeModal(); render();
-      toast('同行成员已更新', 'ok');
-    };
+    t.expenses.forEach(fix);
+    t.hotels.forEach(fix);
   }
 
   /* ---------- 预算 ---------- */
@@ -1592,6 +1589,15 @@
             '<button type="button" class="btn" id="tv-img-use">预览</button>' +
           '</div>' +
         '</div>' +
+        (kind === 'cover' ? (() => {
+          const sel = Array.isArray(trip.coverMoods) ? trip.coverMoods.slice(0, 3) : [];
+          return '<div class="field"><label>封面心情 emoji（最多 3 个，大小会自动错落）</label>' +
+            '<div class="tv-emoji-pick" id="tv-emoji-pick">' +
+              MOODS.map(md => '<button type="button" class="tv-emoji-opt' + (sel.indexOf(md.id) >= 0 ? ' on' : '') + '" data-mood="' + md.id + '" title="' + esc(md.label) + '">' + md.emoji + '</button>').join('') +
+            '</div>' +
+            '<p class="tv-form-tip">不选则自动从最近的日志里挑心情。已选 <b id="tv-emoji-count">' + sel.length + '</b> / 3</p>' +
+          '</div>';
+        })() : '') +
         '<p class="tv-form-tip" id="tv-img-status">上传的图片会自动压缩，只保存在本机。</p>' +
       '</div>' +
       '<div class="modal-acts">' +
@@ -1650,11 +1656,29 @@
     m.querySelector('#tv-img-use').onclick = useUrl;
     urlIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); useUrl(); } });
 
+    let picked = Array.isArray(trip.coverMoods) ? trip.coverMoods.slice(0, 3) : [];
+    const pickBox = m.querySelector('#tv-emoji-pick');
+    if (pickBox) {
+      pickBox.querySelectorAll('.tv-emoji-opt').forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.mood;
+          const at = picked.indexOf(id);
+          if (at >= 0) picked.splice(at, 1);
+          else {
+            if (picked.length >= 3) return toast('最多选 3 个心情', 'err');
+            picked.push(id);
+          }
+          btn.classList.toggle('on', picked.indexOf(id) >= 0);
+          m.querySelector('#tv-emoji-count').textContent = String(picked.length);
+        };
+      });
+    }
+
     m.querySelector('#tv-img-save').onclick = () => {
       const next = pending || def;
       if (!next) return toast('还没有选择图片', 'err');
       let old = '';
-      if (kind === 'cover') { old = trip.cover || ''; trip.cover = next; }
+      if (kind === 'cover') { old = trip.cover || ''; trip.cover = next; trip.coverMoods = picked.slice(); }
       else { old = item.photo || ''; item.photo = next; }
       if (!persist()) {
         if (kind === 'cover') trip.cover = old; else item.photo = old;
