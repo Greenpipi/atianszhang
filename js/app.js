@@ -4101,7 +4101,7 @@ const App = {
     const fitRemark = () => {
       rem.style.height = 'auto';
       const h = rem.scrollHeight;
-      rem.style.height = Math.min(168, Math.max(21, h)) + 'px';
+      rem.style.height = Math.min(168, Math.max(24, h)) + 'px';
       noteExpand.hidden = h <= 172;
     };
     rem.addEventListener('input', () => {

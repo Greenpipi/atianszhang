@@ -2379,12 +2379,14 @@ input,select,textarea{font-family:inherit}
 .lgwb .amount-row input{flex:1;min-width:0;font-family:var(--lg-mono);font-size:38px;font-weight:500;color:var(--lg-ink);letter-spacing:-.02em;line-height:1.18}
 .lgwb .amount-row input::placeholder{color:#CFC6B6}
 .lgwb .kind-tag{font-size:10.5px;font-weight:700;color:var(--lg-gold-deep);background:var(--lg-gold-soft);border:1px solid var(--lg-gold-line);border-radius:999px;padding:4px 10px;white-space:nowrap}
-.lgwb .single-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;align-items:start}
-.lgwb .input-card{display:flex;flex-direction:column;gap:3px;border:1px solid var(--lg-line);border-radius:12px;padding:9px 12px;background:#fff}
-.lgwb .input-card>span{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--lg-faint)}
-.lgwb .input-card input{font-size:13px;font-weight:600;padding:2px 0;width:100%}
-.lgwb .input-card textarea{font-size:13px;font-weight:600;line-height:1.5;padding:2px 0;resize:none;overflow:hidden;min-height:21px;max-height:168px;width:100%}
-.lgwb .input-card .ic-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lgwb .single-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;align-items:stretch}
+.lgwb .input-card{display:flex;flex-direction:column;gap:4px;border:1px solid var(--lg-line);border-radius:12px;padding:10px 12px;background:#fff}
+/* 描述 / 备注：标题同字号同颜色，输入区同高度 */
+.lgwb .input-card>span,
+.lgwb .input-card .ic-head>span{font-size:13px;font-weight:700;letter-spacing:0;line-height:18px;color:var(--lg-faint)}
+.lgwb .input-card input{font-size:13px;font-weight:600;padding:0;width:100%;height:24px;line-height:24px}
+.lgwb .input-card textarea{font-size:13px;font-weight:600;line-height:24px;padding:0;resize:none;overflow:hidden;min-height:24px;max-height:168px;width:100%}
+.lgwb .input-card .ic-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px}
 .lgwb .note-expand{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--lg-gold-deep);padding:2px 4px;border-radius:5px;transition:background .14s}
 .lgwb .note-expand:hover{background:var(--lg-gold-soft)}
 .lgwb .wish-toggle-card{display:flex;align-items:center;gap:14px;border:1px solid var(--lg-line);border-radius:13px;padding:12px 15px;margin-top:12px;background:#fff}
