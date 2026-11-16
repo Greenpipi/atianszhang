@@ -49,6 +49,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 /* 滚动条始终占位：待办各 Tab 内容长短不一，滚动条忽隐忽现会让整页宽度变化、内容左右抖一下 */
 html{-webkit-text-size-adjust:100%;overflow-y:scroll;scrollbar-gutter:stable}
+/* 弹窗打开时冻结背景页面：滚轮/触控都只作用在弹窗内 */
+html.has-modal,body.has-modal{overflow:hidden!important}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
   background:var(--bg);color:var(--text);
@@ -778,7 +780,9 @@ mark{background:#F6EEDC;color:inherit;border-radius:3px;padding:0 1px}
 .modal-mask{
   position:fixed;inset:0;background:rgba(60,56,49,.4);backdrop-filter:blur(3px);
   display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;animation:fadeIn .15s;
+  overscroll-behavior:contain;
 }
+.modal{overscroll-behavior:contain}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{
   background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(64,60,52,.18);
@@ -2460,6 +2464,7 @@ input,select,textarea{font-family:inherit}
 .lgwb .cat-pill>span{overflow-wrap:anywhere}
 .lgwb .cat-pill:hover{color:var(--lg-gold-deep)}
 .lgwb .cat-pill i{font-style:normal;flex:none;font-size:8px;line-height:1;padding:2px 3px;border-radius:3px;background:var(--lg-gold-soft);color:var(--lg-gold-deep)}
+.lgwb .cat-pill .cat-rent{font-style:normal;flex:none;font-size:9px;line-height:1;padding:2px 4px;border-radius:3px;background:#EDF0E9;color:#5E6E55}
 .lgwb .cell-input.note{font-weight:500;color:var(--lg-muted);font-size:11.5px}
 .lgwb .price-wrap{display:flex;align-items:center;gap:1px;padding-left:4px;color:var(--lg-faint);font-family:var(--lg-mono);font-size:11px;border-radius:7px;transition:background .12s,box-shadow .12s}
 .lgwb .price-wrap:focus-within{background:#FFFDF9;box-shadow:inset 0 0 0 1.5px var(--lg-gold-line)}

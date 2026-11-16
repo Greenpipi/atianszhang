@@ -47,6 +47,7 @@ const App = {
     Store.setHandlers(() => this.onDataChange(), () => this.onAuthChange());
     Store.onCloudMissing = () => this.toast('云端数据表尚未创建，已自动切换为本地记账（在 Supabase 执行建表 SQL 后恢复云同步）', '');
     this.bindChrome();
+    this.bindModalScrollGuard();
 
     // 暖启动：先按上次登录身份 + 本地快照把内容画出来，恢复会话（可能触发网络刷新 token）放到后面
     const warmed = this.paintWarmStart();
@@ -2386,7 +2387,7 @@ const App = {
         const amt = Math.abs(Number(r.amount) || 0);
         const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
         const title = r.sub || r.category || '未分类';
-        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', multiLedger && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', r.rental ? '🏠 出租屋' : '', multiLedger && lg ? lg.name : ''].filter(Boolean).join(' · ');
         return '<div class="lrow' + (r.list_id ? ' is-list' : '') + '" data-rid="' + r.id + '" data-lid="' + r.ledger_id + '">'
           + '<span class="rec-ico">' + catEmoji(r.category) + '</span>'
           + '<div class="rec-main"><b>' + hlKw(title, kw) + '</b><span>' + hlKw(meta, kw) + '</span></div>'
@@ -2724,7 +2725,7 @@ const App = {
       const detailRows = selRecs.map(r => {
         const inc = kindOfR(r) === 'income';
         const lg = this.state.ledgers.find(l => l.id === r.ledger_id);
-        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', this.state.ledgers.length > 1 && lg ? lg.name : ''].filter(Boolean).join(' · ');
+        const meta = [r.category, r.note, r.list_id ? ('清单 · ' + (r.list_title || '未命名清单')) : '', r.rental ? '🏠 出租屋' : '', this.state.ledgers.length > 1 && lg ? lg.name : ''].filter(Boolean).join(' · ');
         return '<div class="lrow' + (r.list_id ? ' is-list' : '') + '" data-rid="' + r.id + '"><span class="rec-ico">' + catEmoji(r.category) + '</span>'
           + '<div class="rec-main"><b>' + esc(r.sub || r.category) + '</b><span>' + esc(meta) + '</span></div>'
           + '<span class="rec-amt' + (inc ? ' income' : '') + '">' + (inc ? '+' : '−') + fmtMoney(Math.abs(Number(r.amount) || 0)) + '</span></div>';
@@ -4270,13 +4271,15 @@ const App = {
       };
     };
     const amountOf = r => (parseFloat(r.price) || 0) * (parseFloat(r.qty) || 0);
+    const catPillHTML = r => '<span>' + quote(r.cat) + '</span><i>' + quote(r.sub || '—') + '</i>'
+      + (r.rental ? '<em class="cat-rent" title="归入出租屋账本">🏠</em>' : '');
     const renderRows = () => {
       const tb = $('lgRows');
       if (!tb) return;
       tb.innerHTML = st.rows.map((r, i) => '<tr data-row="' + r.id + '"' + (r.wish ? ' class="good"' : '') + '>' +
         '<td class="idx">' + String(i + 1).padStart(2, '0') + '</td>' +
         '<td><input class="cell-input title" data-f="title" value="' + quote(r.title) + '" placeholder="物品名称" autocomplete="off"></td>' +
-        '<td><button type="button" class="cat-pill" data-act="cat"><span>' + quote(r.cat) + '</span><i>' + quote(r.sub || '—') + '</i></button></td>' +
+        '<td><button type="button" class="cat-pill" data-act="cat">' + catPillHTML(r) + '</button></td>' +
         '<td><div class="price-wrap">¥<input class="cell-input num" data-f="price" inputmode="decimal" value="' + quote(r.price) + '" placeholder="0"></div></td>' +
         '<td><input class="cell-input qty" data-f="qty" inputmode="numeric" value="' + quote(r.qty) + '" placeholder="1"></td>' +
         '<td class="amount-cell">' + fmtMoney(amountOf(r)) + '</td>' +
@@ -4345,29 +4348,37 @@ const App = {
       paint();
       document.body.appendChild(pop);
       placePop(pop, anchor);
+      // 选完大类 / 小类都留在气泡里，方便继续选小类或切换「归入出租屋」；
+      // 只有点击气泡外的空位（或 ✕）才关闭。
+      const syncAnchor = () => {
+        const tr = $('lgRows').querySelector('tr[data-row="' + row.id + '"]');
+        const next = tr && tr.querySelector('[data-act="cat"]');
+        if (next) { anchorEl = next; placePop(pop, anchorEl); }
+      };
       pop.addEventListener('click', e => {
         if (e.target.closest('[data-x]')) return closePops();
         const c = e.target.closest('[data-c]');
         if (c) {
-          // 先选大类：留在气泡里继续选小类，选完小类才关闭
           row.cat = c.dataset.c;
           if (!subsOf(row.cat).includes(row.sub)) row.sub = '';
           renderRows();
           paint();
-          if (!subsOf(row.cat).length) return closePops();
-          const tr = $('lgRows').querySelector('tr[data-row="' + row.id + '"]');
-          const next = tr && tr.querySelector('[data-act="cat"]');
-          if (next) { anchorEl = next; placePop(pop, anchorEl); }
+          syncAnchor();
           return;
         }
         const s = e.target.closest('[data-s]');
         if (s) {
           row.sub = s.dataset.s;
           renderRows();
-          return closePops();
+          paint();
+          syncAnchor();
+          return;
         }
         if (e.target.closest('[data-rent]')) {
           row.rental = !row.rental;
+          const tr = $('lgRows').querySelector('tr[data-row="' + row.id + '"]');
+          const pill = tr && tr.querySelector('.cat-pill');
+          if (pill) pill.innerHTML = catPillHTML(row);
           paint();
         }
       });
@@ -5293,11 +5304,12 @@ const App = {
             '<div class="imp-pct" style="font-size:13px;color:var(--muted)">准备中…</div>' +
             '<div style="font-size:11.5px;color:#B0763C;margin-top:10px">导入期间请勿关闭或刷新页面</div></div>';
           document.getElementById('modal-root').appendChild(ov);
+          this.syncModalLock();
           const pct = ov.querySelector('.imp-pct');
           try {
             const r = await NotionImport.run(data, plan, (done, total) => { pct.textContent = done + ' / ' + total; });
             this.toast('导入完成：新增 ' + r.added + ' 条' + (r.failed ? '，失败 ' + r.failed + ' 条' : ''), r.failed ? 'err' : 'ok');
-          } finally { ov.remove(); }
+          } finally { ov.remove(); this.syncModalLock(); }
           await this.loadData();
           return;
         }
@@ -6233,6 +6245,40 @@ const App = {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') this.closeAllCsel(); });
   },
 
+  /* 弹窗打开时冻结背景页面，滚轮在弹窗内滚动到边界也不再穿透到背景 */
+  bindModalScrollGuard() {
+    document.addEventListener('wheel', e => {
+      const root = document.getElementById('modal-root');
+      if (!root || !root.children.length) return;
+      // 横向滚动（表格/长标题）交给元素自己处理
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      let el = e.target;
+      while (el && el.nodeType === 1) {
+        const cs = getComputedStyle(el);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+          const down = e.deltaY > 0;
+          const atTop = el.scrollTop <= 0;
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+          // 内部还能滚就放行；到顶/到底则拦下，避免带动背景
+          if ((down && !atBottom) || (!down && !atTop)) return;
+          e.preventDefault();
+          return;
+        }
+        if (el === document.body) break;
+        el = el.parentElement;
+      }
+      e.preventDefault();
+    }, { passive: false });
+  },
+
+  /* 有无弹窗时同步锁定/解锁背景滚动（嵌套弹窗按层级判断） */
+  syncModalLock() {
+    const root = document.getElementById('modal-root');
+    const has = !!(root && root.children.length);
+    document.documentElement.classList.toggle('has-modal', has);
+    document.body.classList.toggle('has-modal', has);
+  },
+
   openModal(html, wide, cls, maskCls) {
     // 栈式弹窗：不再预清空，支持嵌套（如在编辑弹窗内再弹输入框）；后开的叠在上层
     const root = document.getElementById('modal-root');
@@ -6242,12 +6288,14 @@ const App = {
     mask.onclick = e => { if (e.target === mask) this.closeModal(); };
     mask.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.closeModal());
     root.appendChild(mask);
+    this.syncModalLock();
     return mask;
   },
   closeModal() {
     // 只关最顶层弹窗（嵌套时底层编辑弹窗保持打开）
     const root = document.getElementById('modal-root');
     if (root.lastElementChild) root.lastElementChild.remove();
+    this.syncModalLock();
   },
 
   /* 小类图标选择器：选中后回调 key；传空字符串表示按小类自动匹配 */
