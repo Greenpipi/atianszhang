@@ -1,8 +1,6 @@
 /* ============ 应用主逻辑 ============ */
 /* 好物状态排序权重：使用中 → 未使用 → 闲置中 → 已弃用 → 已磬用（已弃用/已磬用 始终最后） */
 const STATUS_RANK = { '使用中': 0, '未使用': 1, '闲置中': 2, '已弃用': 3, '已磬用': 4 };
-/* 购买平台：内置标签；用户自定义的只存本地（localStorage），不改表结构 */
-const BASE_PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下'];
 
 /* 旧版季节自动切换会把好物的 status_since 重置为切换当天（已陪伴天数因此显示 1 天）。
  * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
@@ -3677,27 +3675,6 @@ const App = {
     return normGoodsTags(Array.from(document.querySelectorAll(pickerSel + ' input[type=checkbox]:checked')).map(i => i.value));
   },
 
-  /* ---------- 平台标签：内置 + 用户自定义（只存本地，零建表改动） ---------- */
-  platformsOf() {
-    const key = 'fin_platforms_' + ((Store.user && Store.user.email) || 'guest');
-    let saved = [];
-    try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { saved = []; }
-    const seen = {};
-    const out = [];
-    BASE_PLATFORMS.concat(saved, (this.state.records || []).map(r => r.purchase_platform)).forEach(p => {
-      const v = String(p == null ? '' : p).trim();
-      if (!v || seen[v]) return;
-      seen[v] = 1;
-      out.push(v);
-    });
-    return out.slice(0, 14);
-  },
-  savePlatforms(list) {
-    const key = 'fin_platforms_' + ((Store.user && Store.user.email) || 'guest');
-    const custom = (list || []).filter(p => p && !BASE_PLATFORMS.includes(p));
-    try { localStorage.setItem(key, JSON.stringify(custom)); } catch (e) { /* 忽略 */ }
-  },
-
   /* ---------- 评分编解码 ----------
    * records.rating 是 integer 列。为不改线上表结构就支持「负向 + 半星」，新值编码：
    *   0         未评分
@@ -3748,7 +3725,6 @@ const App = {
     let cat = (preCat && catOf(preCat)) ? preCat : (cats.find(c => kindOf(c.name) === kind) || cats[0]).name;
     let sub = (preSub && subsOf(cat).includes(preSub)) ? preSub : (subsOf(cat)[0] || '');
     if (rental && !preCat && catOf(RENTAL_CAT)) { cat = RENTAL_CAT; sub = subsOf(cat)[0] || ''; }
-    let platforms = this.platformsOf();
 
     const single0 = editRec ? (() => {
       const ri = this.ratingInfo(editRec);
@@ -3859,7 +3835,7 @@ const App = {
                 </div>
               </div>
               <div class="single-detail">
-                <div class="gi-row"><span class="gi-label">平台</span><div class="gi-chips" id="lgGiPlats"></div></div>
+                <div class="gi-row"><span class="gi-label">平台</span><input class="gi-input" id="lgGiPlat" type="text" maxlength="20" placeholder="如 宜家 / 淘宝" autocomplete="off"></div>
                 <div class="gi-row"><span class="gi-label">规格</span><input class="gi-input" id="lgGiSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>
               </div>
               <div class="wish-toggle-card">
@@ -4115,70 +4091,19 @@ const App = {
       placePop(pop, anchor);
       bindPopOutside(pop, anchor);
     };
-    const inlinePlatInput = (box, done) => {
-      box.innerHTML = '<div class="plat-input-row"><input type="text" maxlength="12" placeholder="平台名称，回车添加"><button type="button" data-ok>添加</button></div>';
-      const inp = box.querySelector('input');
-      const commit = () => {
-        const v = inp.value.trim();
-        if (!v) return done('');
-        if (!platforms.includes(v)) {
-          platforms.push(v);
-          this.savePlatforms(platforms);
-        }
-        done(v);
-      };
-      box.querySelector('[data-ok]').onclick = commit;
-      inp.onkeydown = e => {
-        if (e.key === 'Enter') { e.preventDefault(); commit(); }
-        if (e.key === 'Escape') { e.stopPropagation(); done(''); }
-      };
-      inp.focus();
-    };
-
     /* ---------- 单笔：好物区 ---------- */
-    const paintSinglePlats = () => {
-      const box = $('lgGiPlats');
-      if (!box) return;
-      box.innerHTML = platforms.map(p => {
-        const on = p === st.single.platform;
-        return '<span class="plat-tag' + (on ? ' on' : '') + '">'
-          + '<button type="button" class="plat-chip' + (on ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>'
-          + (BASE_PLATFORMS.includes(p) ? '' : '<button type="button" class="plat-del" data-delplat="' + quote(p) + '" title="删除这个平台">✕</button>')
-          + '</span>';
-      }).join('') + '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
-    };
-    $('lgGiPlats').onclick = e => {
-      const del = e.target.closest('[data-delplat]');
-      if (del) {
-        const name = del.dataset.delplat;
-        platforms = platforms.filter(p => p !== name);
-        this.savePlatforms(platforms);
-        if (st.single.platform === name) st.single.platform = '';
-        st.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
-        paintSinglePlats();
-        if (st.mode === 'list') renderRows();
-        if (st.drawer) renderDrawer();
-        return;
-      }
-      const b = e.target.closest('[data-plat]');
-      if (!b) return;
-      if (b.dataset.plat === '__add') {
-        inlinePlatInput($('lgGiPlats'), v => {
-          if (v) st.single.platform = v;
-          paintSinglePlats();
-        });
-        return;
-      }
-      st.single.platform = st.single.platform === b.dataset.plat ? '' : b.dataset.plat;
-      paintSinglePlats();
-    };
+    // 平台恢复为纯手动输入，不再用标签
+    const platInput = $('lgGiPlat');
+    if (platInput) {
+      platInput.value = st.single.platform || '';
+      platInput.addEventListener('input', () => { st.single.platform = platInput.value.trim(); });
+    }
     const paintSingleGood = () => {
       const f = st.single;
       $('lgGood').hidden = !f.fav;
       $('lgFav').classList.toggle('on', f.fav);
       $('lgFav').setAttribute('aria-checked', f.fav ? 'true' : 'false');
-      // 平台 / 规格不依赖「存入好物仓库」，普通支出也能填
-      paintSinglePlats();
+      // 规格不依赖「存入好物仓库」，普通支出也能填
       const spec = $('lgGiSpec');
       if (spec && document.activeElement !== spec) spec.value = f.spec;
       if (!f.fav) return;
@@ -4468,7 +4393,7 @@ const App = {
         '</div>' +
         '<div class="insp-field"><div class="insp-label">使用状态</div><div class="status-chips" id="lgDrStatus"></div></div>' +
         '<div class="insp-field"><div class="insp-label">标签</div><div class="tag-chips" id="lgDrTags"></div><button type="button" class="add-tag-btn" id="lgDrTagAdd">＋ 添加标签</button></div>' +
-        '<div class="insp-field"><div class="insp-label">购买平台</div><div class="plat-chips" id="lgDrPlats"></div></div>' +
+        '<div class="insp-field"><div class="insp-label">购买平台</div><input class="insp-input" id="lgDrPlat" type="text" maxlength="20" placeholder="如 淘宝 / 京东" autocomplete="off"></div>' +
         '<div class="insp-field"><div class="insp-label">规格</div><input class="insp-input" id="lgDrSpec" type="text" maxlength="40" placeholder="如 180×60cm / 黑色 M"></div>' +
         '<div class="insp-field"><div class="insp-label">备注</div><textarea class="insp-input" id="lgDrRemark" rows="2" placeholder="选填"></textarea></div>' +
         '<div class="insp-field"><div class="insp-label">图片 <em>' + row.imgs.length + '</em></div><div class="thumb-grid" id="lgDrImgs"></div></div>';
@@ -4487,39 +4412,9 @@ const App = {
           renderDrawer();
         });
       };
-      const platBox = body.querySelector('#lgDrPlats');
-      const paintPlats = () => {
-        platBox.innerHTML = platforms.map(p => {
-          const on = p === row.platform;
-          return '<span class="plat-tag' + (on ? ' on' : '') + '"><button type="button" class="plat-chip' + (on ? ' on' : '') + '" data-plat="' + quote(p) + '">' + quote(p) + '</button>' +
-            (BASE_PLATFORMS.includes(p) ? '' : '<button type="button" class="plat-del" data-delplat="' + quote(p) + '" title="删除这个平台">✕</button>') + '</span>';
-        }).join('') + '<button type="button" class="plat-chip other" data-plat="__add">＋ 自定义</button>';
-      };
-      paintPlats();
-      platBox.onclick = e => {
-        const del = e.target.closest('[data-delplat]');
-        if (del) {
-          const name = del.dataset.delplat;
-          platforms = platforms.filter(p => p !== name);
-          this.savePlatforms(platforms);
-          st.rows.forEach(r => { if (r.platform === name) r.platform = ''; });
-          if (st.single.platform === name) st.single.platform = '';
-          paintPlats();
-          paintSinglePlats();
-          return;
-        }
-        const b = e.target.closest('[data-plat]');
-        if (!b) return;
-        if (b.dataset.plat === '__add') {
-          inlinePlatInput(platBox, v => {
-            if (v) row.platform = v;
-            paintPlats();
-          });
-          return;
-        }
-        row.platform = row.platform === b.dataset.plat ? '' : b.dataset.plat;
-        paintPlats();
-      };
+      const plat = body.querySelector('#lgDrPlat');
+      plat.value = row.platform || '';
+      plat.addEventListener('input', () => { row.platform = plat.value.trim(); });
       const spec = body.querySelector('#lgDrSpec');
       spec.value = row.spec || '';
       spec.addEventListener('input', () => {
