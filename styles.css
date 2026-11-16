@@ -2683,3 +2683,10 @@ input,select,textarea{font-family:inherit}
   .bill-swipe-acts{width:var(--acts-w);box-sizing:border-box;gap:6px;padding:8px 10px}
   .bill-act{width:68px;flex:0 0 68px;font-size:12.5px;border-radius:12px}
 }
+
+/* ============ 隐藏全站滚动条（仍可正常滚动） ============ */
+html, body{scrollbar-width:none;-ms-overflow-style:none;scrollbar-gutter:auto}
+html::-webkit-scrollbar, body::-webkit-scrollbar{width:0;height:0;display:none}
+*, *::before, *::after{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{width:0;height:0;display:none}
+*::-webkit-scrollbar-thumb, *::-webkit-scrollbar-track{background:transparent}
