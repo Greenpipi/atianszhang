@@ -136,6 +136,26 @@
     ];
   }
 
+  /* ---------------- 旅行状态 ---------------- */
+  const TRIP_STATUSES = [
+    { id: 'plan', label: '计划中' },
+    { id: 'going', label: '旅途中' },
+    { id: 'done', label: '已完成' }
+  ];
+  function statusOf(t) {
+    if (t && TRIP_STATUSES.some(s => s.id === t.status)) return t.status;
+    if (!t) return 'plan';
+    const today = todayStr();
+    if (today < t.startDate) return 'plan';
+    if (today > t.endDate) return 'done';
+    return 'going';
+  }
+  function statusLabel(t) {
+    const id = statusOf(t);
+    const s = TRIP_STATUSES.find(x => x.id === id);
+    return s ? s.label : '计划中';
+  }
+
   /* ---------------- 示例数据 ---------------- */
   function seedState() {
     const dali = {
@@ -705,6 +725,30 @@
       '<main class="tv-body">' + renderLibrary() + '</main>';
   }
 
+  function latestJournals(t, n) {
+    return (t.journals || []).slice().sort((a, b) =>
+      (String(b.date) + String(b.created || 0)).localeCompare(String(a.date) + String(a.created || 0))
+    ).slice(0, n);
+  }
+
+  /* 封面上随机大小贴 2-3 个这本册子里的心情 emoji */
+  function coverMoods(t) {
+    const seen = {};
+    const list = [];
+    latestJournals(t, 8).forEach(j => {
+      const md = MOOD[j.mood];
+      if (md && !seen[md.id]) { seen[md.id] = 1; list.push(md); }
+    });
+    if (!list.length) return '';
+    let h = 0;
+    for (let i = 0; i < String(t.id).length; i++) h = (h * 31 + String(t.id).charCodeAt(i)) % 997;
+    return list.slice(0, 3).map((md, i) => {
+      const size = [23, 31, 19][i] + (h + i * 7) % 9;
+      const rot = [-9, 8, -5][i] + (h + i * 3) % 6;
+      return '<span class="tv-book-mood mm' + i + '" style="font-size:' + size + 'px;--rot:' + rot + 'deg">' + md.emoji + '</span>';
+    }).join('');
+  }
+
   function renderLibrary() {
     const trips = state.trips.slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
     const rots = [-2.4, 1.7, -1.3, 2.2, -1.8, 1.4];
@@ -726,7 +770,8 @@
               '<div class="tv-book-cover">' +
                 '<img src="' + esc(t.cover) + '" alt="' + esc(t.destination) + '" loading="lazy" data-act="edit-cover" data-id="' + esc(t.id) + '" title="点击更换封面">' +
                 '<span class="tv-book-tape"></span>' +
-                '<span class="tv-book-stamp">' + esc(String(t.destination || '旅').slice(0, 2)) + '</span>' +
+                '<span class="tv-book-stamp st-' + statusOf(t) + '">' + statusLabel(t) + '</span>' +
+                '<span class="tv-book-moods">' + coverMoods(t) + '</span>' +
                 '<div class="tv-book-tools">' +
                   '<button type="button" data-act="edit-trip" data-id="' + esc(t.id) + '" title="编辑这本">✎</button>' +
                   '<button type="button" data-act="delete-trip" data-id="' + esc(t.id) + '" title="删除这本">×</button>' +
@@ -767,31 +812,25 @@
   }
 
   function renderTripBar(t) {
-    const used = totalMyCents(t);
-    const budget = budgetCents(t);
-    const remain = budget - used;
-    const pct = budget > 0 ? Math.min(100, Math.round(used / budget * 100)) : 0;
     const days = dateRange(t.startDate, t.endDate).length;
     return '<div class="tv-tripbar">' +
         '<button type="button" class="tv-back" data-act="back-library"><span>←</span> 全部旅行册</button>' +
         '<div class="tv-tripinfo">' +
           '<span class="tv-eyebrow">' + esc(t.destination) + ' · ' + days + ' 天</span>' +
-          '<h3>' + esc(t.title) + '</h3>' +
+          '<div class="tv-trip-title">' +
+            '<h3>' + esc(t.title) + '</h3>' +
+            '<button type="button" class="tv-edit-icon" data-act="edit-trip" title="编辑册子" aria-label="编辑册子">' +
+              '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m13.5 6.5 3 3"/></svg>' +
+            '</button>' +
+          '</div>' +
           '<div class="tv-tripmeta">' +
             '<span>' + esc(shortDate(t.startDate)) + ' — ' + esc(shortDate(t.endDate)) + '</span>' +
             '<i></i>' +
-            '<span>' + t.members.length + ' 人同行</span>' +
+            '<button type="button" class="tv-member-link" data-act="edit-members" title="编辑同行成员">' +
+              t.members.length + ' 人同行 <span>✎</span>' +
+            '</button>' +
             '<div class="tv-people">' + t.members.map(m => '<span class="tv-avatar sm ' + esc(m.cls) + '" title="' + esc(m.name) + '">' + esc(m.initial) + '</span>').join('') + '</div>' +
           '</div>' +
-        '</div>' +
-        '<div class="tv-trip-acts">' +
-          '<button type="button" class="tv-chipbtn" data-act="edit-trip">编辑册子</button>' +
-          '<button type="button" class="tv-budget-chip" data-act="edit-budget" title="修改预算">' +
-            '<span>我的预算</span>' +
-            '<b>' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b>' +
-            '<em>' + (budget > 0 ? (remain >= 0 ? '剩 ' + money(yuan(remain)) : '超支 ' + money(yuan(-remain))) : '点这里设置') + '</em>' +
-            '<i class="tv-budget-mini"><u style="width:' + pct + '%"></u></i>' +
-          '</button>' +
         '</div>' +
       '</div>';
   }
@@ -828,13 +867,37 @@
     '</figure>';
   }
 
+  /* 总览右侧：状态戳 + 最近 2-3 条心情贴 */
+  function moodNotes(t) {
+    const js = latestJournals(t, 3);
+    if (!js.length) {
+      return '<div class="tv-mood-notes">' +
+        '<span class="tv-mn-head">心情贴 · MOOD</span>' +
+        '<button type="button" class="tv-mood-note empty" data-act="new-journal">' +
+          '<b>还没有心情贴</b><p>写第一篇日志，把当时的心情贴在这里。</p>' +
+        '</button>' +
+      '</div>';
+    }
+    return '<div class="tv-mood-notes">' +
+      '<span class="tv-mn-head">心情贴 · MOOD</span>' +
+      js.map((j, i) => {
+        const md = MOOD[j.mood] || MOOD.calm;
+        let text = String(j.text || '').replace(/\s+/g, ' ').trim();
+        if (text.length > 34) text = text.slice(0, 34) + '…';
+        return '<button type="button" class="tv-mood-note mn' + i + '" data-act="edit-journal" data-id="' + esc(j.id) + '" style="--mood:' + md.color + ';--rot:' + [-2.4, 2.1, -1.4][i] + 'deg" title="点击修改这篇日志">' +
+          '<span class="tv-mn-top"><i>' + md.emoji + '</i><em>' + esc(md.label) + ' · DAY ' + (j.day || dayOfDate(j.date)) + '</em></span>' +
+          '<p>' + esc(text) + '</p>' +
+        '</button>';
+      }).join('') +
+    '</div>';
+  }
+
   /* ---------- 总览 ---------- */
   function renderOverview(t) {
     const s = settlement();
     const total = totalAllCents(t);
     const mine = totalMyCents(t);
     const budget = budgetCents(t);
-    const remain = budget - mine;
     const per = t.members.length ? Math.round(total / t.members.length) : 0;
     const today = todayStr();
     const day = t.days.find(d => d.date === today) || t.days[0];
@@ -866,25 +929,21 @@
             '<span class="tv-stamp-mark stamp-year">' + esc(String(t.startDate).slice(0, 4)) + '</span>' +
           '</div>' +
         '</div>' +
-        '<div class="tv-ticket">' +
-          '<span class="tv-ticket-label">MY BUDGET</span>' +
-          '<b>' + (budget > 0 ? money(yuan(budget)) : '未设置') + '</b>' +
-          '<em>' + (budget > 0 ? (remain >= 0 ? '还剩 ' + money(yuan(remain)) : '超支 ' + money(yuan(-remain))) : '点这里设预算') + '</em>' +
-          '<i><u style="width:' + (budget > 0 ? Math.min(100, Math.round(mine / budget * 100)) : 0) + '%"></u></i>' +
-          '<span class="tv-ticket-edit" data-act="edit-budget">修改预算</span>' +
+        '<div class="tv-side">' +
+          '<button type="button" class="tv-status-stamp st-' + statusOf(t) + '" data-act="edit-trip" title="修改旅行状态">' + statusLabel(t) + '</button>' +
+          moodNotes(t) +
         '</div>' +
       '</div>' +
       '<div class="tv-stats">' +
         statCard('总花费', money(yuan(total)), t.expenses.length + ' 笔共同账单') +
         statCard('我的花费', money(yuan(mine)), '已按 AA 份额计算', 'accent') +
         statCard('人均', money(yuan(per)), t.members.length + ' 人均摊') +
-        statCard(budget ? (remain >= 0 ? '预算剩余' : '预算超支') : '旅行预算', budget ? money(yuan(Math.abs(remain))) : '未设置', budget ? '预算 ' + money(yuan(budget)) : '点这里输入旅行预算', remain >= 0 ? '' : 'over', 'edit-budget') +
       '</div>' +
       '<div class="tv-grid2">' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>预算进度</h4><button type="button" class="tv-link" data-act="edit-budget">修改预算</button></div>' +
           budgetBar(budget, mine) +
-          '<div class="tv-budget-note">预算按「我的花费」计算，不含朋友那份。' + (budget ? '' : ' 还没填预算，点上面的小票设置一个吧。') + '</div>' +
+          '<div class="tv-budget-note">预算按「我的花费」计算，不含朋友那份。' + (budget ? '' : ' 还没填预算，点右上角「修改预算」设置一个吧。') + '</div>' +
         '</section>' +
         '<section class="tv-panel">' +
           '<div class="tv-panel-head"><h4>成员分摊</h4><button type="button" class="tv-link" data-act="go-settle">查看对账</button></div>' +
@@ -1148,6 +1207,7 @@
     if (act === 'open-trip') openTrip(ds.id);
     else if (act === 'back-library') { state.view = 'library'; persist(); render(); }
     else if (act === 'new-trip') openTripModal(null);
+    else if (act === 'edit-members') openMembersModal();
     else if (act === 'edit-trip') openTripModal(ds.id || (T() && T().id));
     else if (act === 'delete-trip') deleteTrip(ds.id);
     else if (act === 'edit-budget') openBudgetModal();
@@ -1254,6 +1314,7 @@
     const editing = !!id;
     const trip = editing ? state.trips.find(x => x.id === id) : null;
     const defaultDest = editing ? trip.destination : '';
+    const curStatus = editing ? statusOf(trip) : 'plan';
     const data = trip || {
       title: '', destination: '', startDate: todayStr(), endDate: todayStr(),
       budget: '', cover: ''
@@ -1270,9 +1331,10 @@
       '</div>' +
       '<div class="field-row">' +
         field('我的预算（元）', '<input id="tv-t-budget" type="number" min="0" step="100" value="' + (data.budget || '') + '" placeholder="例如 6000">') +
-        field('封面图片链接（可选）', '<input id="tv-t-cover" type="text" value="' + esc(data.cover || '') + '" placeholder="留空按目的地自动生成">') +
+        field('旅行状态', '<select id="tv-t-status">' + TRIP_STATUSES.map(s => '<option value="' + s.id + '"' + (s.id === curStatus ? ' selected' : '') + '>' + s.label + '</option>').join('') + '</select>') +
       '</div>' +
-      '<p class="tv-form-tip">同行成员默认「我 / 小雨 / 阿哲」，可在账单里调整分摊。</p>' +
+      field('封面图片链接（可选）', '<input id="tv-t-cover" type="text" value="' + esc(data.cover || '') + '" placeholder="留空按目的地自动生成，也可以直接点封面图更换">') +
+      '<p class="tv-form-tip">同行成员在旅行册页面的「N 人同行」处编辑，增减成员会同步更新 AA 分摊。</p>' +
       '<div class="modal-acts">' +
         (editing ? '<button type="button" class="btn btn-danger" id="tv-t-del" style="margin-right:auto">删除这本</button>' : '') +
         '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
@@ -1289,13 +1351,14 @@
       const start = m.querySelector('#tv-t-start').dataset.date || todayStr();
       const end = m.querySelector('#tv-t-end').dataset.date || start;
       const budget = Number(m.querySelector('#tv-t-budget').value) || 0;
+      const status = m.querySelector('#tv-t-status').value || curStatus;
       const coverIn = m.querySelector('#tv-t-cover').value.trim();
       if (!title) return toast('请填写旅行册标题', 'err');
       if (!dest) return toast('请填写目的地', 'err');
       if (parseDate(end) < parseDate(start)) return toast('结束日期不能早于出发日期', 'err');
       const cover = coverIn || (trip && trip.cover) || photo(dest + ' travel scenery, film photography, travel journal cover', 'portrait_4_3');
       if (editing) {
-        Object.assign(trip, { title: title, destination: dest, budget: budget, cover: cover });
+        Object.assign(trip, { title: title, destination: dest, budget: budget, cover: cover, status: status });
         if (trip.startDate !== start || trip.endDate !== end) {
           trip.startDate = start; trip.endDate = end;
           trip.days = buildDays(start, end, dest, trip.days);
@@ -1315,6 +1378,7 @@
           startDate: start,
           endDate: end,
           budget: budget,
+          status: status,
           cover: cover,
           createdAt: Date.now(),
           members: defaultMembers(),
@@ -1330,6 +1394,79 @@
       }
       persist(); App.closeModal(); render();
       toast(editing ? '旅行册已更新' : '旅行册已创建，开始贴照片吧', 'ok');
+    };
+  }
+
+  /* ---------- 同行成员 ---------- */
+  function memRow(mem) {
+    return '<div class="tv-memrow" data-id="' + esc(mem.id) + '" data-cls="' + esc(mem.cls || '') + '">' +
+      '<span class="tv-avatar ' + esc(mem.cls || '') + '">' + esc(mem.initial || '新') + '</span>' +
+      '<input class="tv-mem-name" type="text" maxlength="12" value="' + esc(mem.name) + '" placeholder="同行人名字">' +
+      (mem.id === 'me' ? '<span class="tv-mem-fixed">本人</span>' : '<button type="button" class="tv-mem-del" title="移除">×</button>') +
+    '</div>';
+  }
+
+  function openMembersModal() {
+    const t = T();
+    if (!t) return;
+    const m = openModal(
+      modalTitle('同行成员', '增减成员会同步更新 AA 分摊，已生成的账单会重新计算') +
+      '<div class="tv-memlist" id="tv-memlist">' + t.members.map(memRow).join('') + '</div>' +
+      '<button type="button" class="tv-addmem" id="tv-mem-add">＋ 添加同行人</button>' +
+      '<div class="modal-acts">' +
+        '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
+        '<button type="button" class="btn btn-primary" id="tv-mem-save">保存成员</button>' +
+      '</div>'
+    );
+    if (!m) return;
+    const list = m.querySelector('#tv-memlist');
+    const bindRows = () => {
+      list.querySelectorAll('.tv-memrow').forEach(row => {
+        const inp = row.querySelector('.tv-mem-name');
+        inp.oninput = () => {
+          row.querySelector('.tv-avatar').textContent = inp.value.trim().slice(0, 1) || '新';
+        };
+        const del = row.querySelector('.tv-mem-del');
+        if (del) del.onclick = () => row.remove();
+      });
+    };
+    bindRows();
+    m.querySelector('#tv-mem-add').onclick = () => {
+      if (list.children.length >= 12) return toast('最多 12 位同行人', 'err');
+      const cls = 'c' + ((list.children.length - 1) % 5 + 1);
+      list.insertAdjacentHTML('beforeend', memRow({ id: uid('m'), name: '', initial: '新', cls: cls }));
+      bindRows();
+      const last = list.lastElementChild;
+      if (last) last.querySelector('.tv-mem-name').focus();
+    };
+    m.querySelector('#tv-mem-save').onclick = () => {
+      const next = [];
+      list.querySelectorAll('.tv-memrow').forEach(row => {
+        const name = row.querySelector('.tv-mem-name').value.trim();
+        if (!name) return;
+        const id = row.dataset.id;
+        next.push({
+          id: id,
+          name: name,
+          initial: name.slice(0, 1),
+          cls: id === 'me' ? 'me' : (row.dataset.cls || 'c1')
+        });
+      });
+      if (!next.length) return toast('至少保留一位成员', 'err');
+      if (!next.some(x => x.id === 'me')) {
+        next.unshift({ id: 'me', name: '我', initial: '我', cls: 'me' });
+      }
+      const ids = next.map(x => x.id);
+      t.members = next;
+      const fix = list => {
+        if (ids.indexOf(list.payerId) < 0) list.payerId = 'me';
+        list.participants = (list.participants || []).filter(p => ids.indexOf(p) >= 0);
+        if (!list.participants.length) list.participants = ['me'];
+      };
+      t.expenses.forEach(fix);
+      t.hotels.forEach(fix);
+      persist(); App.closeModal(); render();
+      toast('同行成员已更新', 'ok');
     };
   }
 
