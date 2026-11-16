@@ -8,7 +8,7 @@ const BASE_PLATFORMS = ['宜家', '淘宝', '京东', '拼多多', '线下'];
  * 缺陷窗口：2026-10-26 18:17（3702a14 起写入 todayStr()）~ 2026-10-27 11:55（5f89928 修复为止）。
  * 该窗口内被自动切换过的好物，status_since 精确等于 2026-10-26 或 2026-10-27 → 即被污染值。 */
 const WISH_STATUS_BUG_DATES = ['2026-10-26', '2026-10-27'];
-const ROUTE_NAMES = { home: '主页', ledger: '记账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
+const ROUTE_NAMES = { home: '主页', ledger: '记账本', travel: '旅行账本', bills: '待办账单', wishlist: '好物仓库', stats: '统计', rental: '出租屋', budget: '预算设置', settings: '设置' };
 /* 预算表复用标记行（不新增表/列，云端无需 DDL）：
  *   __annual__ + sub=年份  → 年度总预算（amount）
  *   __follow__ + sub=''    → 关注的类目清单（note 存 JSON 数组，元素 "大类::小类"） */
@@ -741,6 +741,7 @@ const App = {
     else if (r === 'rental') this.renderRental();
     else if (r === 'stats') this.renderStats();
     else if (r === 'budget') this.renderBudget();
+    else if (r === 'travel' && window.Travel) window.Travel.render();
     else if (r === 'bills' && this.renderBills) this.renderBills();
   },
   /* 新增：先插入内存并立即渲染，服务端返回后用真实行替换临时行；失败则回滚 */
@@ -855,6 +856,7 @@ const App = {
     const map = {
       home: () => this.renderHomePage(),
       ledger: () => this.renderLedger(),
+      travel: () => { if (window.Travel) window.Travel.render(); },
       bills: () => this.renderBills(),
       wishlist: () => this.renderWishlist(),
       stats: () => this.renderStats(),
