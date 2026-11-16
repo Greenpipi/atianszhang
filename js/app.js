@@ -3773,7 +3773,7 @@ const App = {
             <span class="eyebrow" id="lgDateEyebrow">${esc(st.date)} · ${wd(st.date)}</span>
             <div class="mh-title"><h1 id="lgTitle">${editList ? '编辑清单' : editRec ? '编辑账单' : '记一笔'}</h1></div>
           </div>
-          <div class="mode-switch" id="lgModeSwitch"${(editRec || editList) ? ' hidden' : ''}>
+          <div class="mode-switch" id="lgModeSwitch"${editRec && !editList ? ' hidden' : ''}>
             <button type="button" data-mode="single" class="on">单笔</button>
             <button type="button" data-mode="list">清单</button>
           </div>
@@ -3886,6 +3886,7 @@ const App = {
         <footer class="mf">
           <div class="mf-total"><span class="mf-label">合计</span><span class="mf-num" id="lgTotal">¥0.00</span><span class="mf-sub" id="lgTotalSub"></span></div>
           <div class="mf-actions">
+            <button type="button" class="btn-ghost danger" id="lgDelete"${(editRec || editList) ? '' : ' hidden'}>删除</button>
             <button type="button" class="btn-ghost" data-close>取消</button>
             <button type="button" class="btn-primary" id="lgSave">保存</button>
           </div>
@@ -4491,6 +4492,8 @@ const App = {
     $('lgInspClose').onclick = () => closeDrawer();
 
     /* ---------- 模式切换 ---------- */
+    // 清单里的某一笔：两个标签都有内容——单笔显示这一笔，清单显示整张清单
+    const dualEdit = !!(editRec && editList);
     const setMode = m => {
       st.mode = m;
       root.classList.toggle('list-mode', m === 'list');
@@ -4498,6 +4501,18 @@ const App = {
       $('lgPaneSingle').hidden = m !== 'single';
       $('lgPaneList').hidden = m !== 'list';
       mask.querySelectorAll('#lgModeSwitch [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+      if (dualEdit) {
+        // 单笔页沿用被点那一笔的分类，清单页沿用清单首行，避免保存到错误分类
+        const src = m === 'single' ? editRec : editList[0];
+        if (src) {
+          st.cat = src.category || st.cat;
+          st.sub = src.sub || '';
+          st.kind = kindOf(st.cat);
+          paintRail();
+        }
+        const t = $('lgTitle');
+        if (t) t.textContent = m === 'list' ? '编辑清单' : '编辑账单';
+      }
       if (m === 'list') renderRows();
       else closeDrawer();
       paintTotals();
@@ -4686,6 +4701,20 @@ const App = {
       if (st.mode === 'single') saveSingle();
       else saveList();
     };
+    // 编辑态保留删除：清单页删整张清单，单笔页删这一笔
+    const delBtn = $('lgDelete');
+    if (delBtn) delBtn.onclick = async () => {
+      const wholeList = st.mode === 'list' && !!editList;
+      const targets = wholeList ? editList : (editRec ? [editRec] : []);
+      if (!targets.length) return;
+      const msg = wholeList
+        ? '删除后不可恢复。确定删除整张清单（共 ' + targets.length + ' 笔）吗？'
+        : '删除后不可恢复。确定删除这笔账单吗？';
+      if (!await this.confirmDialog('删除记录', msg)) return;
+      targets.forEach(t => this.optimisticRemove(t.id));
+      this.closeModal();
+      this.toast(wholeList ? '已删除整张清单' : '已删除这笔账单', 'ok');
+    };
     $('lgAmt').addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); closePops(); saveSingle(); }
     });
@@ -4712,11 +4741,13 @@ const App = {
     if (st.mode === 'list') setMode('list');
     // 编辑态：图片列不在轻量查询里，弹窗先出，图片异步补进来
     if (editRec || editList) {
-      const recs = editRec ? [editRec] : editList.filter(r => r.favorite);
+      const recs = [];
+      if (editRec) recs.push(editRec);
+      if (editList) editList.forEach(r => { if (r.favorite && r !== editRec) recs.push(r); });
       this.ensureImages(recs).then(changed => {
         if (!changed) return;
         if (editRec) { st.single.imgs = this.recImages(editRec); paintSingleGood(); }
-        else {
+        if (editList) {
           st.rows.forEach(row => { if (row._orig) row.imgs = this.recImages(row._orig); });
           renderRows();
           if (st.drawer) renderDrawer();
@@ -4734,7 +4765,8 @@ const App = {
     const lid = ledgerId || r.ledger_id;
     if (r.list_id) {
       const rows = this.state.records.filter(x => x.list_id === r.list_id && x.ledger_id === r.ledger_id);
-      return this.addRecordModal(lid, r.date, null, null, false, false, { listId: r.list_id, records: rows });
+      // 同时带上当前这笔：弹窗里「单笔」标签显示它本身，「清单」标签显示整张清单
+      return this.addRecordModal(lid, r.date, null, null, false, false, { record: r, listId: r.list_id, records: rows });
     }
     this.addRecordModal(lid, r.date, null, null, false, false, { record: r });
   },

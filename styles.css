@@ -2327,6 +2327,8 @@ input,select,textarea{font-family:inherit}
 .lgwb .icon-btn{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--lg-muted);transition:background .15s,color .15s;font-size:15px}
 .lgwb .icon-btn:hover{background:#F1ECE2;color:var(--lg-ink)}
 .lgwb .btn-ghost{border:1px solid var(--lg-line);background:#fff;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:700;color:var(--lg-ink2);transition:border-color .15s,background .15s}
+.lgwb .btn-ghost.danger{color:var(--danger);border-color:#E7CFC9}
+.lgwb .btn-ghost.danger:hover{background:#F9EDEA}
 .lgwb .btn-ghost:hover{border-color:var(--lg-gold-line);background:#FEFBF5}
 .lgwb .btn-ghost.sm{padding:6.5px 11px;font-size:11.5px}
 .lgwb .btn-primary{border-radius:9px;padding:9px 20px;font-size:12.5px;font-weight:700;color:#fff;background:linear-gradient(180deg,#B08D57,#977641);box-shadow:0 5px 14px -4px rgba(123,93,51,.45);transition:filter .15s,transform .12s}
@@ -2649,7 +2651,7 @@ input,select,textarea{font-family:inherit}
   .lgwb .mf{padding:12px 15px calc(14px + env(safe-area-inset-bottom,0px));gap:10px}
   .lgwb .mf-num{font-size:21px}
   .lgwb .mf-sub{display:none}
-  .lgwb .mf-actions .btn-ghost{display:none}
+  .lgwb .mf-actions .btn-ghost:not(.danger){display:none}
   .lgwb .mf-actions .btn-primary{padding:9px 20px}
   .lgwb .single-grid{grid-template-columns:1fr}
   .lgwb .amount-row input{font-size:32px}
