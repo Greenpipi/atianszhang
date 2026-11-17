@@ -3824,8 +3824,8 @@ const App = {
               <label class="mini-check"><input type="checkbox" id="lgRental"${st.single.rental ? ' checked' : ''}><span class="mc-full">归入出租屋账本</span><span class="mc-short">出租屋</span></label>
               <div class="trip-links" id="lgTripLinks"></div>
               <div class="hotel-link" id="lgHotelLink" hidden>
-                <label for="lgHotelSel">关联住宿</label>
-                <select id="lgHotelSel"></select>
+                <label>关联住宿</label>
+                <div class="sub-chips" id="lgHotelChips"></div>
                 <input id="lgHotelName" type="text" maxlength="30" placeholder="住宿名称，不填就用描述" hidden>
               </div>
             </div>
@@ -3961,13 +3961,15 @@ const App = {
       box.hidden = !show;
       if (!show) { st.single.hotelId = ''; return; }
       const list = (window.Travel && window.Travel.hotelsOf) ? window.Travel.hotelsOf(st.single.tripId) : [];
-      const sel = $('lgHotelSel');
-      sel.innerHTML = '<option value="">不关联住宿</option>' +
-        list.map(h => '<option value="' + esc(h.id) + '">' + esc(h.name) + '</option>').join('') +
-        '<option value="__new">＋ 新建住宿…</option>';
-      sel.value = list.some(h => h.id === st.single.hotelId) ? st.single.hotelId : '';
-      if (!sel.value) st.single.hotelId = '';
-      $('lgHotelName').hidden = sel.value !== '__new';
+      if (!list.some(h => h.id === st.single.hotelId) && st.single.hotelId !== '__new') st.single.hotelId = '';
+      const chip = (v, label, extra) =>
+        '<button type="button" class="sub-chip' + (st.single.hotelId === v ? ' on' : '') + '" data-hotel="' + esc(v) + '">' +
+        esc(label) + '</button>';
+      $('lgHotelChips').innerHTML =
+        chip('', '不关联') +
+        list.map(h => chip(h.id, h.name)).join('') +
+        chip('__new', '＋ 新建');
+      $('lgHotelName').hidden = st.single.hotelId !== '__new';
     }
     $('lgTripLinks').addEventListener('change', e => {
       const cb = e.target.closest('input[data-trip]');
@@ -3978,12 +3980,18 @@ const App = {
       mask.querySelectorAll('#lgTripLinks input[data-trip]').forEach(x => { x.checked = x === cb && cb.checked; });
       paintHotelLink();
     });
-    $('lgHotelSel').onchange = e => {
-      st.single.hotelId = e.target.value;
+    $('lgHotelChips').addEventListener('click', e => {
+      const b = e.target.closest('[data-hotel]');
+      if (!b) return;
+      st.single.hotelId = b.dataset.hotel;
+      paintHotelLink();
       const nameInp = $('lgHotelName');
-      nameInp.hidden = e.target.value !== '__new';
-      if (e.target.value === '__new' && !nameInp.value) nameInp.value = st.single.note || st.single.remark || '';
-    };
+      if (st.single.hotelId === '__new' && !nameInp.value) {
+        nameInp.value = st.single.note || st.single.remark || '';
+        st.single.hotelName = nameInp.value.trim();
+      }
+      if (st.single.hotelId === '__new') nameInp.focus();
+    });
     $('lgHotelName').oninput = e => { st.single.hotelName = e.target.value.trim(); };
     const attachTravel = (rec) => {
       if (!window.Travel || !window.Travel.attachRecord) return;
