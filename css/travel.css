@@ -1041,7 +1041,6 @@
 #view-travel .tv-hotel-note { margin: 0; padding: 7px 10px; font-size: 10.5px; line-height: 1.6; color: var(--tv-soft); background: var(--tv-surface2); border-radius: 3px 8px 7px 4px; }
 
 /* ---------------- 对账 ---------------- */
-#view-travel .tv-settle-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 #view-travel .tv-settle-hero {
   display: flex; align-items: center; gap: clamp(18px, 3vw, 34px); flex-wrap: wrap;
   padding: clamp(18px, 3vw, 30px);
@@ -1534,8 +1533,6 @@
   #view-travel .tv-hotel-body { padding: 13px 14px 14px; }
   #view-travel .tv-settle-hero { gap: 16px; padding: 18px; }
   #view-travel .tv-settle-mine { align-items: flex-start; width: 100%; }
-  #view-travel .tv-settle-acts { width: 100%; }
-  #view-travel .tv-settle-acts .tv-btn { flex: 1; }
   #view-travel .tv-trip-acts { flex-wrap: wrap; }
   #view-travel .tv-chipbtn { flex: 1; }
   #view-travel .tv-foot { align-items: flex-start; }

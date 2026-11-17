@@ -1402,10 +1402,6 @@
     const totalMine = totalMyCents(t);
     return '<div class="tv-section-head">' +
         '<div><span class="tv-eyebrow">Settlement</span><h3>对账单</h3><p>每一笔钱都拆到消费项目，谁该给谁、为什么给，点开就能核对。</p></div>' +
-        '<div class="tv-settle-acts">' +
-          '<button type="button" class="tv-btn solid" data-act="copy-settle">复制对账单图片</button>' +
-          '<button type="button" class="tv-btn" data-act="download-settle">下载图片</button>' +
-        '</div>' +
       '</div>' +
       '<div class="tv-settle-hero">' +
         '<div class="tv-settle-stamp">对<br>账<br>单</div>' +
@@ -1473,7 +1469,7 @@
             '</details>' : '') +
             '<div class="tv-pair-acts">' +
               '<span>只统计你和 ' + esc(p.name) + ' 之间的消费，不掺其他人的账</span>' +
-              '<button type="button" class="tv-btn" data-act="person-settle" data-id="' + esc(p.id) + '">生成 ' + esc(p.name) + ' 的对账单</button>' +
+              '<button type="button" class="tv-btn" data-act="person-copy" data-id="' + esc(p.id) + '">复制 ' + esc(p.name) + ' 对账单图片</button>' +
             '</div>' +
           '</article>';
         }).join('') + '</div>' : '<p class="tv-empty">还没有其他同行人，先在上方「编辑册子」里添加吧。</p>') +
@@ -1534,9 +1530,7 @@
     else if (act === 'go-settle') { state.tab = 'settle'; persist(); render(); }
     else if (act === 'go-expenses') { state.tab = 'expenses'; persist(); render(); }
     else if (act === 'go-hotels') { state.tab = 'hotels'; persist(); render(); }
-    else if (act === 'copy-settle') copySettlement();
-    else if (act === 'download-settle') downloadSettlement();
-    else if (act === 'person-settle') downloadPersonSettle(ds.id);
+    else if (act === 'person-copy') copyPersonSettle(ds.id);
   }
 
   function openTrip(id) {
@@ -2612,134 +2606,7 @@
     };
   }
 
-  /* ---------------- 对账单图片 ---------------- */
-  function drawSettlement() {
-    const t = T();
-    const s = settlement();
-    const c = THEME_COLORS[state.theme] || THEME_COLORS.bloom;
-    const W = 900, H = 640;
-    const canvas = document.createElement('canvas');
-    const dpr = 2;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    const g = canvas.getContext('2d');
-    g.scale(dpr, dpr);
-
-    function rr(x, y, w, h, r) {
-      g.beginPath();
-      g.moveTo(x + r, y);
-      g.arcTo(x + w, y, x + w, y + h, r);
-      g.arcTo(x + w, y + h, x, y + h, r);
-      g.arcTo(x, y + h, x, y, r);
-      g.arcTo(x, y, x + w, y, r);
-      g.closePath();
-    }
-
-    g.fillStyle = c.bg; g.fillRect(0, 0, W, H);
-    g.fillStyle = c.surface; rr(36, 36, W - 72, H - 72, 22); g.fill();
-    g.strokeStyle = c.line; g.lineWidth = 1; g.stroke();
-
-    /* 顶部标题 */
-    g.fillStyle = c.accent;
-    g.font = '600 22px "Songti SC", "Noto Serif SC", Georgia, serif';
-    g.fillText('旅行对账单', 78, 106);
-    g.fillStyle = c.ink;
-    g.font = '600 34px "Songti SC", "Noto Serif SC", Georgia, serif';
-    g.fillText(t ? t.title : '旅行', 78, 152);
-    g.fillStyle = c.faint;
-    g.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
-    g.fillText((t ? t.startDate + ' — ' + t.endDate + ' · ' + t.members.length + ' 人' : ''), 78, 182);
-
-    /* 金额块 */
-    g.fillStyle = c.ink;
-    g.font = '600 44px "Songti SC", Georgia, serif';
-    g.fillText(money(yuan(s.totalCents)), 78, 258);
-    g.fillStyle = c.faint;
-    g.font = '13px "PingFang SC", sans-serif';
-    g.fillText('共同账单总额', 78, 282);
-
-    g.fillStyle = c.accent;
-    g.font = '600 22px "Songti SC", Georgia, serif';
-    g.fillText(money2(yuan(totalMyCents(t))), 520, 230);
-    g.fillStyle = c.faint;
-    g.font = '12px "PingFang SC", sans-serif';
-    g.fillText('我的花费（已按 AA 份额同步记账本）', 520, 252);
-
-    /* 分隔线 */
-    g.strokeStyle = c.line;
-    g.setLineDash([6, 6]);
-    g.beginPath(); g.moveTo(78, 316); g.lineTo(W - 78, 316); g.stroke();
-    g.setLineDash([]);
-
-    /* 成员分摊 */
-    g.fillStyle = c.ink;
-    g.font = '600 16px "PingFang SC", sans-serif';
-    g.fillText('谁该给谁钱', 78, 350);
-    const lines = [{ name: '我的花费（AA 后）', note: '已同步记账本', right: money2(yuan(totalMyCents(t))), tone: 'pos' }].concat(
-      s.pairs.map(p => {
-        const settled = Math.abs(p.net) < 0.5;
-        const toMe = p.net > 0;
-        return {
-          name: p.name,
-          note: p.items.length + ' 笔共同消费',
-          right: settled ? '已结清' : (toMe ? '需付我 ' : '我需付 ') + money2(yuan(Math.abs(p.net))),
-          tone: settled ? '' : (toMe ? 'pos' : 'neg')
-        };
-      })
-    );
-    lines.forEach((r, i) => {
-      const y = 388 + i * 44;
-      g.fillStyle = c.ink;
-      g.font = '600 15px "PingFang SC", sans-serif';
-      g.fillText(r.name, 78, y);
-      g.fillStyle = c.faint;
-      g.font = '12px "PingFang SC", sans-serif';
-      g.fillText(r.note, 168, y);
-      g.fillStyle = r.tone === 'neg' ? c.accent : c.accent2;
-      g.font = '600 15px "PingFang SC", sans-serif';
-      g.fillText(r.right, W - 78 - g.measureText(r.right).width, y);
-    });
-
-    /* 转账方案 */
-    g.fillStyle = c.ink;
-    g.font = '600 16px "PingFang SC", sans-serif';
-    g.fillText('转账方案', 520, 350);
-    if (!s.transfers.length) {
-      g.fillStyle = c.faint;
-      g.font = '13px "PingFang SC", sans-serif';
-      g.fillText('刚好平账，不用转钱。', 520, 388);
-    } else {
-      s.transfers.slice(0, 5).forEach((tr, i) => {
-        const y = 388 + i * 44;
-        g.fillStyle = c.ink;
-        g.font = '14px "PingFang SC", sans-serif';
-        g.fillText(tr.from + ' → ' + tr.to, 520, y);
-        g.fillStyle = c.accent;
-        g.font = '600 15px "PingFang SC", sans-serif';
-        g.fillText(money(yuan(tr.cents)), 520, y + 20);
-      });
-    }
-
-    /* 页脚 */
-    g.fillStyle = c.faint;
-    g.font = '11px "PingFang SC", sans-serif';
-    g.fillText('旅行账册 · 记账本只记录我的 AA 份额', 78, H - 66);
-    g.strokeStyle = c.accent;
-    g.lineWidth = 1.5;
-    g.beginPath(); g.arc(W - 110, H - 96, 42, 0, Math.PI * 2); g.stroke();
-    g.save();
-    g.translate(W - 110, H - 96);
-    g.rotate(-0.12);
-    g.fillStyle = c.accent;
-    g.font = '600 15px "Songti SC", Georgia, serif';
-    g.textAlign = 'center';
-    g.fillText('旅行', 0, -4);
-    g.fillText('账册', 0, 16);
-    g.restore();
-    g.textAlign = 'left';
-    return canvas;
-  }
-
-  /* 单个成员的对账单：只包含「我」与这位成员之间的往来 */
+  /* ---------------- 个人对账单图片（复制到剪贴板） ---------------- */
   function drawPersonStatement(mid) {
     const t = T();
     if (!t) return null;
@@ -2839,60 +2706,24 @@
     return canvas;
   }
 
-  function downloadPersonSettle(mid) {
+  /* 复制某个人的对账单图片到剪贴板（不落盘、不下载）
+     ClipboardItem 直接接收 Blob Promise，保证仍在点击的用户手势内完成写入 */
+  function copyPersonSettle(mid) {
     const t = T();
     if (!t) return;
     const p = settlement().pairs.find(x => x.id === mid);
     if (!p) return toast('没有找到这个人的账单', 'err');
     const canvas = drawPersonStatement(mid);
     if (!canvas) return toast('生成图片失败', 'err');
-    saveCanvas(canvas, '对账单-' + t.title + '-' + p.name + '.png').then(ok => {
-      toast(ok ? p.name + ' 的对账单已下载' : '生成图片失败', ok ? 'ok' : 'err');
+    if (!navigator.clipboard || !window.ClipboardItem) {
+      return toast('当前浏览器不支持复制图片，请换用 Chrome / Safari 最新版', 'err');
+    }
+    const blobPromise = new Promise((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('no blob')), 'image/png');
     });
-  }
-
-  function saveCanvas(canvas, name) {
-    return new Promise(resolve => {
-      canvas.toBlob(blob => {
-        if (!blob) return resolve(false);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-        resolve(true);
-      }, 'image/png');
-    });
-  }
-
-  function copySettlement() {
-    const t = T();
-    if (!t) return;
-    const canvas = drawSettlement();
-    canvas.toBlob(async blob => {
-      if (!blob) return toast('生成图片失败', 'err');
-      try {
-        if (navigator.clipboard && window.ClipboardItem) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          toast('对账单图片已复制，可以直接粘贴到群里', 'ok');
-        } else {
-          await saveCanvas(canvas, '对账单-' + t.destination + '.png');
-          toast('当前浏览器不支持复制图片，已改为下载', 'ok');
-        }
-      } catch (e) {
-        await saveCanvas(canvas, '对账单-' + t.destination + '.png');
-        toast('复制失败，已改为下载图片', 'err');
-      }
-    }, 'image/png');
-  }
-
-  function downloadSettlement() {
-    const t = T();
-    if (!t) return;
-    const canvas = drawSettlement();
-    saveCanvas(canvas, '对账单-' + t.destination + '.png').then(ok => {
-      toast(ok ? '对账单图片已下载' : '生成图片失败', ok ? 'ok' : 'err');
-    });
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })])
+      .then(() => toast(p.name + ' 的对账单图片已复制，可直接粘贴', 'ok'))
+      .catch(e => toast('复制失败：' + ((e && e.name === 'NotAllowedError') ? '浏览器未允许写剪贴板' : '请重试'), 'err'));
   }
 
   /* ---------------- 对外 ---------------- */
