@@ -2615,7 +2615,7 @@
     if (!p) return null;
     const c = THEME_COLORS[state.theme] || THEME_COLORS.bloom;
     const items = p.items.slice(0, 18);
-    const W = 760, H = 380 + Math.max(1, items.length) * 54 + 100;
+    const W = 760, H = Math.max(420, 330 + Math.max(1, items.length) * 54);
     const canvas = document.createElement('canvas');
     const dpr = 2;
     canvas.width = W * dpr; canvas.height = H * dpr;
@@ -2656,7 +2656,7 @@
     g.fillText(headLine, 68, 218);
     g.fillStyle = c.faint;
     g.font = '12px "PingFang SC", sans-serif';
-    g.fillText('共 ' + p.items.length + ' 笔共同消费 · 金额为 AA 后各自应承担的部分', 68, 244);
+    g.fillText('共 ' + p.items.length + ' 笔共同消费', 68, 244);
 
     g.strokeStyle = c.line;
     g.beginPath(); g.moveTo(68, 266); g.lineTo(W - 68, 266); g.stroke();
@@ -2683,26 +2683,6 @@
       g.fillText(txt, W - 68 - g.measureText(txt).width, y);
     });
 
-    g.fillStyle = c.ink;
-    g.font = '600 13px "PingFang SC", sans-serif';
-    g.fillText('对方应承担 ' + money2(yuan(p.theyOwe)), 68, H - 118);
-    g.fillText('我应承担 ' + money2(yuan(p.iOwe)), 300, H - 118);
-    g.fillStyle = c.faint;
-    g.font = '11px "PingFang SC", sans-serif';
-    g.fillText('旅行账册 · 记账本只记录我的 AA 份额', 68, H - 68);
-
-    g.strokeStyle = c.accent; g.lineWidth = 1.5;
-    g.beginPath(); g.arc(W - 110, H - 96, 38, 0, Math.PI * 2); g.stroke();
-    g.save();
-    g.translate(W - 110, H - 96);
-    g.rotate(-0.12);
-    g.fillStyle = c.accent;
-    g.font = '600 14px "Songti SC", Georgia, serif';
-    g.textAlign = 'center';
-    g.fillText('个人', 0, -4);
-    g.fillText('对账', 0, 16);
-    g.restore();
-    g.textAlign = 'left';
     return canvas;
   }
 
