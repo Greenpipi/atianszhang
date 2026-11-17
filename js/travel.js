@@ -2478,6 +2478,7 @@
       row.querySelector('.tv-pay-del').onclick = () => { row.remove(); refreshSum(); };
     };
     list.querySelectorAll('.tv-payrow').forEach(bindRow);
+    try { App.enhanceSelects(list); } catch (e) { /* ignore */ }
     refreshSum();
 
     m.querySelector('#tv-pay-add').onclick = () => {
@@ -2485,6 +2486,8 @@
       wrap.innerHTML = payRow({ date: m.querySelector('#tv-h-in').dataset.date || data.checkIn });
       const row = wrap.firstElementChild;
       list.appendChild(row);
+      // 新加的行同样走应用内胶囊下拉，不用系统原生 select
+      try { App.enhanceSelects(row); } catch (e) { /* ignore */ }
       bindRow(row);
       refreshSum();
     };

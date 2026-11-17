@@ -1782,3 +1782,15 @@
 .travel-modal .tv-pay-sum em { flex-basis: 100%; font-style: normal; font-size: 10.5px; color: var(--tm-accent); }
 .travel-modal .tv-pay-tip { margin: 7px 0 0; font-size: 10.5px; line-height: 1.6; color: var(--tm-faint); }
 #view-travel .tv-hotel-payers { font-size: 11px; color: var(--tm-soft); }
+
+/* 住宿付款行：下拉统一走应用内胶囊控件（不吃系统 select） */
+.travel-modal .tv-payrow .csel { flex: none; display: inline-flex; }
+.travel-modal .tv-payrow .csel-btn {
+  height: 32px; padding: 0 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  background: #fffdf8;
+}
+.travel-modal .tv-payrow .csel-val { line-height: 1; }
+.travel-modal .tv-payrow .csel-arrow svg { width: 13px; height: 13px; }
+.travel-modal .tv-payrow .csel-pop { min-width: 108px; }
