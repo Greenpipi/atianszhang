@@ -141,8 +141,9 @@
     { id: 'done', label: '已完成' }
   ];
   function statusOf(t) {
-    if (t && TRIP_STATUSES.some(s => s.id === t.status)) return t.status;
     if (!t) return 'plan';
+    // 手动标成已完成就一直是已完成；其余按日期自动流转（计划中 → 旅途中 → 已完成）
+    if (t.status === 'done') return 'done';
     const today = todayStr();
     if (today < t.startDate) return 'plan';
     if (today > t.endDate) return 'done';
@@ -396,6 +397,11 @@
     return arr[i] || 0;
   }
   function myShare(exp) { return yuan(shareCents(exp, 'me')); }
+  /* 住宿已付 = 所有关联到该住宿的账单（含记账本转来的定金 / 尾款）之和 */
+  function hotelPaidCents(t, h) {
+    return ((t && t.expenses) || []).filter(e => e.hotelId === h.id)
+      .reduce((s, e) => s + cents(e.amount), 0);
+  }
   function totalMyCents(t) {
     t = t || T();
     return t ? t.expenses.reduce((s, e) => s + shareCents(e, 'me'), 0) : 0;
@@ -616,6 +622,17 @@
 
   function syncRecord(exp) {
     if (typeof App === 'undefined' || !App.state) return;
+    /* 记账本转来的镜像账单：金额 / 日期以旅行侧修改为准回写，但绝不重建或删除原记录 */
+    if (exp && exp.mirror) {
+      if (!exp.recordId) return;
+      const rec = App.state.records.find(r => r.id === exp.recordId);
+      if (!rec) return;
+      rec.amount = myShare(exp);
+      rec.date = exp.date;
+      try { Store.update('records', exp.recordId, { amount: rec.amount, date: rec.date }); } catch (e) { /* ignore */ }
+      if (App._cacheSnapshot) App._cacheSnapshot();
+      return;
+    }
     const payload = exp.sync === false ? null : recordPayload(exp);
     if (!payload) {
       if (exp.recordId) { dropRecord(exp.recordId); exp.recordId = null; persist(); }
@@ -657,6 +674,113 @@
     } catch (e) {
       toast('同步到记账本失败：' + (e.message || e), 'err');
     }
+  }
+
+  /* ---------------- 记账本 ⇄ 旅行账册 关联 ----------------
+     关联信息只存在旅行侧（expenses[].recordId / hotelId），不改记账本表结构。
+     记账本保存后调用 attachRecord，删除时调用 unlinkRecord。 */
+  function mirrorOf(recordId) {
+    if (!state || !recordId) return null;
+    for (const t of (state.trips || [])) {
+      const exp = (t.expenses || []).find(e => e.mirror && e.recordId === recordId);
+      if (exp) return { trip: t, exp: exp };
+    }
+    return null;
+  }
+  function tripById(tripId) {
+    ensureState();
+    return (state.trips || []).find(t => t.id === tripId) || null;
+  }
+  /* 记账弹窗用：所有未完成的旅行（计划中 / 旅途中） */
+  function activeTrips() {
+    ensureState();
+    return (state.trips || []).filter(t => statusOf(t) !== 'done').map(t => ({
+      id: t.id,
+      title: t.title || t.destination || '旅行',
+      destination: t.destination || '',
+      status: statusOf(t),
+      statusLabel: statusLabel(t),
+      startDate: t.startDate,
+      endDate: t.endDate
+    }));
+  }
+  function hotelsOf(tripId) {
+    const t = tripById(tripId);
+    return t ? (t.hotels || []).map(h => ({ id: h.id, name: h.name || '未命名住宿' })) : [];
+  }
+  function linkOfRecord(recordId) {
+    ensureState();
+    const m = mirrorOf(recordId);
+    return m ? { tripId: m.trip.id, hotelId: m.exp.hotelId || '' } : null;
+  }
+  /* 记账本保存 → 写入 / 更新旅行账册里的镜像账单；tripId 为空表示取消关联 */
+  function attachRecord(rec, opts) {
+    ensureState();
+    if (!rec || !rec.id) return;
+    const tripId = opts && opts.tripId;
+    const existed = mirrorOf(rec.id);
+    if (!tripId) {
+      if (existed) { existed.trip.expenses = existed.trip.expenses.filter(e => e !== existed.exp); persist(); }
+      return;
+    }
+    const trip = tripById(tripId);
+    if (!trip) return;
+    if (existed && existed.trip.id !== tripId) {
+      existed.trip.expenses = existed.trip.expenses.filter(e => e !== existed.exp);
+    }
+    const old = (existed && existed.trip.id === tripId)
+      ? existed.exp
+      : (trip.expenses || []).find(e => e.mirror && e.recordId === rec.id);
+    let hotelId = (opts && opts.hotelId) || '';
+    if (hotelId === '__new') {
+      // 只有住宿类消费才会走到这里：新建一间「先付定金」的住宿，房费总额按已付账单汇总
+      const name = String((opts && opts.hotelName) || rec.note || rec.sub || '住宿').trim();
+      const h = {
+        id: uid('h'), name: name, address: '', checkIn: rec.date, checkOut: rec.date,
+        amount: 0, payerId: 'me', participants: ['me'], note: '', fromRecord: true
+      };
+      if (!Array.isArray(trip.hotels)) trip.hotels = [];
+      trip.hotels.push(h);
+      hotelId = h.id;
+    }
+    const date = rec.date || todayStr();
+    const patch = {
+      title: rec.note || rec.sub || rec.category || '记账',
+      amount: Number(rec.amount) || 0,
+      ledgerCat: rec.category || '',
+      ledgerSub: rec.sub || '',
+      category: travelCatId(rec.category, rec.sub),
+      date: date,
+      day: dayOfDate(date),
+      payerId: 'me',
+      participants: ['me'],
+      note: rec.remark || '',
+      sync: true,
+      mirror: true,
+      recordId: rec.id,
+      hotelId: hotelId
+    };
+    if (old) Object.assign(old, patch);
+    else trip.expenses.push(Object.assign({ id: uid('e') }, patch));
+    persist();
+    if (typeof App !== 'undefined' && App.state && App.state.route === 'travel') render();
+  }
+  function unlinkRecord(recordId) {
+    ensureState();
+    const m = mirrorOf(recordId);
+    if (!m) return;
+    m.trip.expenses = m.trip.expenses.filter(e => e !== m.exp);
+    persist();
+    if (typeof App !== 'undefined' && App.state && App.state.route === 'travel') render();
+  }
+  /* 新增记账先在本地用临时 id 插入，云端返回真实 id 后把关联改过去 */
+  function rebindRecordId(oldId, newId) {
+    if (!oldId || !newId || oldId === newId) return;
+    let hit = false;
+    (state && state.trips || []).forEach(t => (t.expenses || []).forEach(e => {
+      if (e.recordId === oldId) { e.recordId = newId; hit = true; }
+    }));
+    if (hit) persist();
   }
 
   /* ---------------- 主题 ---------------- */
@@ -1038,13 +1162,15 @@
     if (!list.length) return '<p class="tv-empty">还没有住宿记录，去「住宿」加一间。</p>';
     return '<div class="tv-hotel-mini-list">' + list.map(h => {
       const n = nights(h.checkIn, h.checkOut);
+      const pays = (t.expenses || []).filter(e => e.hotelId === h.id);
+      const amt = pays.length ? yuan(hotelPaidCents(t, h)) : (Number(h.amount) || 0);
       return '<button type="button" class="tv-hotel-mini" data-act="edit-hotel" data-id="' + esc(h.id) + '">' +
         (h.photo ? '<img src="' + esc(h.photo) + '" referrerpolicy="no-referrer" alt="" loading="lazy">' : '<span class="tv-hotel-mini-none">宿</span>') +
         '<span class="tv-hotel-mini-main">' +
           '<b>' + esc(h.name) + '</b>' +
           '<em>' + esc(shortDate(h.checkIn)) + ' — ' + esc(shortDate(h.checkOut)) + ' · ' + n + ' 晚</em>' +
         '</span>' +
-        '<span class="tv-hotel-mini-amt">' + money(yuan(cents(h.amount))) + '</span>' +
+        '<span class="tv-hotel-mini-amt">' + money(amt) + '</span>' +
       '</button>';
     }).join('') + '</div>';
   }
@@ -1186,7 +1312,8 @@
               '<div class="tv-exp-title"><b>' + esc(e.title) + '</b>' +
                 (e.hotelId ? '<span class="tv-tag">住宿</span>' : '') +
                 (n > 1 ? '<span class="tv-tag aa">AA ' + n + ' 人</span>' : '<span class="tv-tag solo">不分摊</span>') +
-                (e.recordId ? '<span class="tv-tag synced">已记记账本</span>' : '') +
+                (e.mirror ? '<span class="tv-tag synced">来自记账本</span>'
+                  : e.recordId ? '<span class="tv-tag synced">已记记账本</span>' : '') +
               '</div>' +
               '<p class="tv-exp-meta">' + esc(shortDate(e.date)) + ' · ' + esc(payer.name) + '付款' +
                 (act ? ' · 关联：' + esc(act.title) : '') + (e.note ? ' · ' + esc(e.note) : '') +
@@ -1207,6 +1334,9 @@
       (t.hotels.length ? '<div class="tv-hotel-grid">' + t.hotels.map(h => {
         const nt = nights(h.checkIn, h.checkOut);
         const payer = member(h.payerId);
+        const pays = (t.expenses || []).filter(e => e.hotelId === h.id);
+        const paid = yuan(hotelPaidCents(t, h));
+        const amt = pays.length ? paid : (Number(h.amount) || 0);
         return '<article class="tv-hotel" data-act="edit-hotel" data-id="' + h.id + '">' +
           (h.photo
             ? '<div class="tv-hotel-photo" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击更换照片"><img src="' + esc(h.photo) + '" referrerpolicy="no-referrer" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
@@ -1217,12 +1347,13 @@
               '<div><span>入住</span><b>' + esc(shortDate(h.checkIn)) + '</b></div>' +
               '<i>→</i>' +
               '<div><span>退房</span><b>' + esc(shortDate(h.checkOut)) + '</b></div>' +
-              '<div class="tv-hotel-amt"><span>房费</span><b>' + money(h.amount) + '</b></div>' +
+              '<div class="tv-hotel-amt"><span>' + (pays.length ? '已付' : '房费') + '</span><b>' + money(amt) + '</b></div>' +
             '</div>' +
             '<div class="tv-hotel-foot">' +
               '<span class="tv-avatar sm ' + esc(payer.cls) + '">' + esc(payer.initial) + '</span>' +
               '<span>' + esc(payer.name) + '付 · ' + (h.participants || []).length + ' 人分</span>' +
-              (h.expenseId ? '<span class="tv-tag synced">已生成账单</span>' : '<span class="tv-tag">未生成账单</span>') +
+              (pays.length ? '<span class="tv-tag synced">' + pays.length + ' 笔付款</span>'
+                : h.expenseId ? '<span class="tv-tag synced">已生成账单</span>' : '<span class="tv-tag">未生成账单</span>') +
             '</div>' +
             (h.note ? '<p class="tv-hotel-note">' + esc(h.note) + '</p>' : '') +
           '</div>' +
@@ -2161,9 +2292,12 @@
     updPreview();
     const del = m.querySelector('#tv-e-del');
     if (del) del.onclick = () => {
-      App.confirmDialog('删除账单', '「' + data.title + '」会从旅行账本和记账本一起删除。').then(ok => {
+      const tip = e.mirror
+        ? '「' + data.title + '」来自记账本，删除只会取消这里的关联，不会删掉记账本里的那笔账单。'
+        : '「' + data.title + '」会从旅行账本和记账本一起删除。';
+      App.confirmDialog('删除账单', tip).then(ok => {
         if (!ok) return;
-        if (e.recordId) dropRecord(e.recordId);
+        if (e.recordId && !e.mirror) dropRecord(e.recordId);
         t.expenses = t.expenses.filter(x => x.id !== e.id);
         t.hotels.forEach(h => { if (h.expenseId === e.id) h.expenseId = ''; });
         persist(); App.closeModal(); render();
@@ -2245,9 +2379,11 @@
         if (!ok) return;
         if (h.expenseId) {
           const exp = t.expenses.find(e => e.id === h.expenseId);
-          if (exp && exp.recordId) dropRecord(exp.recordId);
+          if (exp && exp.recordId && !exp.mirror) dropRecord(exp.recordId);
           t.expenses = t.expenses.filter(e => e.id !== h.expenseId);
         }
+        // 记账本转来的住宿付款只解除关联，不删除原账单
+        t.expenses.forEach(e => { if (e.hotelId === h.id) e.hotelId = ''; });
         t.hotels = t.hotels.filter(x => x.id !== h.id);
         persist(); App.closeModal(); render();
         toast('住宿已删除', 'ok');
@@ -2598,7 +2734,13 @@
   /* ---------------- 对外 ---------------- */
   window.Travel = {
     render: render,
-    state: function () { return state; }
+    state: function () { return state; },
+    activeTrips: activeTrips,
+    hotelsOf: hotelsOf,
+    linkOfRecord: linkOfRecord,
+    attachRecord: attachRecord,
+    unlinkRecord: unlinkRecord,
+    rebindRecordId: rebindRecordId
   };
 
   if (typeof document !== 'undefined') {

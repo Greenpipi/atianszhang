@@ -2393,6 +2393,16 @@ input,select,textarea{font-family:inherit}
 .lgwb .mini-check{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--lg-muted);cursor:pointer}
 .lgwb .mini-check input{width:14px;height:14px;accent-color:var(--lg-gold)}
 .lgwb .mini-check .mc-short{display:none}
+/* 旅行账册：勾选后这笔账同时进旅行账本 */
+.lgwb .trip-links{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.lgwb .trip-links[hidden],.lgwb .hotel-link[hidden]{display:none}
+.lgwb .trip-check{color:var(--lg-ink2);font-weight:600;min-width:0}
+.lgwb .trip-check .mc-full{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.lgwb .trip-check .trip-st{font-style:normal;font-weight:400;font-size:10px;color:var(--lg-faint);margin-left:3px}
+.lgwb .hotel-link{display:flex;flex-direction:column;gap:6px;margin-top:9px;padding:9px 10px;border:1px dashed var(--lg-line);border-radius:10px;background:rgba(255,253,249,.72)}
+.lgwb .hotel-link>label{font-family:var(--lg-mono);font-size:9px;letter-spacing:.1em;color:var(--lg-faint)}
+.lgwb .hotel-link select,.lgwb .hotel-link input{width:100%;height:30px;border:1px solid var(--lg-line);border-radius:8px;background:#fff;padding:0 9px;font-size:11.5px;color:var(--lg-ink2)}
+.lgwb .hotel-link input[hidden]{display:none}
 .lgwb .rail-mobile{display:none}
 
 /* 中间主区 */
@@ -2646,8 +2656,12 @@ input,select,textarea{font-family:inherit}
   .lgwb .rail-kind .type-switch{width:96px}
   .lgwb .rail-date{order:2;flex:1;min-width:104px}
   .lgwb .rail-date .date-btn{width:100%;padding:9px 10px;font-size:12px;text-align:center}
-  .lgwb .rail-more{order:3;display:flex;align-items:center;margin:0;padding:0;border:0;white-space:nowrap}
+  .lgwb .rail-more{order:3;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:0;border:0;white-space:nowrap}
   .lgwb .mini-check{white-space:nowrap;font-size:11px}
+  .lgwb .trip-links{flex-direction:row;flex-wrap:wrap;gap:10px;width:100%;margin-top:0}
+  .lgwb .trip-check{font-size:11px}
+  .lgwb .hotel-link{width:100%;margin-top:2px}
+  .lgwb .hotel-link select{height:36px;font-size:13px}
   .lgwb .mini-check .mc-full{display:none}
   .lgwb .mini-check .mc-short{display:inline}
   .lgwb .rail-mobile{order:4;display:flex;gap:8px;flex:1 1 100%}

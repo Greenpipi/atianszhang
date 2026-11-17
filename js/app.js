@@ -796,11 +796,14 @@ const App = {
       if (row && row.id) {
         if (i >= 0) { row._imgLoaded = true; this.state.records[i] = row; }
         else if (!this.state.records.some(x => x.id === row.id)) this.state.records.push(row);
+        // 临时 id → 云端真实 id：同步旅行账册里的关联
+        if (window.Travel && window.Travel.rebindRecordId) window.Travel.rebindRecordId(rec.id, row.id);
       }
       this._cacheSnapshot();
       this.refreshCurrentView();
     }).catch(e => {
       this.state.records = this.state.records.filter(x => x !== rec);
+      if (window.Travel && window.Travel.unlinkRecord) window.Travel.unlinkRecord(rec.id);
       this._cacheSnapshot();
       this.refreshCurrentView();
       this.toast('保存失败：' + ((e && e.message) || e), 'err');
@@ -811,6 +814,8 @@ const App = {
   optimisticRemove(rid) {
     const idx = this.state.records.findIndex(r => r.id === rid);
     if (idx < 0) return;
+    // 删除账单时同步取消旅行账册里的关联（只解除关联，不动旅行册里的其他数据）
+    if (window.Travel && window.Travel.unlinkRecord) window.Travel.unlinkRecord(rid);
     const removed = this.state.records.splice(idx, 1)[0];
     this._cacheSnapshot();
     this.refreshCurrentView();
@@ -3726,17 +3731,23 @@ const App = {
     let sub = (preSub && subsOf(cat).includes(preSub)) ? preSub : (subsOf(cat)[0] || '');
     if (rental && !preCat && catOf(RENTAL_CAT)) { cat = RENTAL_CAT; sub = subsOf(cat)[0] || ''; }
 
+    // 已关联旅行的记录：回填勾选状态与住宿，编辑时可直接改 / 取消
+    const travelLink = editRec && window.Travel && window.Travel.linkOfRecord
+      ? window.Travel.linkOfRecord(editRec.id) : null;
     const single0 = editRec ? (() => {
       const ri = this.ratingInfo(editRec);
       return {
         amount: Number(editRec.amount) ? String(Number(editRec.amount)) : '',
         note: editRec.note || '', remark: editRec.remark || '',
         fav: !!editRec.favorite, rental: !!editRec.rental,
+        tripId: travelLink ? travelLink.tripId : '',
+        hotelId: travelLink ? travelLink.hotelId : '',
+        hotelName: '',
         status: editRec.status || '使用中', rating: ri.mag, neg: ri.neg,
         tags: recTags(editRec).slice(), platform: editRec.purchase_platform || '',
         spec: editRec.attribute || '', imgs: this.recImages(editRec)
       };
-    })() : { amount: '', note: '', remark: '', fav: false, rental: !!rental, status: '使用中', rating: 0, neg: false, tags: [], platform: '', spec: '', imgs: [] };
+    })() : { amount: '', note: '', remark: '', fav: false, rental: !!rental, tripId: '', hotelId: '', hotelName: '', status: '使用中', rating: 0, neg: false, tags: [], platform: '', spec: '', imgs: [] };
 
     const st = {
       mode: editList ? 'list' : 'single', kind: kindOf(cat), cat, sub,
@@ -3811,6 +3822,12 @@ const App = {
             </div>
             <div class="rail-more">
               <label class="mini-check"><input type="checkbox" id="lgRental"${st.single.rental ? ' checked' : ''}><span class="mc-full">归入出租屋账本</span><span class="mc-short">出租屋</span></label>
+              <div class="trip-links" id="lgTripLinks"></div>
+              <div class="hotel-link" id="lgHotelLink" hidden>
+                <label for="lgHotelSel">关联住宿</label>
+                <select id="lgHotelSel"></select>
+                <input id="lgHotelName" type="text" maxlength="30" placeholder="住宿名称，不填就用描述" hidden>
+              </div>
             </div>
             <div class="rail-mobile">
               <select class="rm-select" id="lgCatSel" aria-label="大类"></select>
@@ -3920,6 +3937,63 @@ const App = {
     mask.addEventListener('click', e => { if (e.target === mask) cleanup(); });
     root.addEventListener('click', e => { if (e.target.closest('[data-close]')) cleanup(); });
 
+    /* ---------- 旅行账册关联（勾选后这笔账同时进旅行账本） ---------- */
+    const isStayCat = (c, s) => /酒店|民宿|住宿|客栈|旅馆|青旅/.test(String(c || '') + String(s || ''));
+    let tripOptions = [];
+    function paintTripLinks() {
+      const box = $('lgTripLinks');
+      if (!box) return;
+      tripOptions = (window.Travel && window.Travel.activeTrips) ? window.Travel.activeTrips() : [];
+      const show = st.kind === 'expense' && tripOptions.length > 0;
+      box.hidden = !show;
+      if (!show) { st.single.tripId = ''; st.single.hotelId = ''; box.innerHTML = ''; paintHotelLink(); return; }
+      if (!tripOptions.some(t => t.id === st.single.tripId)) st.single.tripId = '';
+      box.innerHTML = tripOptions.map(t =>
+        '<label class="mini-check trip-check"><input type="checkbox" data-trip="' + esc(t.id) + '"' + (t.id === st.single.tripId ? ' checked' : '') + '>' +
+        '<span class="mc-full">' + esc(t.title) + '<em class="trip-st">（' + esc(t.statusLabel) + '）</em></span>' +
+        '<span class="mc-short">' + esc(t.title.slice(0, 4)) + '</span></label>').join('');
+      paintHotelLink();
+    }
+    function paintHotelLink() {
+      const box = $('lgHotelLink');
+      if (!box) return;
+      const show = st.kind === 'expense' && !!st.single.tripId && isStayCat(st.cat, st.sub);
+      box.hidden = !show;
+      if (!show) { st.single.hotelId = ''; return; }
+      const list = (window.Travel && window.Travel.hotelsOf) ? window.Travel.hotelsOf(st.single.tripId) : [];
+      const sel = $('lgHotelSel');
+      sel.innerHTML = '<option value="">不关联住宿</option>' +
+        list.map(h => '<option value="' + esc(h.id) + '">' + esc(h.name) + '</option>').join('') +
+        '<option value="__new">＋ 新建住宿…</option>';
+      sel.value = list.some(h => h.id === st.single.hotelId) ? st.single.hotelId : '';
+      if (!sel.value) st.single.hotelId = '';
+      $('lgHotelName').hidden = sel.value !== '__new';
+    }
+    $('lgTripLinks').addEventListener('change', e => {
+      const cb = e.target.closest('input[data-trip]');
+      if (!cb) return;
+      st.single.tripId = cb.checked ? cb.dataset.trip : '';
+      if (!cb.checked) st.single.hotelId = '';
+      // 最多归入一个旅行
+      mask.querySelectorAll('#lgTripLinks input[data-trip]').forEach(x => { x.checked = x === cb && cb.checked; });
+      paintHotelLink();
+    });
+    $('lgHotelSel').onchange = e => {
+      st.single.hotelId = e.target.value;
+      const nameInp = $('lgHotelName');
+      nameInp.hidden = e.target.value !== '__new';
+      if (e.target.value === '__new' && !nameInp.value) nameInp.value = st.single.note || st.single.remark || '';
+    };
+    $('lgHotelName').oninput = e => { st.single.hotelName = e.target.value.trim(); };
+    const attachTravel = (rec) => {
+      if (!window.Travel || !window.Travel.attachRecord) return;
+      window.Travel.attachRecord(
+        { id: rec.id, category: rec.category, sub: rec.sub, amount: rec.amount, date: rec.date, note: rec.note, remark: rec.remark },
+        { tripId: st.single.tripId, hotelId: st.single.hotelId, hotelName: st.single.hotelName }
+      );
+    };
+    paintTripLinks();
+
     /* ---------- 分类栏 ---------- */
     const paintRail = () => {
       const list = cats.filter(c => kindOf(c.name) === st.kind);
@@ -3949,6 +4023,8 @@ const App = {
       mask.querySelectorAll('#lgTypeSwitch [data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === st.kind));
       const kt = $('lgKindTag');
       if (kt) kt.textContent = st.kind === 'income' ? '收入' : '支出';
+      // 分类变了：住宿类才显示「关联住宿」，收入则隐藏旅行勾选
+      paintTripLinks();
     };
     $('lgTypeSwitch').onclick = e => {
       const b = e.target.closest('[data-kind]');
@@ -4515,6 +4591,7 @@ const App = {
         Store.update('records', editRec.id, patch).then(() => {
           const rec = this.state.records.find(x => x.id === editRec.id);
           if (rec) Object.assign(rec, patch);
+          attachTravel({ id: editRec.id, category: st.cat, sub: st.sub, amount, date: st.date, note: payload.note, remark: payload.remark });
           this.touchQuickMru(st.cat, st.sub);
           this.refreshQuickBar(ledgerId);
           this._cacheSnapshot();
@@ -4524,10 +4601,14 @@ const App = {
         }).catch(e => this.toast('保存失败：' + ((e && e.message) || e), 'err'));
         return true;
       }
-      this.optimisticAdd(payload);
+      const savedRec = this.optimisticAdd(payload);
+      attachTravel(savedRec);
       this.touchQuickMru(st.cat, st.sub);
       this.refreshQuickBar(ledgerId);
       if (continuous) {
+        st.single.tripId = '';
+        st.single.hotelId = '';
+        st.single.hotelName = '';
         st.single.amount = '';
         st.single.note = '';
         st.single.remark = '';
@@ -4546,6 +4627,7 @@ const App = {
         fitRemark();
         paintSingleGood();
         paintStars();
+        paintTripLinks();
         paintTotals();
         $('lgAmt').focus();
         this.toast('已保存，可继续记下一笔', 'ok');
