@@ -130,9 +130,7 @@
 
   function defaultMembers() {
     return [
-      { id: 'me', name: '我', initial: '我', cls: 'me' },
-      { id: 'xiaoyu', name: '小雨', initial: '小', cls: 'xiaoyu' },
-      { id: 'azhe', name: '阿哲', initial: '哲', cls: 'azhe' }
+      { id: 'me', name: '我', initial: '我', cls: 'me' }
     ];
   }
 
@@ -156,244 +154,19 @@
     return s ? s.label : '计划中';
   }
 
-  /* ---------------- 示例数据 ---------------- */
-  function seedState() {
-    const dali = {
-      id: 'trip-dali',
-      title: '大理，四天三夜',
-      destination: '大理',
-      startDate: '2026-11-15',
-      endDate: '2026-11-18',
-      budgets: { stay: 2400, food: 1400, ticket: 400, transport: 700, fun: 500, shop: 400, other: 200 },
-      createdAt: 1,
-      cover: photo('dali ancient town travel photography, cangshan mountain and erhai lake in distance, warm autumn afternoon, film grain, dreamy travel journal cover', 'portrait_4_3'),
-      members: [
-        { id: 'me', name: '我', initial: '我', cls: 'me' },
-        { id: 'xiaoyu', name: '小雨', initial: '小', cls: 'xiaoyu' },
-        { id: 'azhe', name: '阿哲', initial: '哲', cls: 'azhe' }
-      ],
-      days: [
-        {
-          day: 1, date: '2026-11-15', city: '大理古城', theme: '抵达 · 古城慢逛', weather: '晴 19°',
-          photo: photo('dali ancient town stone street with wooden houses and red lanterns, warm sunlight, travel snapshot', 'landscape_4_3'),
-          activities: [
-            { id: 'a1', time: '09:10', title: '昆明南 → 大理', place: '动车 D8656 · 2 小时 10 分', note: '', cost: 435 },
-            { id: 'a2', time: '13:40', title: '入住古城民宿', place: '人民路下段 · 15:00 后可入住', note: '', cost: 0 },
-            { id: 'a3', time: '16:00', title: '古城闲逛 · 五华楼', place: '复兴路 · 人民路', note: '', cost: 0 },
-            { id: 'a4', time: '19:00', title: '再回首凉鸡米线', place: '古城南门', note: '', cost: 86 }
-          ]
-        },
-        {
-          day: 2, date: '2026-11-16', city: '洱海西岸', theme: '环海 · 稻田与咖啡', weather: '晴 21°',
-          photo: photo('erhai lake west shore golden rice fields, bicycle road, yunnan countryside, warm afternoon light, travel photo', 'landscape_4_3'),
-          activities: [
-            { id: 'a5', time: '08:00', title: '洱海门早点', place: '才村码头 · 稀豆粉配饵块', note: '', cost: 42 },
-            { id: 'a6', time: '09:30', title: '环洱海包车', place: '才村 → 喜洲 → 双廊', note: '', cost: 480 },
-            { id: 'a7', time: '12:30', title: '喜洲稻田咖啡', place: '喜林苑旁的稻田边', note: '', cost: 108 },
-            { id: 'a8', time: '18:30', title: '双廊渔家晚饭', place: '双廊古镇 · 酸辣鱼', note: '', cost: 268 },
-            { id: 'a9', time: '21:00', title: '入住双廊海景民宿', place: '环海东路', note: '', cost: 780 }
-          ]
-        },
-        {
-          day: 3, date: '2026-11-17', city: '双廊 · 洱海东岸', theme: '坐船 · 等一场日落', weather: '多云 18°',
-          photo: photo('shuanglang lakeside sunset over erhai lake, orange sky, silhouettes of boats, travel journal', 'landscape_4_3'),
-          activities: [
-            { id: 'a10', time: '09:00', title: '南诏风情岛', place: '双廊码头 · 船票 + 门票', note: '', cost: 150 },
-            { id: 'a11', time: '13:00', title: '海地生活 · 玻璃球拍照', place: '双廊环海路', note: '', cost: 0 },
-            { id: 'a12', time: '17:30', title: '鹿卧山看日落', place: '环海东路', note: '', cost: 0 },
-            { id: 'a13', time: '20:00', title: '深夜烧烤 + 风花雪月', place: '双廊镇口', note: '', cost: 156 }
-          ]
-        },
-        {
-          day: 4, date: '2026-11-18', city: '大理 → 昆明', theme: '返程 · 下次再见', weather: '晴 20°',
-          photo: photo('yunnan rice noodle breakfast on rustic wooden table, steam, morning light, travel memory', 'landscape_4_3'),
-          activities: [
-            { id: 'a14', time: '09:30', title: '最后一碗饵丝', place: '古城北门', note: '', cost: 54 },
-            { id: 'a15', time: '11:00', title: '大理 → 昆明', place: '动车 D8672', note: '', cost: 0 },
-            { id: 'a16', time: '14:00', title: '解散，各自返程', place: '昆明南站', note: '已经开始想下次去哪儿了', cost: 0 }
-          ]
-        }
-      ],
-      hotels: [
-        {
-          id: 'h1', name: '既下山 · 大理古城', address: '大理市古城区人民路下段 108 号',
-          checkIn: '2026-11-15', checkOut: '2026-11-17', amount: 1160,
-          payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '两层小院，天台能看见苍山', expenseId: 'e1',
-          photo: photo('boutique guesthouse courtyard in dali with wooden beams, plants and warm lantern light', 'landscape_4_3')
-        },
-        {
-          id: 'h2', name: '云七 · 双廊海景民宿', address: '大理市双廊镇环海东路',
-          checkIn: '2026-11-17', checkOut: '2026-11-18', amount: 780,
-          payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '阳台正对洱海，早上有海鸥', expenseId: 'e9',
-          photo: photo('seaside guesthouse balcony facing erhai lake, white curtains, morning light', 'landscape_4_3')
-        }
-      ],
-      expenses: [
-        { id: 'e1', hotelId: 'h1', activityId: 'a2', day: 1, date: '2026-11-15', category: 'stay', title: '既下山 · 大理古城（2 晚）', amount: 1160, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '含早餐', sync: true },
-        { id: 'e2', activityId: 'a1', day: 1, date: '2026-11-15', category: 'transport', title: '昆明 → 大理 动车票 ×3', amount: 435, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e3', activityId: 'a4', day: 1, date: '2026-11-15', category: 'food', title: '再回首凉鸡米线', amount: 86, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e4', day: 1, date: '2026-11-15', category: 'ticket', title: '崇圣寺三塔门票 ×3', amount: 225, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e5', activityId: 'a5', day: 2, date: '2026-11-16', category: 'food', title: '洱海门早点', amount: 42, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e6', activityId: 'a6', day: 2, date: '2026-11-16', category: 'transport', title: '环洱海包车一天', amount: 480, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '师傅人很好，一路讲解', sync: true },
-        { id: 'e7', activityId: 'a7', day: 2, date: '2026-11-16', category: 'food', title: '喜洲稻田咖啡 ×3', amount: 108, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e8', activityId: 'a8', day: 2, date: '2026-11-16', category: 'food', title: '双廊渔家晚饭', amount: 268, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '酸辣鱼 + 银鱼煎蛋', sync: true },
-        { id: 'e9', hotelId: 'h2', activityId: 'a9', day: 3, date: '2026-11-17', category: 'stay', title: '云七 · 双廊海景民宿（1 晚）', amount: 780, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e10', activityId: 'a10', day: 3, date: '2026-11-17', category: 'ticket', title: '南诏风情岛船票 ×3', amount: 150, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e11', day: 3, date: '2026-11-17', category: 'shop', title: '扎染围巾（小雨自己买）', amount: 68, payerId: 'xiaoyu', participants: ['xiaoyu'], note: '个人消费，不分摊', sync: true },
-        { id: 'e12', activityId: 'a13', day: 3, date: '2026-11-17', category: 'food', title: '深夜烧烤 + 风花雪月', amount: 156, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'e13', day: 4, date: '2026-11-18', category: 'food', title: '返程前最后一碗饵丝', amount: 54, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true }
-      ],
-      journals: [
-        {
-          id: 'j1', day: 1, date: '2026-11-15', mood: 'excited', weather: '晴 · 风里有洱海味', created: 1,
-          text: '动车穿过一个接一个的隧道，出站那一刻，风里已经有洱海的味道。放下行李就去古城乱走，苍山的雪顶在巷子尽头忽隐忽现，像给这趟旅行盖了个章。'
-        },
-        {
-          id: 'j2', day: 2, date: '2026-11-16', mood: 'content', weather: '晴 · 喜洲稻田', created: 2,
-          text: '包车师傅一路都在讲哪片稻田拍照最好看。下午在喜洲喝咖啡，风把稻子吹成一片金色的海。晚上双廊的酸辣鱼太好吃，三个人吃到不说话。'
-        },
-        {
-          id: 'j3', day: 3, date: '2026-11-17', mood: 'broke', weather: '多云 · 双廊', created: 3,
-          text: '南诏风情岛的船票比想象中贵，但海风值回票价。晚上烧烤配风花雪月，账单又悄悄变长了一点。钱包疼，但下次还敢。'
-        },
-        {
-          id: 'j4', day: 3, date: '2026-11-17', mood: 'moved', weather: '日落 · 鹿卧山', created: 4,
-          text: '双廊的日落把整片海染成橘色。阿哲说以后每年都要来一次，我说好。有些瞬间不用拍照，也一直记得。'
-        }
-      ]
-    };
-
-    const kyoto = {
-      id: 'trip-kyoto',
-      title: '京都，追一场红叶',
-      destination: '京都',
-      startDate: '2026-11-05',
-      endDate: '2026-11-08',
-      budgets: { stay: 5000, food: 2400, ticket: 1500, transport: 1800, fun: 700, shop: 400, other: 200 },
-      createdAt: 2,
-      cover: photo('kyoto autumn temple with red maple leaves, traditional wooden street, soft film photography, travel journal cover', 'portrait_4_3'),
-      members: defaultMembers(),
-      days: [
-        {
-          day: 1, date: '2026-11-05', city: '清水寺 · 二年坂', theme: '初见 · 红叶与石阶', weather: '晴 17°',
-          photo: photo('kiyomizu dera temple wooden stage above red and orange autumn leaves, kyoto, clear day', 'landscape_4_3'),
-          activities: [
-            { id: 'k1', time: '10:20', title: '关西机场 → 京都', place: 'HARUKA 特急', note: '', cost: 0 },
-            { id: 'k2', time: '14:00', title: '清水寺参拜', place: '音羽山 · 清水舞台', note: '', cost: 400 },
-            { id: 'k3', time: '17:00', title: '二年坂散步', place: '石塀小路 · 八坂塔', note: '', cost: 0 }
-          ]
-        },
-        {
-          day: 2, date: '2026-11-06', city: '伏见稻荷 · 宇治', theme: '千本鸟居 · 抹茶', weather: '多云 16°',
-          photo: photo('fushimi inari shrine thousands of red torii gates path, kyoto, soft morning light', 'landscape_4_3'),
-          activities: [
-            { id: 'k4', time: '08:30', title: '伏见稻荷大社', place: '千本鸟居 · 稻荷山', note: '', cost: 0 },
-            { id: 'k5', time: '13:00', title: '宇治平等院', place: '宇治川 · 抹茶一条街', note: '', cost: 700 }
-          ]
-        },
-        {
-          day: 3, date: '2026-11-07', city: '岚山 · 竹林', theme: '竹林 · 小火车', weather: '晴 18°',
-          photo: photo('arashiyama bamboo grove path with sunlight rays, kyoto, green and gold tones', 'landscape_4_3'),
-          activities: [
-            { id: 'k6', time: '09:00', title: '岚山竹林', place: '嵯峨野', note: '', cost: 0 },
-            { id: 'k7', time: '11:00', title: '嵯峨野小火车', place: 'トロッコ嵯峨站', note: '', cost: 880 }
-          ]
-        },
-        {
-          day: 4, date: '2026-11-08', city: '京都 → 上海', theme: '返程 · 带回一片红叶', weather: '阴 15°',
-          photo: photo('kyoto station modern architecture at dusk, travelers with luggage, autumn evening', 'landscape_4_3'),
-          activities: [
-            { id: 'k8', time: '10:00', title: '锦市场买手信', place: '锦小路通', note: '', cost: 0 },
-            { id: 'k9', time: '15:30', title: '京都 → 关西机场', place: 'HARUKA 特急', note: '', cost: 0 }
-          ]
-        }
-      ],
-      hotels: [
-        {
-          id: 'kh1', name: '町家旅馆 · 五条', address: '京都市下京区五条通',
-          checkIn: '2026-11-05', checkOut: '2026-11-08', amount: 3600,
-          payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '木造町家，晚上能听见风铃', expenseId: 'ke1',
-          photo: photo('traditional kyoto machiya wooden townhouse interior, tatami and small garden', 'landscape_4_3')
-        }
-      ],
-      expenses: [
-        { id: 'ke1', hotelId: 'kh1', day: 1, date: '2026-11-05', category: 'stay', title: '町家旅馆 · 五条（3 晚）', amount: 3600, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'ke2', day: 1, date: '2026-11-05', category: 'transport', title: '关西机场 → 京都 HARUKA ×3', amount: 480, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'ke3', activityId: 'k2', day: 1, date: '2026-11-05', category: 'ticket', title: '清水寺门票 ×3', amount: 60, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'ke4', day: 2, date: '2026-11-06', category: 'food', title: '宇治抹茶甜品', amount: 168, payerId: 'me', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'ke5', activityId: 'k7', day: 3, date: '2026-11-07', category: 'fun', title: '嵯峨野小火车 ×3', amount: 132, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true }
-      ],
-      journals: [
-        { id: 'kj1', day: 1, date: '2026-11-05', mood: 'look', weather: '晴 · 清水寺', created: 1, text: '第一次看到这么红的枫叶，像有人把整座山点燃了。站在清水舞台往下看，人群像缓慢流动的河。' },
-        { id: 'kj2', day: 3, date: '2026-11-07', mood: 'free', weather: '晴 · 岚山', created: 2, text: '竹林里风一吹，沙沙声从头顶盖下来。什么都没做，只是慢慢走，也觉得这一天很完整。' }
-      ]
-    };
-
-    const quanzhou = {
-      id: 'trip-quanzhou',
-      title: '泉州，刺桐旧巷',
-      destination: '泉州',
-      startDate: '2026-06-13',
-      endDate: '2026-06-15',
-      budgets: { stay: 900, food: 800, ticket: 300, transport: 500, fun: 300, shop: 100, other: 100 },
-      createdAt: 3,
-      cover: photo('quanzhou old town red brick lanes, kaiyuan temple twin pagodas, southern fujian architecture, warm evening light, travel journal cover', 'portrait_4_3'),
-      members: defaultMembers(),
-      days: [
-        {
-          day: 1, date: '2026-06-13', city: '西街 · 开元寺', theme: '红砖厝 · 半城烟火', weather: '晴 30°',
-          photo: photo('quanzhou west street old town with red brick buildings and kaiyuan temple pagodas, evening lights', 'landscape_4_3'),
-          activities: [
-            { id: 'q1', time: '11:00', title: '西街闲逛', place: '钟楼 · 开元寺', note: '', cost: 0 },
-            { id: 'q2', time: '15:00', title: '开元寺', place: '东西塔 · 古桑树', note: '', cost: 0 },
-            { id: 'q3', time: '19:00', title: '面线糊 + 土笋冻', place: '水门巷', note: '', cost: 58 }
-          ]
-        },
-        {
-          day: 2, date: '2026-06-14', city: '蟳埔村 · 海边', theme: '簪花围 · 海风', weather: '多云 29°',
-          photo: photo('xunpu village women with flower hair ornaments, oyster shell houses, quanzhou coast', 'landscape_4_3'),
-          activities: [
-            { id: 'q4', time: '09:30', title: '蟳埔村簪花', place: '蟳埔妈祖庙附近', note: '', cost: 120 },
-            { id: 'q5', time: '15:00', title: '洛阳桥', place: '洛阳江入海口', note: '', cost: 0 }
-          ]
-        },
-        {
-          day: 3, date: '2026-06-15', city: '泉州 → 回家', theme: '最后一碗四果汤', weather: '晴 31°',
-          photo: photo('quanzhou street food four fruits soup dessert on table, summer afternoon', 'landscape_4_3'),
-          activities: [
-            { id: 'q6', time: '10:00', title: '承天寺', place: '南俊路', note: '', cost: 0 },
-            { id: 'q7', time: '14:00', title: '返程', place: '泉州站', note: '', cost: 0 }
-          ]
-        }
-      ],
-      hotels: [
-        {
-          id: 'qh1', name: '西街民宿 · 红砖小院', address: '泉州市鲤城区西街',
-          checkIn: '2026-06-13', checkOut: '2026-06-15', amount: 640,
-          payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '天井里有棵石榴树', expenseId: 'qe1',
-          photo: photo('traditional southern fujian red brick courtyard guesthouse with pomegranate tree', 'landscape_4_3')
-        }
-      ],
-      expenses: [
-        { id: 'qe1', hotelId: 'qh1', day: 1, date: '2026-06-13', category: 'stay', title: '西街民宿（2 晚）', amount: 640, payerId: 'xiaoyu', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'qe2', activityId: 'q3', day: 1, date: '2026-06-13', category: 'food', title: '面线糊 + 土笋冻', amount: 58, payerId: 'azhe', participants: ['me', 'xiaoyu', 'azhe'], note: '', sync: true },
-        { id: 'qe3', activityId: 'q4', day: 2, date: '2026-06-14', category: 'fun', title: '蟳埔簪花 + 拍照', amount: 120, payerId: 'me', participants: ['xiaoyu'], note: '只有小雨拍了', sync: true }
-      ],
-      journals: [
-        { id: 'qj1', day: 1, date: '2026-06-13', mood: 'happy', weather: '晴 · 西街', created: 1, text: '红砖厝在夕阳里像刚出炉的面包。西街的钟楼下人来人往，面线糊热得刚好。' }
-      ]
-    };
-
+  /* ---------------- 空状态（不再内置示例册子） ---------------- */
+  function emptyState() {
     return {
       version: 2,
       theme: 'bloom',
       view: 'library',
-      activeTripId: 'trip-dali',
+      activeTripId: '',
       tab: 'overview',
       filterCat: 'all',
-      trips: [dali, kyoto, quanzhou]
+      trips: []
     };
   }
+
 
   function buildDays(start, end, destination, prevDays) {
     return dateRange(start, end).map((date, i) => {
@@ -420,12 +193,20 @@
     try { return (typeof Store !== 'undefined' && Store.user && Store.user.email) || 'guest'; } catch (e) { return 'guest'; }
   }
 
+  /* 旧版本内置的示例册子：加载时一并清掉，老用户也不会再看到演示数据 */
+  const DEMO_TRIP_IDS = ['trip-dali', 'trip-kyoto', 'trip-quanzhou'];
+  function isDemoTrip(t) {
+    return !!t && (DEMO_TRIP_IDS.indexOf(t.id) >= 0 || (t.createdAt != null && Number(t.createdAt) < 1e12));
+  }
+
   function normalizeState(s) {
-    if (!s || !Array.isArray(s.trips)) return seedState();
+    if (!s || !Array.isArray(s.trips)) return emptyState();
+    s.trips = s.trips.filter(t => !isDemoTrip(t));
     if (!s.theme || !THEMES.some(t => t.id === s.theme)) s.theme = 'bloom';
     if (s.view !== 'trip') s.view = 'library';
     if (!s.trips.length) s.view = 'library';
     if (s.view === 'trip' && !s.trips.some(t => t.id === s.activeTripId)) s.view = 'library';
+    if (!s.trips.some(t => t.id === s.activeTripId)) s.activeTripId = '';
     if (!s.activeTripId && s.trips[0]) s.activeTripId = s.trips[0].id;
     if (s.tab == null) s.tab = 'overview';
     if (s.filterCat == null) s.filterCat = 'all';
@@ -481,7 +262,7 @@
         if (s && s.version === 1) return migrateV1(s);
       }
     } catch (e) { console.warn('读取旅行数据失败', e); }
-    return seedState();
+    return emptyState();
   }
 
   function ensureState() {
@@ -489,13 +270,78 @@
     if (!state || stateKey !== k) {
       stateKey = k;
       state = loadFor(k);
+      pullCloudOnce();
     }
     return state;
   }
 
   function persist() {
-    try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); return true; }
-    catch (e) { console.warn('保存旅行数据失败', e); return false; }
+    state.updatedAt = Date.now();
+    try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); } catch (e) { console.warn('保存旅行数据失败', e); return false; }
+    pushCloudSoon();
+    return true;
+  }
+
+  /* ---------------- 云端同步（Supabase travel_state 表） ----------------
+     本机仍是权威缓存：先读本地立即出画面，再异步拉云端比对 updatedAt。
+     示例册子（seed）不参与同步，避免新设备把演示数据反向覆盖真实账本。 */
+  let cloudSync = 'idle';   // idle | syncing | done | missing | off
+  let cloudTimer = null;
+
+  function hasOwnTrips(s) {
+    const list = (s && Array.isArray(s.trips)) ? s.trips : [];
+    return list.some(t => !isDemoTrip(t));
+  }
+
+  function cloudReady() {
+    try {
+      return typeof Store !== 'undefined' && Store.mode === 'supabase' && !!Store.user
+        && typeof Store.getTravelState === 'function' && typeof Store.saveTravelState === 'function';
+    } catch (e) { return false; }
+  }
+
+  function pushCloudSoon() {
+    if (!cloudReady() || !hasOwnTrips(state)) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(() => {
+      Store.saveTravelState(state).then(ok => {
+        if (!ok && Store.travelMissing) {
+          cloudSync = 'missing';
+          warnMissingCloud();
+        }
+      }).catch(() => {});
+    }, 800);
+  }
+
+  function warnMissingCloud() {
+    if (warnMissingCloud.shown) return;
+    warnMissingCloud.shown = true;
+    toast('旅行账本云同步未开启：到「设置 → 建表 SQL」重新执行一次，即可跨设备同步', 'err');
+  }
+
+  function pullCloudOnce() {
+    if (cloudSync !== 'idle' || !cloudReady()) { if (!cloudReady()) cloudSync = 'off'; return; }
+    cloudSync = 'syncing';
+    Store.getTravelState().then(row => {
+      if (Store.travelMissing) { cloudSync = 'missing'; warnMissingCloud(); return; }
+      const cloudOk = row && row.data && hasOwnTrips(row.data);
+      if (cloudOk) {
+        const ts = Date.parse(row.updated_at) || 0;
+        if (ts > (Number(state.updatedAt) || 0) + 2000) {
+          const next = normalizeState(row.data);
+          next.updatedAt = ts;
+          state = next;
+          try { localStorage.setItem(STORAGE_PREFIX + stateKey, JSON.stringify(state)); } catch (e) { /* 配额不足时仅内存生效 */ }
+          cloudSync = 'done';
+          render();
+          toast('已同步云端的旅行账本', 'ok');
+          return;
+        }
+      }
+      cloudSync = 'done';
+      // 云端没有 / 比本机旧：把本机真实账本推上去（示例册子不推）
+      if (hasOwnTrips(state)) pushCloudSoon();
+    }).catch(() => { cloudSync = 'off'; });
   }
 
   /* 当前翻开的旅行册 */
@@ -897,7 +743,7 @@
           '<div>' +
             '<span class="tv-eyebrow">My travel books</span>' +
             '<h3>我的旅行册</h3>' +
-            '<p>每出发一次，就多一本贴满照片、票根和心情的手帐。点开一本翻看。</p>' +
+            '<p>' + (trips.length ? '每出发一次，就多一本贴满照片、票根和心情的手帐。点开一本翻看。' : '还没有旅行册。新建一本，把下一段旅程记下来。') + '</p>' +
           '</div>' +
           '<button type="button" class="tv-btn solid" data-act="new-trip">＋ 新建旅行册</button>' +
         '</div>' +
@@ -935,8 +781,7 @@
           '</button>' +
         '</div>' +
         '<div class="tv-foot">' +
-          '<span>旅行明细保存在本机 · 账单按我的 AA 份额同步到记账本</span>' +
-          '<button type="button" class="tv-link" data-act="reset-demo">恢复示例数据</button>' +
+          '<span>旅行册同步云端 · 账单按我的 AA 份额同步到记账本</span>' +
         '</div>' +
       '</section>';
   }
@@ -1528,7 +1373,6 @@
     else if (act === 'copy-settle') copySettlement();
     else if (act === 'download-settle') downloadSettlement();
     else if (act === 'person-settle') downloadPersonSettle(ds.id);
-    else if (act === 'reset-demo') resetDemo();
   }
 
   function openTrip(id) {
@@ -2748,16 +2592,6 @@
     const canvas = drawSettlement();
     saveCanvas(canvas, '对账单-' + t.destination + '.png').then(ok => {
       toast(ok ? '对账单图片已下载' : '生成图片失败', ok ? 'ok' : 'err');
-    });
-  }
-
-  function resetDemo() {
-    App.confirmDialog('恢复示例数据', '会清空当前所有旅行册，恢复为三本示例旅行册。确定吗？').then(ok => {
-      if (!ok) return;
-      state = seedState();
-      stateKey = userKey();
-      persist(); render();
-      toast('已恢复示例旅行册', 'ok');
     });
   }
 

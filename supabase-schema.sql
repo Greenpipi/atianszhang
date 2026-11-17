@@ -122,6 +122,13 @@ begin
     updated_at timestamptz not null default now()
   ) $ddl$;
 
+  -- 旅行账本整册状态（每用户一行 JSON，跨设备同步）
+  execute $ddl$ create table if not exists travel_state (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    data jsonb not null default '{}'::jsonb,
+    updated_at timestamptz not null default now()
+  ) $ddl$;
+
   -- 账单标签列（多选标签，文本数组）
   execute $ddl$ alter table records add column if not exists tags text[] not null default '{}'::text[] $ddl$;
 
@@ -165,6 +172,7 @@ begin
   execute $ddl$ alter table templates  enable row level security $ddl$;
   execute $ddl$ alter table banners    enable row level security $ddl$;
   execute $ddl$ alter table bills      enable row level security $ddl$;
+  execute $ddl$ alter table travel_state enable row level security $ddl$;
 
   execute $ddl$ drop policy if exists "own ledgers" on ledgers $ddl$;
   execute $ddl$ create policy "own ledgers" on ledgers for all
@@ -194,6 +202,10 @@ begin
   execute $ddl$ create policy "own bills" on bills for all
     using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
 
-  return 'done：7 张表已创建（含 banners、bills），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
+  execute $ddl$ drop policy if exists "own travel_state" on travel_state $ddl$;
+  execute $ddl$ create policy "own travel_state" on travel_state for all
+    using (auth.uid() = user_id) with check (auth.uid() = user_id) $ddl$;
+
+  return 'done：8 张表已创建（含 banners、bills、travel_state），records.tags 列与 templates/ledgers 等全部所需列已补齐，RLS 已启用。可到 Database > Replication 开启实时同步。';
 end
 $fn$;

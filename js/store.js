@@ -449,6 +449,39 @@ const Store = {
     this._localWrite(db);
   },
 
+  /* ---------- 旅行账本（整册 JSON，每用户一行，跨设备同步） ---------- */
+  async getTravelState() {
+    if (this.mode !== 'supabase' || !this.user) return null;
+    this.travelMissing = false;
+    try {
+      const { data, error } = await this.sb.from('travel_state').select('data, updated_at').maybeSingle();
+      if (error) {
+        if (this._isTableErr(error)) { this.travelMissing = true; return null; }
+        throw error;
+      }
+      return data || null;
+    } catch (e) {
+      if (this._isTableErr(e)) { this.travelMissing = true; return null; }
+      throw e;
+    }
+  },
+
+  async saveTravelState(data) {
+    if (this.mode !== 'supabase' || !this.user) return false;
+    try {
+      const { error } = await this.sb.from('travel_state').upsert({
+        user_id: this.user.id, data, updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      this._noteWrite();
+      return true;
+    } catch (e) {
+      if (this._isTableErr(e)) { this.travelMissing = true; return false; }
+      console.warn('旅行账本云端同步失败（已保留在本机）', e);
+      return false;
+    }
+  },
+
   /* ---------- 背景头图配置（云端 banners 表；表未建时回退本地） ---------- */
   async getBanner() {
     if (this.mode === 'supabase' && this.user) {
