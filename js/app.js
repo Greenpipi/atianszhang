@@ -3944,6 +3944,11 @@ const App = {
       const box = $('lgTripLinks');
       if (!box) return;
       tripOptions = (window.Travel && window.Travel.activeTrips) ? window.Travel.activeTrips() : [];
+      // 编辑已完成旅行的账单时，也要把该旅行显示出来，避免保存时被当成取消关联
+      if (st.single.tripId && !tripOptions.some(t => t.id === st.single.tripId) && window.Travel.tripBrief) {
+        const brief = window.Travel.tripBrief(st.single.tripId);
+        if (brief) tripOptions = tripOptions.concat([brief]);
+      }
       const show = st.kind === 'expense' && tripOptions.length > 0;
       box.hidden = !show;
       if (!show) { st.single.tripId = ''; st.single.hotelId = ''; box.innerHTML = ''; paintHotelLink(); return; }

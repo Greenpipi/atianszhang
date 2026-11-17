@@ -680,10 +680,11 @@
   /* ---------------- 记账本 ⇄ 旅行账册 关联 ----------------
      关联信息只存在旅行侧（expenses[].recordId / hotelId），不改记账本表结构。
      记账本保存后调用 attachRecord，删除时调用 unlinkRecord。 */
-  function mirrorOf(recordId) {
+  /* 找到某笔记账记录对应的旅行账单：既包括记账本转来的镜像，也包括旅行册自己生成后写入记账本的账单 */
+  function linkExpenseOf(recordId) {
     if (!state || !recordId) return null;
     for (const t of (state.trips || [])) {
-      const exp = (t.expenses || []).find(e => e.mirror && e.recordId === recordId);
+      const exp = (t.expenses || []).find(e => e.recordId === recordId);
       if (exp) return { trip: t, exp: exp };
     }
     return null;
@@ -709,29 +710,53 @@
     const t = tripById(tripId);
     return t ? (t.hotels || []).map(h => ({ id: h.id, name: h.name || '未命名住宿' })) : [];
   }
+  /* 单本旅行的摘要：编辑已完成旅行的账单时，勾选项仍要能显示出来 */
+  function tripBrief(tripId) {
+    const t = tripById(tripId);
+    if (!t) return null;
+    return {
+      id: t.id, title: t.title || t.destination || '旅行', destination: t.destination || '',
+      status: statusOf(t), statusLabel: statusLabel(t), startDate: t.startDate, endDate: t.endDate
+    };
+  }
   function linkOfRecord(recordId) {
     ensureState();
-    const m = mirrorOf(recordId);
-    return m ? { tripId: m.trip.id, hotelId: m.exp.hotelId || '' } : null;
+    const m = linkExpenseOf(recordId);
+    return m ? { tripId: m.trip.id, hotelId: m.exp.hotelId || '', origin: m.exp.mirror ? 'ledger' : 'travel' } : null;
   }
   /* 记账本保存 → 写入 / 更新旅行账册里的镜像账单；tripId 为空表示取消关联 */
   function attachRecord(rec, opts) {
     ensureState();
     if (!rec || !rec.id) return;
     const tripId = opts && opts.tripId;
-    const existed = mirrorOf(rec.id);
+    const existed = linkExpenseOf(rec.id);
     if (!tripId) {
-      if (existed) { existed.trip.expenses = existed.trip.expenses.filter(e => e !== existed.exp); persist(); }
+      if (existed) {
+        if (existed.exp.mirror) existed.trip.expenses = existed.trip.expenses.filter(e => e !== existed.exp);
+        else { existed.exp.recordId = ''; existed.exp.sync = false; } // 旅行册自己的账单：只取消关联，保留账单
+        persist();
+      }
       return;
     }
     const trip = tripById(tripId);
     if (!trip) return;
+    let old = null;
     if (existed && existed.trip.id !== tripId) {
       existed.trip.expenses = existed.trip.expenses.filter(e => e !== existed.exp);
+      if (existed.exp.mirror) {
+        old = null;
+      } else {
+        // 旅行册生成的账单换到另一本旅行：连同 AA / 付款人一起搬过去
+        existed.exp.hotelId = '';
+        if (!Array.isArray(trip.expenses)) trip.expenses = [];
+        trip.expenses.push(existed.exp);
+        old = existed.exp;
+      }
+    } else if (existed) {
+      old = existed.exp;
+    } else {
+      old = (trip.expenses || []).find(e => e.recordId === rec.id) || null;
     }
-    const old = (existed && existed.trip.id === tripId)
-      ? existed.exp
-      : (trip.expenses || []).find(e => e.mirror && e.recordId === rec.id);
     let hotelId = (opts && opts.hotelId) || '';
     if (hotelId === '__new') {
       // 只有住宿类消费才会走到这里：新建一间「先付定金」的住宿，房费总额按已付账单汇总
@@ -761,16 +786,22 @@
       recordId: rec.id,
       hotelId: hotelId
     };
-    if (old) Object.assign(old, patch);
-    else trip.expenses.push(Object.assign({ id: uid('e') }, patch));
+    if (old) {
+      // 旅行册自己生成的账单以旅行侧为准（金额是全额、含 AA），这里只同步住宿关联，不覆盖 AA / 付款人
+      if (old.mirror) Object.assign(old, patch);
+      else old.hotelId = hotelId;
+    } else {
+      trip.expenses.push(Object.assign({ id: uid('e') }, patch));
+    }
     persist();
     if (typeof App !== 'undefined' && App.state && App.state.route === 'travel') render();
   }
   function unlinkRecord(recordId) {
     ensureState();
-    const m = mirrorOf(recordId);
+    const m = linkExpenseOf(recordId);
     if (!m) return;
-    m.trip.expenses = m.trip.expenses.filter(e => e !== m.exp);
+    if (m.exp.mirror) m.trip.expenses = m.trip.expenses.filter(e => e !== m.exp);
+    else { m.exp.recordId = ''; m.exp.sync = false; } // 旅行册自己的账单只解除关联
     persist();
     if (typeof App !== 'undefined' && App.state && App.state.route === 'travel') render();
   }
@@ -2869,6 +2900,7 @@
     render: render,
     state: function () { return state; },
     activeTrips: activeTrips,
+    tripBrief: tripBrief,
     hotelsOf: hotelsOf,
     linkOfRecord: linkOfRecord,
     attachRecord: attachRecord,
