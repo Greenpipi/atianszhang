@@ -1329,15 +1329,17 @@
   /* ---------- 住宿 ---------- */
   function renderHotels(t) {
     return '<div class="tv-section-head">' +
-        '<div><span class="tv-eyebrow">Stays</span><h3>住宿酒店</h3><p>民宿 / 酒店可以有很多个。新增时会自动生成一笔住宿账单。</p></div>' +
+        '<div><span class="tv-eyebrow">Stays</span><h3>住宿酒店</h3><p>一次旅行可以住很多家；同一家能分定金 / 尾款多次付款，朋友付的只在对账里出现。</p></div>' +
         '<button type="button" class="tv-btn solid" data-act="new-hotel">＋ 加住宿</button>' +
       '</div>' +
       (t.hotels.length ? '<div class="tv-hotel-grid">' + t.hotels.map(h => {
         const nt = nights(h.checkIn, h.checkOut);
-        const payer = member(h.payerId);
         const pays = (t.expenses || []).filter(e => e.hotelId === h.id);
         const paid = yuan(hotelPaidCents(t, h));
         const amt = pays.length ? paid : (Number(h.amount) || 0);
+        const who = [];
+        pays.forEach(e => { if (e.amount > 0 && who.indexOf(e.payerId) < 0) who.push(e.payerId); });
+        const whoTxt = who.length ? who.map(id => member(id).name).join('、') + '付' : '还没记录付款';
         return '<article class="tv-hotel" data-act="edit-hotel" data-id="' + h.id + '">' +
           (h.photo
             ? '<div class="tv-hotel-photo" data-act="edit-hotel-photo" data-id="' + h.id + '" title="点击更换照片"><img src="' + esc(h.photo) + '" referrerpolicy="no-referrer" alt="' + esc(h.name) + '" loading="lazy"><span class="tv-tape"></span></div>'
@@ -1351,10 +1353,9 @@
               '<div class="tv-hotel-amt"><span>' + (pays.length ? '已付' : '房费') + '</span><b>' + money(amt) + '</b></div>' +
             '</div>' +
             '<div class="tv-hotel-foot">' +
-              '<span class="tv-avatar sm ' + esc(payer.cls) + '">' + esc(payer.initial) + '</span>' +
-              '<span>' + esc(payer.name) + '付 · ' + (h.participants || []).length + ' 人分</span>' +
+              '<span class="tv-hotel-payers">' + esc(whoTxt) + '</span>' +
               (pays.length ? '<span class="tv-tag synced">' + pays.length + ' 笔付款</span>'
-                : h.expenseId ? '<span class="tv-tag synced">已生成账单</span>' : '<span class="tv-tag">未生成账单</span>') +
+                : '<span class="tv-tag">未记录付款</span>') +
             '</div>' +
             (h.note ? '<p class="tv-hotel-note">' + esc(h.note) + '</p>' : '') +
           '</div>' +
@@ -2344,28 +2345,87 @@
     if (!t) return;
     const h = id ? t.hotels.find(x => x.id === id) : null;
     const editing = !!h;
-    const data = h || {
-      name: '', address: '', checkIn: t.startDate, checkOut: t.endDate,
-      amount: '', payerId: 'me', participants: t.members.map(m => m.id), note: ''
+    const data = h || { name: '', address: '', checkIn: t.startDate, checkOut: t.endDate, note: '' };
+    const members = t.members;
+    const linked = h ? (t.expenses || []).filter(e => e.hotelId === h.id) : [];
+    let ownPays = linked.filter(e => !e.mirror);
+    const mirrorPays = linked.filter(e => e.mirror);
+    // 旧数据：只有一笔总额、还没拆成付款记录，打开时先按原样铺一行
+    if (!linked.length && h && cents(h.amount) > 0) {
+      const parts = (h.participants && h.participants.length) ? h.participants : members.map(m => m.id);
+      ownPays = [{
+        id: '', date: h.checkIn, amount: Number(h.amount) || 0, payerId: h.payerId || 'me',
+        split: parts.length > 1 ? 'aa' : 'self', participants: parts,
+        title: '房费', payLabel: '房费'
+      }];
+    }
+    const LABELS = ['定金', '尾款', '房费', '押金', '加床', '其他'];
+
+    const labelOf = p => {
+      if (p.payLabel) return p.payLabel;
+      const parts = String(p.title || '').split('·');
+      const last = (parts[parts.length - 1] || '').trim();
+      return LABELS.indexOf(last) >= 0 ? last : '房费';
     };
-    const hasExpense = !!(h && h.expenseId && t.expenses.some(e => e.id === h.expenseId));
+    const payRow = p => {
+      const split = p.split === 'self' ? 'self' : 'aa';
+      const parts = (p.participants && p.participants.length) ? p.participants : members.map(m => m.id);
+      const date = p.date || data.checkIn;
+      const expId = p.id || '';
+      return '<div class="tv-payrow" data-exp="' + esc(expId) + '">' +
+        '<div class="tv-payrow-head">' +
+          '<select class="tv-pay-title" data-f="label">' +
+            LABELS.map(l => '<option' + (l === labelOf(p) ? ' selected' : '') + '>' + l + '</option>').join('') +
+          '</select>' +
+          '<div class="tv-pay-amt"><input type="number" min="0" step="0.01" data-f="amount" value="' + (p.amount ? p.amount : '') + '" placeholder="0.00"><span>元</span></div>' +
+          '<button type="button" class="tv-pay-del" title="删除这笔付款">✕</button>' +
+        '</div>' +
+        '<div class="tv-payrow-line">' +
+          '<label class="tv-pay-lab">付款日</label>' +
+          '<input class="cal-input tv-pay-date" type="text" readonly value="' + esc(date) + '" data-date="' + esc(date) + '">' +
+          '<label class="tv-pay-lab">谁付的</label>' +
+          '<select class="tv-pay-payer" data-f="payer">' + memberOptions(p.payerId || 'me') + '</select>' +
+        '</div>' +
+        '<div class="tv-payrow-line">' +
+          '<span class="tv-pay-lab">怎么摊</span>' +
+          '<div class="tv-seg">' +
+            '<button type="button" class="tv-seg-opt' + (split === 'aa' ? ' on' : '') + '" data-split="aa">和大家 AA</button>' +
+            '<button type="button" class="tv-seg-opt' + (split === 'self' ? ' on' : '') + '" data-split="self">付款人自己承担</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="tv-payrow-parts"' + (split === 'aa' ? '' : ' hidden') + '>' +
+          '<span class="tv-pay-lab">参与人</span>' +
+          '<div class="tv-checks tv-checks-sm">' + members.map(mm =>
+            '<label class="tv-check"><input type="checkbox" value="' + mm.id + '"' + (parts.indexOf(mm.id) >= 0 ? ' checked' : '') + '>' +
+              '<span class="tv-check-box">' + CHECK_SVG + '</span>' +
+              '<span class="tv-check-text">' + esc(mm.name) + '</span>' +
+            '</label>').join('') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    };
+
     const m = openModal(
-      modalTitle(editing ? '编辑住宿' : '加一个住宿', '一次旅行可以有很多个酒店 / 民宿') +
+      modalTitle(editing ? '编辑住宿' : '加一个住宿', '一次旅行可以有多家酒店；每家可以分定金、尾款等多笔付款') +
       '<div class="field-row">' +
         field('住宿名称', '<input id="tv-h-name" type="text" value="' + esc(data.name) + '" placeholder="例如 既下山 · 大理古城">') +
-        field('房费总额（元）', '<input id="tv-h-amount" type="number" min="0" step="0.01" value="' + (data.amount || '') + '" placeholder="0.00">') +
+        field('地址', '<input id="tv-h-address" type="text" value="' + esc(data.address) + '" placeholder="可选">') +
       '</div>' +
-      field('地址', '<input id="tv-h-address" type="text" value="' + esc(data.address) + '" placeholder="可选">') +
       '<div class="field-row">' +
         field('入住日期', dateInput('tv-h-in', data.checkIn)) +
         field('退房日期', dateInput('tv-h-out', data.checkOut)) +
       '</div>' +
-      '<div class="field-row">' +
-        field('谁付的钱', '<select id="tv-h-payer">' + memberOptions(data.payerId) + '</select>') +
-        field('备注', '<input id="tv-h-note" type="text" value="' + esc(data.note) + '" placeholder="可选">') +
+      field('备注', '<input id="tv-h-note" type="text" value="' + esc(data.note) + '" placeholder="可选">') +
+      '<div class="tv-payblock">' +
+        '<div class="tv-payblock-head"><b>付款记录</b><span>可以只记一次，也可以拆成定金 / 尾款</span></div>' +
+        (mirrorPays.length ? '<div class="tv-pay-mirror">记账本里已关联这家住宿的账单：' +
+          mirrorPays.map(e => '<span class="tv-tag synced">' + esc(e.title) + ' ' + money(yuan(cents(e.amount))) + '</span>').join('') +
+          '</div>' : '') +
+        '<div id="tv-pay-list">' + (ownPays.length ? ownPays.map(payRow).join('') : payRow({ date: data.checkIn })) + '</div>' +
+        '<button type="button" class="tv-pay-add" id="tv-pay-add">＋ 添加一笔付款</button>' +
+        '<div class="tv-pay-sum" id="tv-h-sum"></div>' +
+        '<p class="tv-pay-tip">我付的部分按份额写入记账本；朋友付的只记在旅行册和对账单里，不会进你的记账本。</p>' +
       '</div>' +
-      '<div class="field"><label>谁参与分摊（AA）</label>' + memberChecks(data.participants) + '</div>' +
-      '<div class="tv-sync-box">' + checkLine('tv-h-gen', '同时生成一笔住宿账单（并同步记账本我的份额）', editing ? hasExpense : true) + '</div>' +
       '<div class="modal-acts">' +
         (editing ? '<button type="button" class="btn btn-danger" id="tv-h-del" style="margin-right:auto">删除住宿</button>' : '') +
         '<button type="button" class="btn btn-ghost" data-close>取消</button>' +
@@ -2374,76 +2434,145 @@
     );
     if (!m) return;
     bindControls(m);
+
+    const list = m.querySelector('#tv-pay-list');
+    const sumBox = m.querySelector('#tv-h-sum');
+
+    const refreshSum = () => {
+      let total = 0, mine = 0, ledger = 0;
+      list.querySelectorAll('.tv-payrow').forEach(r => {
+        const amt = Number(r.querySelector('[data-f="amount"]').value) || 0;
+        if (amt <= 0) return;
+        const payer = r.querySelector('[data-f="payer"]').value;
+        const split = r.querySelector('.tv-seg-opt.on').dataset.split;
+        const parts = Array.from(r.querySelectorAll('.tv-payrow-parts input:checked')).map(x => x.value);
+        total += amt;
+        if (split === 'self') {
+          if (payer === 'me') { mine += amt; ledger += amt; }
+        } else if (parts.indexOf('me') >= 0) {
+          const sh = amt / parts.length;
+          mine += sh;
+          if (payer === 'me') ledger += sh;
+        }
+      });
+      const r2 = n => Math.round(n * 100) / 100;
+      sumBox.innerHTML = '房费合计 <b>' + money(r2(total)) + '</b>' +
+        '<i></i>我承担 <b>' + money(r2(mine)) + '</b>' +
+        '<i></i>写入记账本 <b>' + money(r2(ledger)) + '</b>' +
+        (mine - ledger > 0.005 ? '<em>朋友垫付 ' + money(r2(mine - ledger)) + ' 只在对账里</em>' : '');
+    };
+
+    const bindRow = row => {
+      row.querySelectorAll('.cal-input').forEach(inp => { inp.onclick = () => App.openCalendar(inp, 'day'); });
+      row.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('input', refreshSum);
+        el.addEventListener('change', refreshSum);
+      });
+      row.querySelectorAll('.tv-seg-opt').forEach(btn => {
+        btn.onclick = () => {
+          row.querySelectorAll('.tv-seg-opt').forEach(b => b.classList.toggle('on', b === btn));
+          row.querySelector('.tv-payrow-parts').hidden = btn.dataset.split !== 'aa';
+          refreshSum();
+        };
+      });
+      row.querySelector('.tv-pay-del').onclick = () => { row.remove(); refreshSum(); };
+    };
+    list.querySelectorAll('.tv-payrow').forEach(bindRow);
+    refreshSum();
+
+    m.querySelector('#tv-pay-add').onclick = () => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = payRow({ date: m.querySelector('#tv-h-in').dataset.date || data.checkIn });
+      const row = wrap.firstElementChild;
+      list.appendChild(row);
+      bindRow(row);
+      refreshSum();
+    };
+
     const del = m.querySelector('#tv-h-del');
     if (del) del.onclick = () => {
-      App.confirmDialog('删除住宿', '「' + data.name + '」的住宿记录和关联账单会一起删除。').then(ok => {
+      App.confirmDialog('删除住宿', '「' + data.name + '」和这里记录的付款会一起删除；记账本转来的账单只解除关联。').then(ok => {
         if (!ok) return;
-        if (h.expenseId) {
-          const exp = t.expenses.find(e => e.id === h.expenseId);
-          if (exp && exp.recordId && !exp.mirror) dropRecord(exp.recordId);
-          t.expenses = t.expenses.filter(e => e.id !== h.expenseId);
-        }
-        // 记账本转来的住宿付款只解除关联，不删除原账单
+        ownPays.forEach(e => { if (e.recordId) dropRecord(e.recordId); });
+        t.expenses = (t.expenses || []).filter(e => e.hotelId !== h.id || e.mirror);
         t.expenses.forEach(e => { if (e.hotelId === h.id) e.hotelId = ''; });
         t.hotels = t.hotels.filter(x => x.id !== h.id);
         persist(); App.closeModal(); render();
         toast('住宿已删除', 'ok');
       });
     };
+
     m.querySelector('#tv-h-save').onclick = () => {
       const name = m.querySelector('#tv-h-name').value.trim();
-      const amount = Number(m.querySelector('#tv-h-amount').value) || 0;
       const checkIn = m.querySelector('#tv-h-in').dataset.date || t.startDate;
       const checkOut = m.querySelector('#tv-h-out').dataset.date || checkIn;
-      const participants = checkedIds(m);
       if (!name) return toast('请填写住宿名称', 'err');
-      if (!participants.length) return toast('至少选一个分摊的人', 'err');
       if (parseDate(checkOut) < parseDate(checkIn)) return toast('退房日期不能早于入住日期', 'err');
-      const patch = {
-        name: name, address: m.querySelector('#tv-h-address').value.trim(),
-        checkIn: checkIn, checkOut: checkOut,
-        amount: Math.round(amount * 100) / 100,
-        payerId: m.querySelector('#tv-h-payer').value || 'me',
-        participants: participants,
-        note: m.querySelector('#tv-h-note').value.trim()
-      };
+
+      const rows = Array.from(list.querySelectorAll('.tv-payrow'));
+      const pays = [];
+      for (const r of rows) {
+        const amount = Math.round((Number(r.querySelector('[data-f="amount"]').value) || 0) * 100) / 100;
+        if (amount <= 0) continue;
+        const split = r.querySelector('.tv-seg-opt.on').dataset.split;
+        const parts = Array.from(r.querySelectorAll('.tv-payrow-parts input:checked')).map(x => x.value);
+        if (split === 'aa' && !parts.length) return toast('选一下这笔付款由谁分摊', 'err');
+        pays.push({
+          expId: r.dataset.exp || '',
+          label: r.querySelector('[data-f="label"]').value,
+          amount: amount,
+          date: r.querySelector('.tv-pay-date').dataset.date || checkIn,
+          payerId: r.querySelector('[data-f="payer"]').value || 'me',
+          split: split,
+          participants: split === 'aa' ? parts : [r.querySelector('[data-f="payer"]').value || 'me']
+        });
+      }
+
       let target = h;
-      if (target) Object.assign(target, patch);
-      else {
-        target = Object.assign({ id: uid('h') }, patch);
+      if (target) {
+        target.name = name;
+        target.address = m.querySelector('#tv-h-address').value.trim();
+        target.checkIn = checkIn; target.checkOut = checkOut;
+        target.note = m.querySelector('#tv-h-note').value.trim();
+      } else {
+        target = { id: uid('h'), name: name, address: m.querySelector('#tv-h-address').value.trim(), checkIn: checkIn, checkOut: checkOut, note: m.querySelector('#tv-h-note').value.trim() };
         t.hotels.push(target);
       }
-      const gen = m.querySelector('#tv-h-gen').checked && amount > 0;
-      const linked = target.expenseId ? t.expenses.find(e => e.id === target.expenseId) : null;
-      if (gen) {
-        const expPatch = {
+      target.amount = 0;
+
+      const keep = [];
+      pays.forEach(p => {
+        const patch = {
           hotelId: target.id,
-          day: dayOfDate(checkIn),
-          date: checkIn,
+          day: dayOfDate(p.date),
+          date: p.date,
           category: 'stay',
-          title: name + '（' + nights(checkIn, checkOut) + ' 晚）',
-          amount: target.amount,
-          payerId: target.payerId,
-          participants: participants,
+          title: target.name + ' · ' + p.label,
+          payLabel: p.label,
+          amount: p.amount,
+          payerId: p.payerId,
+          participants: p.participants,
           note: target.note,
-          sync: true
+          sync: p.payerId === 'me'
         };
-        if (linked) Object.assign(linked, expPatch);
+        let exp = p.expId ? (t.expenses || []).find(e => e.id === p.expId) : null;
+        if (exp) Object.assign(exp, patch);
         else {
-          const exp = Object.assign({ id: uid('e') }, expPatch);
+          exp = Object.assign({ id: uid('e') }, patch);
           t.expenses.push(exp);
-          target.expenseId = exp.id;
         }
-        persist();
-        syncRecord(linked || t.expenses.find(e => e.id === target.expenseId));
-      } else if (linked) {
-        if (linked.recordId) dropRecord(linked.recordId);
-        t.expenses = t.expenses.filter(e => e.id !== linked.id);
-        target.expenseId = '';
-        persist();
-      } else {
-        persist();
-      }
+        keep.push(exp);
+      });
+      // 删掉本次编辑里被移除的付款（记账本转来的 mirror 账单不动）
+      ownPays.forEach(e => {
+        if (keep.indexOf(e) >= 0) return;
+        if (e.recordId) dropRecord(e.recordId);
+        t.expenses = t.expenses.filter(x => x.id !== e.id);
+      });
+      target.amount = yuan(hotelPaidCents(t, target));
+
+      persist();
+      keep.forEach(e => syncRecord(e));
       App.closeModal(); render();
       toast(editing ? '住宿已更新' : '住宿已添加', 'ok');
     };

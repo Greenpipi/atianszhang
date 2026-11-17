@@ -1698,3 +1698,87 @@
 
 
 
+
+/* ---------------- 住宿 · 多笔付款 ---------------- */
+.travel-modal .tv-payblock {
+  margin-top: 14px; padding: 12px;
+  border: 1px dashed rgba(58, 38, 40, .30);
+  border-radius: 13px;
+  background: #f8f0ea;
+}
+.travel-modal .tv-payblock-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+.travel-modal .tv-payblock-head b { font-size: 13px; font-weight: 600; color: var(--tm-ink); }
+.travel-modal .tv-payblock-head span { font-size: 10.5px; color: var(--tm-faint); }
+.travel-modal .tv-pay-mirror { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 9px; font-size: 10.5px; color: var(--tm-faint); }
+
+.travel-modal .tv-payrow {
+  padding: 9px 10px 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--tm-line);
+  border-radius: 11px;
+  background: #fffdf8;
+}
+.travel-modal .tv-payrow-head { display: flex; align-items: center; gap: 8px; }
+.travel-modal .tv-payrow-head select,
+.travel-modal .tv-payrow-head input,
+.travel-modal .tv-payrow-line select,
+.travel-modal .tv-payrow-line .cal-input {
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--tm-line);
+  border-radius: 8px;
+  background: #f8f0ea;
+  color: var(--tm-ink);
+  font-family: inherit;
+  font-size: 12px;
+}
+.travel-modal .tv-payrow-head select { flex: none; }
+.travel-modal .tv-pay-amt { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.travel-modal .tv-pay-amt input { width: 98px; text-align: right; font-family: "Fraunces", Georgia, serif; font-size: 13px; }
+.travel-modal .tv-pay-amt span { font-size: 10.5px; color: var(--tm-faint); }
+.travel-modal .tv-pay-del {
+  flex: none; width: 26px; height: 26px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--tm-faint); font-size: 12px; line-height: 1;
+}
+.travel-modal .tv-pay-del:hover { color: var(--tm-accent); border-color: var(--tm-line); background: #f8f0ea; }
+.travel-modal .tv-payrow-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.travel-modal .tv-pay-lab { flex: none; font-size: 10.5px; letter-spacing: .06em; color: var(--tm-faint); }
+.travel-modal .tv-pay-date { width: 118px; cursor: pointer; }
+
+.travel-modal .tv-seg {
+  display: inline-flex; padding: 2px; gap: 2px;
+  border: 1px solid var(--tm-line); border-radius: 999px;
+  background: #f8f0ea;
+}
+.travel-modal .tv-seg-opt {
+  padding: 4px 10px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--tm-soft);
+  font-family: inherit; font-size: 11px; cursor: pointer;
+  transition: background .18s, color .18s;
+}
+.travel-modal .tv-seg-opt.on { background: var(--tm-accent); color: #fff; }
+.travel-modal .tv-payrow-parts { margin-top: 8px; display: flex; align-items: flex-start; gap: 9px; }
+.travel-modal .tv-checks-sm { gap: 6px; margin-top: 0; }
+.travel-modal .tv-checks-sm .tv-check { padding: 3px 8px; }
+
+.travel-modal .tv-pay-add {
+  width: 100%; padding: 8px; margin-top: 2px;
+  border: 1px dashed rgba(58, 38, 40, .30); border-radius: 10px;
+  background: transparent; color: var(--tm-soft);
+  font-family: inherit; font-size: 12px; cursor: pointer;
+  transition: color .18s, border-color .18s;
+}
+.travel-modal .tv-pay-add:hover { color: var(--tm-accent); border-color: var(--tm-accent); }
+
+.travel-modal .tv-pay-sum {
+  margin-top: 10px; padding: 8px 10px;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  background: #fffdf8; border-radius: 10px;
+  font-size: 11px; color: var(--tm-soft);
+}
+.travel-modal .tv-pay-sum b { font-family: "Fraunces", Georgia, serif; font-size: 13px; font-weight: 600; color: var(--tm-ink); }
+.travel-modal .tv-pay-sum i { width: 1px; height: 11px; background: rgba(58, 38, 40, .30); display: inline-block; }
+.travel-modal .tv-pay-sum em { flex-basis: 100%; font-style: normal; font-size: 10.5px; color: var(--tm-accent); }
+.travel-modal .tv-pay-tip { margin: 7px 0 0; font-size: 10.5px; line-height: 1.6; color: var(--tm-faint); }
+#view-travel .tv-hotel-payers { font-size: 11px; color: var(--tm-soft); }
