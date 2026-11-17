@@ -555,18 +555,19 @@
     return CATS.map(c => ({ name: c.label, subs: [] }));
   }
 
-  /* 记账本大类名 → 旅行分类 id（用于图标 / 分类统计） */
+  /* 记账本大类 / 小类 → 旅行分类 id（用于图标 / 分类统计）
+     先看小类关键词再看大类：同一个「娱乐支出」下，酒店度假→住宿、景区景点→门票、内容消费→玩乐 */
   function travelCatId(catName, subName) {
+    const s = String(catName || '') + ' ' + String(subName || '');
+    if (/酒店|民宿|住宿|客栈|旅馆|青旅|房租/.test(s)) return 'stay';
+    if (/交通|打车|机票|高铁|火车|地铁|公交|油|停车|过路|租车|充电|车费/.test(s)) return 'transport';
+    if (/门票|景点|景区|演出|展览|游船/.test(s)) return 'ticket';
+    if (/食|餐|饮|咖啡|奶茶|外卖|零食|甜品/.test(s)) return 'food';
+    if (/娱乐|玩乐|电影|游戏|酒吧|ktv/i.test(s)) return 'fun';
+    if (/购物|日用|服饰|美妆|数码|文创/.test(s)) return 'shop';
     for (const id in RECORD_MAP) {
       if (RECORD_MAP[id][0] === catName) return id;
     }
-    const s = String(catName || '') + String(subName || '');
-    if (/食|餐|饮|咖啡|外卖/.test(s)) return 'food';
-    if (/住|酒店|民宿|房租/.test(s)) return 'stay';
-    if (/交通|车|油|打车|机票|地铁/.test(s)) return 'transport';
-    if (/门票|景点|景区/.test(s)) return 'ticket';
-    if (/娱乐|玩乐|电影|游戏/.test(s)) return 'fun';
-    if (/购物|日用|服饰|美妆/.test(s)) return 'shop';
     return 'other';
   }
 
