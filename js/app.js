@@ -4567,7 +4567,8 @@ const App = {
     const saveSingle = () => {
       const f = st.single;
       const amount = Math.round((parseFloat(f.amount) || 0) * 100) / 100;
-      if (!(amount > 0)) {
+      // 允许负数（理财 / 收入冲减等场景），只拦非法值和 0
+      if (!amount || !isFinite(amount)) {
         this.toast('请输入正确金额', 'err');
         $('lgAmt').focus();
         return false;
@@ -4656,7 +4657,7 @@ const App = {
         const r = st.rows[i];
         const price = parseFloat(r.price) || 0;
         if (!price && !String(r.title).trim()) continue;
-        if (!(price > 0)) {
+        if (!price || !isFinite(price)) {
           this.toast('第 ' + (i + 1) + ' 行还没有单价', 'err');
           return false;
         }
