@@ -4835,6 +4835,7 @@ const App = {
 
   renderRental() {
     const el = document.getElementById('view-rental');
+    if (this._hideRentalCatTip) this._hideRentalCatTip();
     const lid = this.state.currentLedgerId;
     const scope = this.state.rentalScope || 'month';   // month 本月 / year 本年 / all 总计
     const month = this.state.rentalMonth;
@@ -4889,11 +4890,13 @@ const App = {
 
     // 分类统计（按小类，范围口径）
     const bySub = {};
+    const subRecords = {};   // 每个小类下的账单，供悬停浮层展示
     scopeRecs.forEach(r => {
       const k = r.sub || '其他';
       bySub[k] = bySub[k] || { amount: 0, count: 0 };
       bySub[k].amount += Number(r.amount) || 0;
       bySub[k].count += 1;
+      (subRecords[k] = subRecords[k] || []).push(r);
     });
     const subRows = Object.keys(bySub).sort((a, b) => bySub[b].amount - bySub[a].amount);
     const subMax = Math.max(...subRows.map(k => bySub[k].amount), 1);
@@ -4949,18 +4952,21 @@ const App = {
       <div class="grid grid-2" style="margin-bottom:18px;align-items:stretch">
         <div class="card">
           <div class="card-head">
-            <div><div class="card-title">分类统计</div><div class="card-sub">${scopeDesc}各分类占比</div></div>
+            <div><div class="card-title">分类统计</div><div class="card-sub">${scopeDesc}各分类占比 · 悬停分类查看账单</div></div>
           </div>
           ${subRows.length ? `
-            <div class="rental-stat-grid">
-              <div class="chart-box" style="max-width:280px;margin:0 auto"><canvas id="rental-donut" height="240"></canvas></div>
-              <div class="mini-bars">
-                ${subRows.map(k => {
+            <div class="rental-stat-body">
+              <div class="rental-stat-donut"><canvas id="rental-donut" height="240"></canvas></div>
+              <div class="cat-chips" id="rental-cat-chips">
+                ${subRows.map((k, i) => {
                   const meta = RENTAL_META[k] || {};
                   return `
-                  <div class="mini-bar-row">
-                    <div class="mini-bar-top"><span>${meta.emoji || '•'} ${esc(k)} <span style="color:var(--muted)">×${bySub[k].count}</span></span><b>${fmtMoney(bySub[k].amount)}</b></div>
-                    <div class="mini-bar"><div class="mini-bar-fill" style="width:${Math.max(2, bySub[k].amount / subMax * 100)}%;background:${meta.color || 'var(--accent)'}"></div></div>
+                  <div class="cat-chip" data-si="${i}" tabindex="0">
+                    <div class="cat-chip-top">
+                      <span class="cat-chip-name"><i>${meta.emoji || '•'}</i><span>${esc(k)}</span></span>
+                      <b>${fmtMoney(bySub[k].amount)}</b>
+                    </div>
+                    <div class="cat-chip-bar"><span style="width:${Math.max(2, bySub[k].amount / subMax * 100)}%;background:${meta.color || 'var(--primary)'}"></span></div>
                   </div>`;
                 }).join('')}
               </div>
@@ -5014,6 +5020,74 @@ const App = {
 
     if (donutItems.length) Charts.donut(el.querySelector('#rental-donut'), donutItems, scopeName + '合计');
     Charts.line(el.querySelector('#rental-line'), trendLabels, [{ name: '出租屋支出', color: '#A5824C', data: trendData }]);
+    this.bindRentalCatHover(el, subRows.map(k => ({
+      key: k, recs: subRecords[k] || [], total: bySub[k].amount
+    })));
+  },
+
+  /* 出租屋分类统计：悬停/聚焦分类 → 浮动账单列表（名称 / 日期 / 金额 / 备注） */
+  bindRentalCatHover(root, groups) {
+    if (!groups.length) return;
+    let tip = this._rentalCatTip;
+    if (!tip) {
+      tip = this._rentalCatTip = document.createElement('div');
+      tip.className = 'cat-tip';
+      document.body.appendChild(tip);
+    }
+    let timer = 0;
+    const hide = () => { tip.style.visibility = 'hidden'; tip.style.opacity = '0'; };
+    this._hideRentalCatTip = hide;
+    tip.onmouseenter = () => clearTimeout(timer);
+    tip.onmouseleave = () => { timer = setTimeout(hide, 140); };
+
+    const show = (chip, g) => {
+      const recs = g.recs.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      tip.innerHTML = `
+        <div class="cat-tip-head">
+          <span>${(RENTAL_META[g.key] || {}).emoji || '•'} ${esc(g.key)}</span>
+          <em>${recs.length} 笔 · ${fmtMoney(g.total)}</em>
+        </div>
+        <div class="cat-tip-cols"><span>名称</span><span>日期</span><span>金额</span><span>备注</span></div>
+        <div class="cat-tip-list">
+          ${recs.map(r => `
+            <div class="cat-tip-row">
+              <span class="cat-tip-name">${esc(r.note || r.sub || '未命名')}</span>
+              <span class="cat-tip-date">${esc(String(r.date || '').replace(/-/g, '/'))}</span>
+              <span class="cat-tip-amt">${fmtMoney(r.amount)}</span>
+              <span class="cat-tip-note">${esc(r.remark || '—')}</span>
+            </div>`).join('')}
+        </div>`;
+      tip.style.visibility = 'hidden';
+      tip.style.opacity = '0';
+      // 先量尺寸再定位：优先贴在分类右侧，放不下翻到左侧，并夹在视口内
+      const cr = chip.getBoundingClientRect();
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let left = cr.right + 12;
+      if (left + tw > window.innerWidth - 12) left = cr.left - tw - 12;
+      if (left < 12) left = Math.max(12, Math.min(window.innerWidth - tw - 12, cr.left));
+      let top = cr.top + cr.height / 2 - th / 2;
+      top = Math.max(12, Math.min(top, window.innerHeight - th - 12));
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+      tip.style.visibility = 'visible';
+      tip.style.opacity = '1';
+    };
+
+    root.querySelectorAll('.cat-chip[data-si]').forEach(chip => {
+      const g = groups[Number(chip.dataset.si)];
+      if (!g) return;
+      chip.addEventListener('mouseenter', () => { clearTimeout(timer); show(chip, g); });
+      chip.addEventListener('mouseleave', () => { timer = setTimeout(hide, 180); });
+      chip.addEventListener('focus', () => show(chip, g));
+      chip.addEventListener('blur', hide);
+      chip.addEventListener('click', () => show(chip, g));
+    });
+
+    // 页面滚动时收起，避免浮层和分类错位
+    if (this._catTipScrollOff) this._catTipScrollOff();
+    const onScroll = () => hide();
+    window.addEventListener('scroll', onScroll, true);
+    this._catTipScrollOff = () => window.removeEventListener('scroll', onScroll, true);
   },
 
   /* ---------- 视图：预算设置（年度总控 + 关注类目月度规划） ---------- */

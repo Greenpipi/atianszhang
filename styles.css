@@ -1241,8 +1241,55 @@ button.sc-row{cursor:pointer}
   .scope-seg button{padding:7px 14px;font-size:13px}
   .scope-seg{border-radius:12px;padding:3px}
 }
-.rental-stat-grid{display:grid;grid-template-columns:280px 1fr;gap:22px;align-items:center}
-@media (max-width:860px){.rental-stat-grid{grid-template-columns:1fr}}
+/* 出租屋分类统计：多列紧凑排布，整块高度收在半屏内，超出的分类在内部滚动 */
+.rental-stat-body{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:20px;align-items:center}
+.rental-stat-donut{width:100%;max-width:200px;margin:0 auto}
+.rental-stat-donut canvas{width:100%;display:block}
+.cat-chips{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(156px,1fr));gap:2px 14px;
+  align-content:start;min-height:0;max-height:calc(50vh - 104px);
+  overflow-y:auto;overscroll-behavior:contain;padding-right:4px;
+  scrollbar-width:thin;scrollbar-color:#DED7CB transparent;
+}
+.cat-chips::-webkit-scrollbar{width:6px}
+.cat-chips::-webkit-scrollbar-thumb{background:#DED7CB;border-radius:999px}
+.cat-chip{padding:3px 8px 4px;border-radius:9px;cursor:default;min-width:0;transition:background .14s}
+.cat-chip:hover,.cat-chip:focus-visible{background:#F7F4EE;outline:none}
+.cat-chip-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.35}
+.cat-chip-name{display:flex;align-items:baseline;gap:4px;min-width:0;font-weight:600}
+.cat-chip-name i{flex:none;font-style:normal}
+.cat-chip-name>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-chip-top b{flex:none;font-size:12px;font-variant-numeric:tabular-nums}
+.cat-chip-bar{height:3px;border-radius:999px;background:#EFEAE2;margin-top:3px;overflow:hidden}
+.cat-chip-bar span{display:block;height:100%;border-radius:999px}
+@media (max-width:860px){
+  .rental-stat-body{grid-template-columns:1fr}
+  .rental-stat-donut{max-width:180px}
+  .cat-chips{max-height:none;overflow:visible;padding-right:0;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
+
+/* 分类悬停浮层：账单明细（名称 / 日期 / 金额 / 备注） */
+.cat-tip{
+  position:fixed;z-index:260;width:400px;max-width:calc(100vw - 24px);
+  background:#fff;border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 12px 34px rgba(64,60,52,.16);
+  padding:12px 14px;opacity:0;visibility:hidden;transition:opacity .12s;
+}
+.cat-tip-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;margin-bottom:8px}
+.cat-tip-head em{font-style:normal;font-size:11px;font-weight:500;color:var(--muted)}
+.cat-tip-cols,.cat-tip-row{display:grid;grid-template-columns:minmax(0,1.3fr) 58px 76px minmax(0,1.1fr);gap:10px;align-items:baseline}
+.cat-tip-cols{font-size:10.5px;color:var(--muted);padding-bottom:5px;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+.cat-tip-cols span:nth-child(3),.cat-tip-row .cat-tip-amt{text-align:right}
+.cat-tip-list{max-height:min(46vh,340px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#DED7CB transparent}
+.cat-tip-list::-webkit-scrollbar{width:6px}
+.cat-tip-list::-webkit-scrollbar-thumb{background:#DED7CB;border-radius:999px}
+.cat-tip-row{padding:6px 0;border-bottom:1px dashed var(--line-soft);font-size:12px}
+.cat-tip-row:last-child{border-bottom:0}
+.cat-tip-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-tip-date{color:var(--muted);font-variant-numeric:tabular-nums;font-size:10.5px;white-space:nowrap}
+.cat-tip-amt{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.cat-tip-note{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.cat-tip-empty{padding:14px 0;text-align:center;font-size:12px;color:var(--muted)}
 
 /* 手机端：周视图横向滚动，月/年视图网格收紧 */
 @media (max-width:860px){
